@@ -28,12 +28,12 @@ const els = {
   tooltip: document.querySelector("#tooltip")
 };
 
-function makeChoice(container, group, value, checked, color, code) {
+function makeChoice(container, group, value, checked, color, code, nextElection) {
   const wrap = document.createElement("div");
-  wrap.className = `choice ${group === "party" ? "party-choice" : ""}`;
+  wrap.className = `choice ${group === "party" ? "party-choice" : ""} ${group === "region" ? "region-choice" : ""}`;
   if (color) wrap.style.setProperty("--party-color", color);
   const id = `${group}-${value.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  const label = code ? `<strong class="region-code">${code}</strong><span>${value}</span>` : value;
+  const label = code ? `<span class="region-name"><strong class="region-code">${code}</strong><span>${value}</span></span><small class="next-election">Nächste Wahl: ${nextElection || "noch offen"}</small>` : value;
   wrap.innerHTML = `<input id="${id}" type="checkbox" name="${group}" value="${value}" ${checked ? "checked" : ""}><label for="${id}">${label}</label>`;
   container.append(wrap);
   return wrap.querySelector("input");
@@ -41,7 +41,7 @@ function makeChoice(container, group, value, checked, color, code) {
 
 function buildControls() {
   state.data.regions.forEach(region => {
-    const input = makeChoice(els.regions, "region", region, state.regions.has(region), null, REGION_CODES[region]);
+    const input = makeChoice(els.regions, "region", region, state.regions.has(region), null, REGION_CODES[region], state.data.nextElections?.[region]);
     input.addEventListener("change", () => {
       if (input.checked) state.regions.add(region); else state.regions.delete(region);
       if (!state.regions.size) {
@@ -134,7 +134,7 @@ function render() {
   if (!series.length || !parties.length) return;
 
   const compact = window.innerWidth < 700;
-  const slotWidth = compact ? 38 : 48;
+  const slotWidth = compact ? 48 : 60;
   const groupWidth = Math.max(compact ? 76 : 96, series.length * slotWidth + 30);
   const margin = { top: 62, right: 34, bottom: 142, left: 64 };
   const width = Math.max(els.scroll.clientWidth - 2, margin.left + margin.right + parties.length * groupWidth);
@@ -159,8 +159,8 @@ function render() {
     els.chart.append(label);
   }
 
-  const barGap = compact ? 8 : 12;
-  const barWidth = compact ? 28 : 34;
+  const barGap = compact ? 12 : 18;
+  const barWidth = compact ? 30 : 36;
   parties.forEach((party, partyIndex) => {
     const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
     const totalBars = series.length * barWidth + (series.length - 1) * barGap;
