@@ -10,7 +10,7 @@ const PARTY_META = {
   "Sonstige": { color: "var(--sonstige)", label: "Sonstige" }
 };
 
-const state = { data: null, region: "Bundestag", parties: new Set(Object.keys(PARTY_META)), selectedPolls: new Set() };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]) };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -25,15 +25,23 @@ function makeChoice(container, group, value, checked, color) {
   wrap.className = `choice ${group === "party" ? "party-choice" : ""}`;
   if (color) wrap.style.setProperty("--party-color", color);
   const id = `${group}-${value.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  wrap.innerHTML = `<input id="${id}" type="${group === "region" ? "radio" : "checkbox"}" name="${group}" value="${value}" ${checked ? "checked" : ""}><label for="${id}">${value}</label>`;
+  wrap.innerHTML = `<input id="${id}" type="checkbox" name="${group}" value="${value}" ${checked ? "checked" : ""}><label for="${id}">${value}</label>`;
   container.append(wrap);
   return wrap.querySelector("input");
 }
 
 function buildControls() {
   state.data.regions.forEach(region => {
-    const input = makeChoice(els.regions, "region", region, region === state.region);
-    input.addEventListener("change", () => { state.region = input.value; updatePollOptions(true); render(); });
+    const input = makeChoice(els.regions, "region", region, state.regions.has(region));
+    input.addEventListener("change", () => {
+      if (input.checked) state.regions.add(region); else state.regions.delete(region);
+      if (!state.regions.size) {
+        state.regions.add(region);
+        input.checked = true;
+      }
+      updatePollOptions(false);
+      render();
+    });
   });
   Object.entries(PARTY_META).forEach(([party, meta]) => {
     const input = makeChoice(els.parties, "party", party, true, meta.color);
@@ -49,31 +57,35 @@ function buildControls() {
     event.currentTarget.textContent = select ? "Alle abwählen" : "Alle auswählen";
     render();
   });
-  document.querySelector("#region-toggle").addEventListener("click", () => {
+  document.querySelector("#region-toggle").addEventListener("click", event => {
     const inputs = [...els.regions.querySelectorAll("input")];
-    const current = inputs.findIndex(input => input.checked);
-    inputs[(current + 1) % inputs.length].click();
+    const selectAll = state.regions.size !== state.data.regions.length;
+    state.regions = new Set(selectAll ? state.data.regions : ["Bundestag"]);
+    inputs.forEach(input => input.checked = state.regions.has(input.value));
+    event.currentTarget.textContent = selectAll ? "Nur Bundestag" : "Alle auswählen";
+    updatePollOptions(false);
+    render();
   });
 }
 
-function pollKey(poll) { return `${poll.date}|${poll.institute}|${JSON.stringify(poll.values)}`; }
-
 function updatePollOptions(reset = false) {
-  const recent = (state.data.polls[state.region] || []).slice(0, 3);
-  if (reset || !state.selectedPolls.size) state.selectedPolls = new Set(recent.length ? [pollKey(recent[0])] : []);
+  if (reset || !state.selectedPollRanks.size) state.selectedPollRanks = new Set([0]);
   els.polls.replaceChildren();
-  recent.forEach((poll, index) => {
-    const key = pollKey(poll);
+  const singleRegion = state.regions.size === 1 ? [...state.regions][0] : null;
+  const recent = singleRegion ? (state.data.polls[singleRegion] || []).slice(0, 3) : [];
+  [0, 1, 2].forEach(index => {
+    const poll = recent[index];
     const wrap = document.createElement("div");
     wrap.className = "choice poll-choice";
     wrap.style.setProperty("--poll-opacity", [1, .62, .34][index]);
     const id = `poll-${index}`;
-    wrap.innerHTML = `<input id="${id}" type="checkbox" value="${index}" ${state.selectedPolls.has(key) ? "checked" : ""}><label for="${id}"><span><strong>${index === 0 ? "Neueste" : `${index + 1}. jüngste`}</strong><small>${poll.institute} · ${formatDate(poll.date)}</small></span></label>`;
+    const detail = poll ? `${poll.institute} · ${formatDate(poll.date)}` : `für jedes ausgewählte Parlament`;
+    wrap.innerHTML = `<input id="${id}" type="checkbox" value="${index}" ${state.selectedPollRanks.has(index) ? "checked" : ""}><label for="${id}"><span><strong>${index === 0 ? "Neueste" : `${index + 1}. jüngste`}</strong><small>${detail}</small></span></label>`;
     const input = wrap.querySelector("input");
     input.addEventListener("change", () => {
-      if (input.checked) state.selectedPolls.add(key); else state.selectedPolls.delete(key);
-      if (!state.selectedPolls.size) {
-        state.selectedPolls.add(key);
+      if (input.checked) state.selectedPollRanks.add(index); else state.selectedPollRanks.delete(index);
+      if (!state.selectedPollRanks.size) {
+        state.selectedPollRanks.add(index);
         input.checked = true;
       }
       render();
@@ -89,26 +101,30 @@ function svgEl(name, attrs = {}) {
 }
 
 function render() {
-  const all = state.data.polls[state.region] || [];
-  const polls = all.slice(0, 3).filter(poll => state.selectedPolls.has(pollKey(poll)));
+  const selectedRegions = state.data.regions.filter(region => state.regions.has(region));
+  const series = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+    const poll = (state.data.polls[region] || [])[rank];
+    return poll ? { region, rank, poll } : null;
+  }).filter(Boolean));
   const parties = Object.keys(PARTY_META).filter(p => state.parties.has(p));
-  els.title.textContent = state.region;
-  els.kicker.textContent = state.region === "Bundestag" ? "Bundestagswahl" : "Landtagswahl";
-  els.meta.textContent = polls.length === 1 ? `${polls[0].institute} · ${formatDate(polls[0].date)}` : `${polls.length} jüngste Umfragen im Vergleich`;
-  els.description.textContent = `Nach Parteien gruppiertes Balkendiagramm mit ${polls.length} ausgewählten Umfragen für ${state.region}.`;
+  const oneRegion = selectedRegions.length === 1;
+  els.title.textContent = oneRegion ? selectedRegions[0] : `${selectedRegions.length} Parlamente im Vergleich`;
+  els.kicker.textContent = oneRegion ? (selectedRegions[0] === "Bundestag" ? "Bundestagswahl" : "Landtagswahl") : "Bund & Länder";
+  els.meta.textContent = series.length === 1 ? `${series[0].poll.institute} · ${formatDate(series[0].poll.date)}` : `${series.length} Umfragen aus ${selectedRegions.length} Parlamenten`;
+  els.description.textContent = `Nach Parteien gruppiertes Balkendiagramm mit ${series.length} Umfragen aus ${selectedRegions.length} Parlamenten.`;
   els.chart.replaceChildren();
-  els.empty.hidden = Boolean(polls.length && parties.length);
-  els.scroll.hidden = !polls.length || !parties.length;
-  if (!polls.length || !parties.length) return;
+  els.empty.hidden = Boolean(series.length && parties.length);
+  els.scroll.hidden = !series.length || !parties.length;
+  if (!series.length || !parties.length) return;
 
   const compact = window.innerWidth < 700;
-  const groupWidth = Math.max(compact ? 58 : 76, polls.length * (compact ? 12 : 16) + 28);
+  const groupWidth = Math.max(compact ? 58 : 76, series.length * (compact ? 10 : 13) + 30);
   const margin = { top: 28, right: 24, bottom: 118, left: 50 };
   const width = Math.max(els.scroll.clientWidth - 2, margin.left + margin.right + parties.length * groupWidth);
   const height = compact ? 480 : 560;
   const innerH = height - margin.top - margin.bottom;
   const chartW = width - margin.left - margin.right;
-  const maxValue = Math.max(50, ...polls.flatMap(p => parties.map(party => p.values[party] || 0)));
+  const maxValue = Math.max(50, ...series.flatMap(item => parties.map(party => item.poll.values[party] || 0)));
   const yMax = Math.ceil(maxValue / 10) * 10;
   els.chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
   els.chart.setAttribute("width", width);
@@ -123,16 +139,16 @@ function render() {
   }
 
   const barGap = 2;
-  const barWidth = Math.max(7, Math.min(18, (groupWidth - 20) / polls.length - barGap));
+  const barWidth = Math.max(5, Math.min(18, (groupWidth - 20) / series.length - barGap));
   parties.forEach((party, partyIndex) => {
     const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
-    const totalBars = polls.length * barWidth + (polls.length - 1) * barGap;
+    const totalBars = series.length * barWidth + (series.length - 1) * barGap;
     const startX = center - totalBars / 2;
-    polls.forEach((poll, pollIndex) => {
-      const value = Number(poll.values[party] || 0);
+    series.forEach((item, seriesIndex) => {
+      const value = Number(item.poll.values[party] || 0);
       const h = (value / yMax) * innerH;
-      const bar = svgEl("rect", { x: startX + pollIndex * (barWidth + barGap), y: margin.top + innerH - h, width: barWidth, height: h, fill: PARTY_META[party].color, opacity: [1, .62, .34][all.indexOf(poll)], class: "bar", rx: 1 });
-      bar.addEventListener("pointermove", event => showTooltip(event, poll, party, value));
+      const bar = svgEl("rect", { x: startX + seriesIndex * (barWidth + barGap), y: margin.top + innerH - h, width: barWidth, height: h, fill: PARTY_META[party].color, opacity: [1, .62, .34][item.rank], class: "bar", rx: 1 });
+      bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, party, value));
       bar.addEventListener("pointerleave", hideTooltip);
       els.chart.append(bar);
     });
@@ -142,8 +158,8 @@ function render() {
   });
 }
 
-function showTooltip(event, poll, party, value) {
-  els.tooltip.innerHTML = `<strong>${party}: ${String(value).replace(".", ",")} %</strong><br>${poll.institute}<br>${formatDate(poll.date)}${poll.client ? `<br>${poll.client}` : ""}`;
+function showTooltip(event, region, poll, party, value) {
+  els.tooltip.innerHTML = `<strong>${region}</strong><br>${party}: ${String(value).replace(".", ",")} %<br>${poll.institute} · ${formatDate(poll.date)}${poll.client ? `<br>${poll.client}` : ""}`;
   els.tooltip.hidden = false;
   const left = Math.min(window.innerWidth - 280, event.clientX + 14);
   els.tooltip.style.left = `${Math.max(8, left)}px`;
