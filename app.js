@@ -10,6 +10,14 @@ const PARTY_META = {
   "Sonstige": { color: "var(--sonstige)", label: "Sonstige" }
 };
 
+const REGION_CODES = {
+  "Bundestag": "BUND", "Baden-Württemberg": "BW", "Bayern": "BY", "Berlin": "BE",
+  "Brandenburg": "BB", "Bremen": "HB", "Hamburg": "HH", "Hessen": "HE",
+  "Mecklenburg-Vorpommern": "MV", "Niedersachsen": "NI", "Nordrhein-Westfalen": "NW",
+  "Rheinland-Pfalz": "RP", "Saarland": "SL", "Sachsen": "SN", "Sachsen-Anhalt": "ST",
+  "Schleswig-Holstein": "SH", "Thüringen": "TH"
+};
+
 const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]) };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
@@ -20,19 +28,20 @@ const els = {
   tooltip: document.querySelector("#tooltip")
 };
 
-function makeChoice(container, group, value, checked, color) {
+function makeChoice(container, group, value, checked, color, code) {
   const wrap = document.createElement("div");
   wrap.className = `choice ${group === "party" ? "party-choice" : ""}`;
   if (color) wrap.style.setProperty("--party-color", color);
   const id = `${group}-${value.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  wrap.innerHTML = `<input id="${id}" type="checkbox" name="${group}" value="${value}" ${checked ? "checked" : ""}><label for="${id}">${value}</label>`;
+  const label = code ? `<strong class="region-code">${code}</strong><span>${value}</span>` : value;
+  wrap.innerHTML = `<input id="${id}" type="checkbox" name="${group}" value="${value}" ${checked ? "checked" : ""}><label for="${id}">${label}</label>`;
   container.append(wrap);
   return wrap.querySelector("input");
 }
 
 function buildControls() {
   state.data.regions.forEach(region => {
-    const input = makeChoice(els.regions, "region", region, state.regions.has(region));
+    const input = makeChoice(els.regions, "region", region, state.regions.has(region), null, REGION_CODES[region]);
     input.addEventListener("change", () => {
       if (input.checked) state.regions.add(region); else state.regions.delete(region);
       if (!state.regions.size) {
@@ -175,8 +184,11 @@ function render() {
       const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
       deltaLabel.textContent = isNew ? `${formatPercent(delta, true)} NEW` : formatPercent(delta, true);
       els.chart.append(deltaLabel);
+      const regionLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 43, "text-anchor": "middle", class: "region-label" });
+      regionLabel.textContent = REGION_CODES[item.region] || item.region;
+      els.chart.append(regionLabel);
     });
-    const label = svgEl("text", { x: center, y: height - margin.bottom + 52, "text-anchor": "middle", class: "poll-label" });
+    const label = svgEl("text", { x: center, y: height - margin.bottom + 76, "text-anchor": "middle", class: "poll-label" });
     label.textContent = party;
     els.chart.append(label);
   });
