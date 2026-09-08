@@ -10,11 +10,10 @@ const PARTY_META = {
   "Sonstige": { color: "var(--sonstige)", label: "Sonstige" }
 };
 
-const state = { data: null, region: "Bundestag", parties: new Set(Object.keys(PARTY_META)), count: 20 };
+const state = { data: null, region: "Bundestag", parties: new Set(Object.keys(PARTY_META)), selectedPolls: new Set() };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
-  parties: document.querySelector("#party-options"), count: document.querySelector("#poll-count"),
-  countValue: document.querySelector("#poll-count-value"), chart: document.querySelector("#chart"),
+  parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   kicker: document.querySelector("#chart-kicker"), meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
@@ -34,7 +33,7 @@ function makeChoice(container, group, value, checked, color) {
 function buildControls() {
   state.data.regions.forEach(region => {
     const input = makeChoice(els.regions, "region", region, region === state.region);
-    input.addEventListener("change", () => { state.region = input.value; render(); });
+    input.addEventListener("change", () => { state.region = input.value; updatePollOptions(true); render(); });
   });
   Object.entries(PARTY_META).forEach(([party, meta]) => {
     const input = makeChoice(els.parties, "party", party, true, meta.color);
@@ -43,7 +42,6 @@ function buildControls() {
       render();
     });
   });
-  els.count.addEventListener("input", () => { state.count = Number(els.count.value); els.countValue.value = state.count; render(); });
   document.querySelector("#party-toggle").addEventListener("click", event => {
     const select = state.parties.size !== Object.keys(PARTY_META).length;
     state.parties = new Set(select ? Object.keys(PARTY_META) : []);
@@ -58,6 +56,32 @@ function buildControls() {
   });
 }
 
+function pollKey(poll) { return `${poll.date}|${poll.institute}|${JSON.stringify(poll.values)}`; }
+
+function updatePollOptions(reset = false) {
+  const recent = (state.data.polls[state.region] || []).slice(0, 3);
+  if (reset || !state.selectedPolls.size) state.selectedPolls = new Set(recent.length ? [pollKey(recent[0])] : []);
+  els.polls.replaceChildren();
+  recent.forEach((poll, index) => {
+    const key = pollKey(poll);
+    const wrap = document.createElement("div");
+    wrap.className = "choice poll-choice";
+    wrap.style.setProperty("--poll-opacity", [1, .62, .34][index]);
+    const id = `poll-${index}`;
+    wrap.innerHTML = `<input id="${id}" type="checkbox" value="${index}" ${state.selectedPolls.has(key) ? "checked" : ""}><label for="${id}"><span><strong>${index === 0 ? "Neueste" : `${index + 1}. jüngste`}</strong><small>${poll.institute} · ${formatDate(poll.date)}</small></span></label>`;
+    const input = wrap.querySelector("input");
+    input.addEventListener("change", () => {
+      if (input.checked) state.selectedPolls.add(key); else state.selectedPolls.delete(key);
+      if (!state.selectedPolls.size) {
+        state.selectedPolls.add(key);
+        input.checked = true;
+      }
+      render();
+    });
+    els.polls.append(wrap);
+  });
+}
+
 function svgEl(name, attrs = {}) {
   const el = document.createElementNS("http://www.w3.org/2000/svg", name);
   Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
@@ -66,21 +90,21 @@ function svgEl(name, attrs = {}) {
 
 function render() {
   const all = state.data.polls[state.region] || [];
-  const polls = all.slice(0, state.count).reverse();
+  const polls = all.slice(0, 3).filter(poll => state.selectedPolls.has(pollKey(poll)));
   const parties = Object.keys(PARTY_META).filter(p => state.parties.has(p));
   els.title.textContent = state.region;
   els.kicker.textContent = state.region === "Bundestag" ? "Bundestagswahl" : "Landtagswahl";
-  els.meta.textContent = `${polls.length} von ${all.length} verfügbaren Umfragen`;
-  els.description.textContent = `Gruppiertes Balkendiagramm mit ${polls.length} Umfragen für ${state.region}.`;
+  els.meta.textContent = polls.length === 1 ? `${polls[0].institute} · ${formatDate(polls[0].date)}` : `${polls.length} jüngste Umfragen im Vergleich`;
+  els.description.textContent = `Nach Parteien gruppiertes Balkendiagramm mit ${polls.length} ausgewählten Umfragen für ${state.region}.`;
   els.chart.replaceChildren();
   els.empty.hidden = Boolean(polls.length && parties.length);
   els.scroll.hidden = !polls.length || !parties.length;
   if (!polls.length || !parties.length) return;
 
   const compact = window.innerWidth < 700;
-  const groupWidth = Math.max(compact ? 76 : 92, parties.length * (compact ? 9 : 12) + 26);
+  const groupWidth = Math.max(compact ? 58 : 76, polls.length * (compact ? 12 : 16) + 28);
   const margin = { top: 28, right: 24, bottom: 118, left: 50 };
-  const width = Math.max(els.scroll.clientWidth - 2, margin.left + margin.right + polls.length * groupWidth);
+  const width = Math.max(els.scroll.clientWidth - 2, margin.left + margin.right + parties.length * groupWidth);
   const height = compact ? 480 : 560;
   const innerH = height - margin.top - margin.bottom;
   const chartW = width - margin.left - margin.right;
@@ -99,21 +123,21 @@ function render() {
   }
 
   const barGap = 2;
-  const barWidth = Math.max(5, Math.min(14, (groupWidth - 20) / parties.length - barGap));
-  polls.forEach((poll, pollIndex) => {
-    const center = margin.left + pollIndex * groupWidth + groupWidth / 2;
-    const totalBars = parties.length * barWidth + (parties.length - 1) * barGap;
+  const barWidth = Math.max(7, Math.min(18, (groupWidth - 20) / polls.length - barGap));
+  parties.forEach((party, partyIndex) => {
+    const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
+    const totalBars = polls.length * barWidth + (polls.length - 1) * barGap;
     const startX = center - totalBars / 2;
-    parties.forEach((party, partyIndex) => {
+    polls.forEach((poll, pollIndex) => {
       const value = Number(poll.values[party] || 0);
       const h = (value / yMax) * innerH;
-      const bar = svgEl("rect", { x: startX + partyIndex * (barWidth + barGap), y: margin.top + innerH - h, width: barWidth, height: h, fill: PARTY_META[party].color, class: "bar", rx: 1 });
+      const bar = svgEl("rect", { x: startX + pollIndex * (barWidth + barGap), y: margin.top + innerH - h, width: barWidth, height: h, fill: PARTY_META[party].color, opacity: [1, .62, .34][all.indexOf(poll)], class: "bar", rx: 1 });
       bar.addEventListener("pointermove", event => showTooltip(event, poll, party, value));
       bar.addEventListener("pointerleave", hideTooltip);
       els.chart.append(bar);
     });
-    const label = svgEl("text", { x: center, y: height - margin.bottom + 16, "text-anchor": "end", transform: `rotate(-55 ${center} ${height - margin.bottom + 16})`, class: "poll-label" });
-    label.textContent = `${formatDate(poll.date)} · ${poll.institute}`;
+    const label = svgEl("text", { x: center, y: height - margin.bottom + 23, "text-anchor": "middle", class: "poll-label" });
+    label.textContent = party;
     els.chart.append(label);
   });
 }
@@ -138,6 +162,7 @@ fetch("data/polls.json", { cache: "no-store" })
     state.data = data;
     els.updated.textContent = formatDate(data.updated);
     buildControls();
+    updatePollOptions(true);
     render();
     window.addEventListener("resize", render);
   })

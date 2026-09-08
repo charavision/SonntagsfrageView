@@ -41,10 +41,14 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .choice input:checked + label { border-color: var(--ink); background: var(--ink); color: white; }
 .party-choice label::before { width: 10px; height: 10px; margin-right: 7px; background: var(--party-color); content: ""; }
 .party-choice input:checked + label { border-color: var(--party-color); background: color-mix(in srgb, var(--party-color) 15%, white); color: var(--ink); }
-.range-row { display: grid; grid-template-columns: auto 52px minmax(180px, 1fr); align-items: center; gap: 14px; margin-top: 28px; }
-.range-row label { font-size: 14px; font-weight: 750; }
-.range-row output { text-align: right; font-variant-numeric: tabular-nums; font-weight: 800; }
-input[type="range"] { width: 100%; accent-color: var(--accent); }
+.poll-picker { margin-top: 24px; }
+.poll-picker .control-heading span { color: var(--muted); font-size: 12px; }
+.poll-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.poll-choice label { align-items: flex-start; gap: 9px; min-height: 60px; }
+.poll-choice label::before { flex: 0 0 auto; width: 8px; height: 32px; margin-top: 1px; background: var(--ink); content: ""; opacity: var(--poll-opacity); }
+.poll-choice label span { display: block; }
+.poll-choice label small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.poll-choice input:checked + label { border-color: var(--ink); background: var(--surface); color: var(--ink); }
 .chart-section { padding: 34px 0 20px; }
 .chart-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 18px; }
 .chart-heading h2 { font-family: Georgia, serif; font-size: clamp(28px, 4vw, 46px); font-weight: 500; }
@@ -65,7 +69,6 @@ footer a { color: inherit; }
   main { padding: 18px; }
   .hero, .chart-heading { align-items: flex-start; flex-direction: column; }
   .status, .chart-meta { text-align: left; }
-  .range-row { grid-template-columns: 1fr 50px; }
-  .range-row input { grid-column: 1 / -1; }
+  .poll-options { grid-template-columns: 1fr; }
   #chart { min-height: 480px; }
 }

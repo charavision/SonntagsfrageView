@@ -6,8 +6,9 @@ Interaktive GitHub-Pages-Seite für aktuelle Bundestags- und Landtagsumfragen. D
 
 - Bundestag und alle 16 Landesparlamente
 - neun auswählbare Kategorien: CDU/CSU, SPD, GRÜNE, FDP, LINKE, AfD, BSW, FW und Sonstige
-- 1 bis 160 Umfragen im gruppierten Balkendiagramm
-- horizontal wachsende Darstellung für lange Zeitreihen
+- standardmäßig nur die jeweils aktuellste Umfrage
+- optionaler Vergleich der drei jüngsten Umfragen
+- Gruppierung nach Partei, sodass die Werte verschiedener Institute direkt nebeneinanderstehen
 - responsive Bedienung und Detailwerte per Maus oder Touch
 
 ## Veröffentlichung

@@ -13,7 +13,7 @@
       <div>
         <p class="eyebrow">Bund & Länder</p>
         <h1>Sonntagsfragen</h1>
-        <p class="intro">Umfragewerte im Zeitverlauf – von der jüngsten Erhebung bis zu 160 Umfragen zurück.</p>
+        <p class="intro">Die jeweils aktuellste Sonntagsfrage – auf Wunsch im Vergleich mit den drei jüngsten Umfragen.</p>
       </div>
       <div class="status" aria-live="polite">
         <span>Stand</span>
@@ -38,10 +38,12 @@
         <div id="party-options" class="party-options"></div>
       </div>
 
-      <div class="range-row">
-        <label for="poll-count">Angezeigte Umfragen</label>
-        <output id="poll-count-value" for="poll-count">20</output>
-        <input id="poll-count" type="range" min="1" max="160" value="20" step="1">
+      <div class="control-group poll-picker">
+        <div class="control-heading">
+          <h2>Umfragen vergleichen</h2>
+          <span>maximal die letzten drei</span>
+        </div>
+        <div id="poll-options" class="poll-options"></div>
       </div>
     </section>
 
