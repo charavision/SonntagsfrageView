@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
+  <title>Sonntagsfragen – Bund & Länder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Bund & Länder</p>
+        <h1>Sonntagsfragen</h1>
+        <p class="intro">Umfragewerte im Zeitverlauf – von der jüngsten Erhebung bis zu 160 Umfragen zurück.</p>
+      </div>
+      <div class="status" aria-live="polite">
+        <span>Stand</span>
+        <strong id="updated">wird geladen …</strong>
+      </div>
+    </header>
+
+    <section class="controls" aria-label="Auswahl">
+      <div class="control-group regions">
+        <div class="control-heading">
+          <h2>Parlament</h2>
+          <button id="region-toggle" class="text-button" type="button">Alle anzeigen</button>
+        </div>
+        <div id="region-options" class="option-grid"></div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-heading">
+          <h2>Parteien</h2>
+          <button id="party-toggle" class="text-button" type="button">Alle abwählen</button>
+        </div>
+        <div id="party-options" class="party-options"></div>
+      </div>
+
+      <div class="range-row">
+        <label for="poll-count">Angezeigte Umfragen</label>
+        <output id="poll-count-value" for="poll-count">20</output>
+        <input id="poll-count" type="range" min="1" max="160" value="20" step="1">
+      </div>
+    </section>
+
+    <section class="chart-section" aria-labelledby="chart-title">
+      <div class="chart-heading">
+        <div>
+          <p id="chart-kicker" class="eyebrow"></p>
+          <h2 id="chart-title">Umfrageverlauf</h2>
+        </div>
+        <p id="chart-meta" class="chart-meta"></p>
+      </div>
+      <div id="chart-scroll" class="chart-scroll">
+        <svg id="chart" role="img" aria-labelledby="chart-title chart-description"></svg>
+      </div>
+      <p id="chart-description" class="sr-only"></p>
+      <div id="empty-state" class="empty-state" hidden>Für diese Auswahl sind noch keine Daten verfügbar.</div>
+    </section>
+
+    <footer>
+      <p>Daten: <a href="https://www.wahlrecht.de/umfragen/" target="_blank" rel="noreferrer">Wahlrecht.de</a>. Die Werte werden automatisiert übernommen; maßgeblich ist die Originalquelle.</p>
+    </footer>
+  </main>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
