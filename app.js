@@ -100,6 +100,13 @@ function svgEl(name, attrs = {}) {
   return el;
 }
 
+function formatPercent(value, signed = false) {
+  const absolute = Math.abs(Number(value)).toFixed(1).replace(".", ",");
+  if (!signed) return `${absolute} %`;
+  if (Math.abs(value) < .05) return "±0,0";
+  return `${value > 0 ? "+" : "−"}${absolute}`;
+}
+
 function render() {
   const selectedRegions = state.data.regions.filter(region => state.regions.has(region));
   const series = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
@@ -118,8 +125,9 @@ function render() {
   if (!series.length || !parties.length) return;
 
   const compact = window.innerWidth < 700;
-  const groupWidth = Math.max(compact ? 58 : 76, series.length * (compact ? 10 : 13) + 30);
-  const margin = { top: 28, right: 24, bottom: 118, left: 50 };
+  const slotWidth = compact ? 38 : 48;
+  const groupWidth = Math.max(compact ? 76 : 96, series.length * slotWidth + 30);
+  const margin = { top: 62, right: 34, bottom: 142, left: 64 };
   const width = Math.max(els.scroll.clientWidth - 2, margin.left + margin.right + parties.length * groupWidth);
   const height = compact ? 480 : 560;
   const innerH = height - margin.top - margin.bottom;
@@ -130,6 +138,10 @@ function render() {
   els.chart.setAttribute("width", width);
   els.chart.setAttribute("height", height);
 
+  const defs = svgEl("defs");
+  defs.innerHTML = `<filter id="bar-glow" x="-80%" y="-30%" width="260%" height="180%"><feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  els.chart.append(defs);
+
   for (let tick = 0; tick <= yMax; tick += 10) {
     const y = margin.top + innerH - (tick / yMax) * innerH;
     els.chart.append(svgEl("line", { x1: margin.left, x2: width - margin.right, y1: y, y2: y, class: "grid-line" }));
@@ -138,21 +150,33 @@ function render() {
     els.chart.append(label);
   }
 
-  const barGap = 2;
-  const barWidth = Math.max(5, Math.min(18, (groupWidth - 20) / series.length - barGap));
+  const barGap = compact ? 8 : 12;
+  const barWidth = compact ? 28 : 34;
   parties.forEach((party, partyIndex) => {
     const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
     const totalBars = series.length * barWidth + (series.length - 1) * barGap;
     const startX = center - totalBars / 2;
     series.forEach((item, seriesIndex) => {
       const value = Number(item.poll.values[party] || 0);
+      const election = state.data.elections?.[item.region];
+      const baseline = Number(election?.values?.[party] || 0);
+      const delta = value - baseline;
+      const isNew = !election?.represented?.includes(party) && value >= 5 && party !== "Sonstige";
       const h = (value / yMax) * innerH;
-      const bar = svgEl("rect", { x: startX + seriesIndex * (barWidth + barGap), y: margin.top + innerH - h, width: barWidth, height: h, fill: PARTY_META[party].color, opacity: [1, .62, .34][item.rank], class: "bar", rx: 1 });
+      const x = startX + seriesIndex * (barWidth + barGap);
+      const y = margin.top + innerH - h;
+      const bar = svgEl("rect", { x, y, width: barWidth, height: h, fill: PARTY_META[party].color, opacity: [1, .72, .46][item.rank], class: "bar", rx: 3 });
       bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, party, value));
       bar.addEventListener("pointerleave", hideTooltip);
       els.chart.append(bar);
+      const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
+      valueLabel.textContent = formatPercent(value);
+      els.chart.append(valueLabel);
+      const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
+      deltaLabel.textContent = isNew ? `${formatPercent(delta, true)} NEW` : formatPercent(delta, true);
+      els.chart.append(deltaLabel);
     });
-    const label = svgEl("text", { x: center, y: height - margin.bottom + 23, "text-anchor": "middle", class: "poll-label" });
+    const label = svgEl("text", { x: center, y: height - margin.bottom + 52, "text-anchor": "middle", class: "poll-label" });
     label.textContent = party;
     els.chart.append(label);
   });
@@ -175,6 +199,9 @@ fetch("data/polls.json", { cache: "no-store" })
       date: row[0], institute: row[1], client: row[2],
       values: Object.fromEntries(data.parties.map((party, index) => [party, row[3][index] || 0]))
     }))]));
+    data.elections = Object.fromEntries(Object.entries(data.elections || {}).map(([region, row]) => [region, {
+      date: row[0], values: Object.fromEntries(data.parties.map((party, index) => [party, row[1][index] || 0])), represented: row[2] || []
+    }]));
     state.data = data;
     els.updated.textContent = formatDate(data.updated);
     buildControls();
