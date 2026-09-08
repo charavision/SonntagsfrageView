@@ -61,6 +61,17 @@ def iso_date(text: str) -> str | None:
     except ValueError:
         return None
 
+def election_label_date(text: str) -> str | None:
+    numeric = iso_date(text)
+    if numeric:
+        return numeric
+    months = {"januar": 1, "februar": 2, "märz": 3, "april": 4, "mai": 5, "juni": 6,
+              "juli": 7, "august": 8, "september": 9, "oktober": 10, "november": 11, "dezember": 12}
+    match = re.search(r"(\d{1,2})\.\s*([A-Za-zÄÖÜäöüß]+)\s+(\d{4})", clean(text))
+    if not match or match.group(2).lower() not in months:
+        return None
+    return date(int(match.group(3)), months[match.group(2).lower()], int(match.group(1))).isoformat()
+
 def normalize_party(text: str) -> str | None:
     key = re.sub(r"\s*/\s*", "/", clean(text)).upper().replace("Ü", "UE")
     for candidate, normalized in ALIASES.items():
@@ -163,6 +174,28 @@ def discover_state_urls() -> dict[str, str]:
         found.setdefault(name, urljoin(LAND_INDEX, f"{slug}.htm"))
     return found
 
+def extract_next_elections() -> dict[str, str]:
+    soup = fetch(LAND_INDEX)
+    elections = {"Bundestag": "Termin noch offen (voraussichtlich 2029)"}
+    table = soup.select_one("table.wilko")
+    if not table:
+        return elections
+    for row in table.select("tbody tr"):
+        cells = row.find_all(["th", "td"], recursive=False)
+        if len(cells) < 2:
+            continue
+        link = cells[0].select_one("a[href]")
+        slug = Path(link.get("href", "")).stem if link else ""
+        region = STATE_NAMES.get(slug, clean(cells[0].get_text(" ", strip=True)))
+        if region not in STATE_NAMES.values():
+            continue
+        label = clean(cells[1].get_text(" ", strip=True))
+        election_date = election_label_date(label)
+        if election_date and election_date <= date.today().isoformat():
+            label = f"voraussichtlich {int(election_date[:4]) + 5}"
+        elections[region] = label
+    return elections
+
 def extract_bundestag() -> list[dict]:
     soup = fetch(BASE)
     links = []
@@ -212,7 +245,7 @@ def main() -> None:
         ]
         for region in regions
     }
-    payload = {"updated": date.today().isoformat(), "regions": regions, "parties": PARTIES, "polls": compact_polls, "elections": compact_elections}
+    payload = {"updated": date.today().isoformat(), "regions": regions, "parties": PARTIES, "polls": compact_polls, "elections": compact_elections, "nextElections": extract_next_elections()}
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     total = sum(len(v) for v in polls.values())
