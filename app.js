@@ -117,12 +117,12 @@ function formatPercent(value, signed = false) {
 }
 
 function render() {
-  const selectedRegions = state.data.regions.filter(region => state.regions.has(region));
+  const selectedRegions = [...state.regions];
   const series = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
     const poll = (state.data.polls[region] || [])[rank];
     return poll ? { region, rank, poll } : null;
   }).filter(Boolean));
-  const parties = Object.keys(PARTY_META).filter(p => state.parties.has(p));
+  const parties = [...state.parties];
   const oneRegion = selectedRegions.length === 1;
   els.title.textContent = oneRegion ? selectedRegions[0] : `${selectedRegions.length} Parlamente im Vergleich`;
   els.kicker.textContent = oneRegion ? (selectedRegions[0] === "Bundestag" ? "Bundestagswahl" : "Landtagswahl") : "Bund & Länder";
@@ -182,13 +182,20 @@ function render() {
       valueLabel.textContent = formatPercent(value);
       els.chart.append(valueLabel);
       const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
-      deltaLabel.textContent = isNew ? `${formatPercent(delta, true)} NEW` : formatPercent(delta, true);
+      const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
+      deltaLine.textContent = formatPercent(delta, true);
+      deltaLabel.append(deltaLine);
+      if (isNew) {
+        const newLine = svgEl("tspan", { x: x + barWidth / 2, dy: 13, class: "new-label" });
+        newLine.textContent = "NEW";
+        deltaLabel.append(newLine);
+      }
       els.chart.append(deltaLabel);
-      const regionLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 43, "text-anchor": "middle", class: "region-label" });
+      const regionLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 51, "text-anchor": "middle", class: "region-label" });
       regionLabel.textContent = REGION_CODES[item.region] || item.region;
       els.chart.append(regionLabel);
     });
-    const label = svgEl("text", { x: center, y: height - margin.bottom + 76, "text-anchor": "middle", class: "poll-label" });
+    const label = svgEl("text", { x: center, y: height - margin.bottom + 82, "text-anchor": "middle", class: "poll-label" });
     label.textContent = party;
     els.chart.append(label);
   });
