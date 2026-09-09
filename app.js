@@ -213,6 +213,7 @@ function render(animate = true) {
   const barGap = series.length === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
   const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : 34;
   const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth, availablePerBar - barGap));
+  const displayedBars = [];
   parties.forEach((party, partyIndex) => {
     const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
     const totalBars = series.length * barWidth + (series.length - 1) * barGap;
@@ -249,35 +250,9 @@ function render(animate = true) {
       }
       els.chart.append(deltaLabel);
       old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, newLabelDelay);
+      displayedBars.push({ region: item.region, center: x + barWidth / 2 });
       nextLayout.set(key, { x, center: x + barWidth / 2 });
     });
-
-    // One centered parliament label per consecutive poll group. A single bar
-    // remains vertical on phones; grouped labels have enough room horizontally.
-    let groupStart = 0;
-    while (groupStart < series.length) {
-      let groupEnd = groupStart + 1;
-      while (groupEnd < series.length && series[groupEnd].region === series[groupStart].region) groupEnd += 1;
-      const count = groupEnd - groupStart;
-      const firstCenter = startX + groupStart * (barWidth + barGap) + barWidth / 2;
-      const lastCenter = startX + (groupEnd - 1) * (barWidth + barGap) + barWidth / 2;
-      const regionLabelX = (firstCenter + lastCenter) / 2;
-      const regionLabelY = margin.top + innerH + 51;
-      const rotateRegionLabel = compact && count === 1;
-      const regionLabel = svgEl("text", {
-        x: regionLabelX,
-        y: regionLabelY,
-        "text-anchor": rotateRegionLabel ? "end" : "middle",
-        class: `region-label${compact ? " mobile-region-label" : ""}`,
-        ...(rotateRegionLabel ? { transform: `rotate(-90 ${regionLabelX} ${regionLabelY})` } : {})
-      });
-      regionLabel.textContent = REGION_CODES[series[groupStart].region] || series[groupStart].region;
-      const regionLabelGroup = svgEl("g");
-      regionLabelGroup.append(regionLabel);
-      els.chart.append(regionLabelGroup);
-      fadeIn(regionLabelGroup, motionEnabled, newLabelDelay);
-      groupStart = groupEnd;
-    }
 
     // Most party groups get one shared label. The Union group is split only
     // where the correct name changes between Bundestag, Bavaria and other states.
@@ -307,6 +282,31 @@ function render(animate = true) {
     }
     nextLayout.set(`party:${party}`, { center });
   });
+
+  // Parliament labels follow the complete visual bar sequence, not individual
+  // party groups. Any adjacent bars from one parliament therefore share one label.
+  let regionStart = 0;
+  while (regionStart < displayedBars.length) {
+    let regionEnd = regionStart + 1;
+    while (regionEnd < displayedBars.length && displayedBars[regionEnd].region === displayedBars[regionStart].region) regionEnd += 1;
+    const count = regionEnd - regionStart;
+    const regionLabelX = (displayedBars[regionStart].center + displayedBars[regionEnd - 1].center) / 2;
+    const regionLabelY = margin.top + innerH + 51;
+    const rotateRegionLabel = compact && count === 1;
+    const regionLabel = svgEl("text", {
+      x: regionLabelX,
+      y: regionLabelY,
+      "text-anchor": rotateRegionLabel ? "end" : "middle",
+      class: `region-label${compact ? " mobile-region-label" : ""}`,
+      ...(rotateRegionLabel ? { transform: `rotate(-90 ${regionLabelX} ${regionLabelY})` } : {})
+    });
+    regionLabel.textContent = REGION_CODES[displayedBars[regionStart].region] || displayedBars[regionStart].region;
+    const regionLabelGroup = svgEl("g");
+    regionLabelGroup.append(regionLabel);
+    els.chart.append(regionLabelGroup);
+    fadeIn(regionLabelGroup, motionEnabled, newLabelDelay);
+    regionStart = regionEnd;
+  }
   const legendX = compact ? margin.left / 2 : margin.left - 10;
   [
     ["Veränderung", margin.top + innerH + 20],
