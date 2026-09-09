@@ -571,13 +571,26 @@ async function exportChartAsJpeg() {
     text.style.letterSpacing = computed.letterSpacing;
   });
   const viewBox = els.chart.viewBox.baseVal;
-  const headerHeight = 92;
+  const selectedRegions = [...state.regions];
+  const selectedParties = [...state.parties];
+  const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+    const poll = (state.data.polls[region] || [])[rank];
+    return poll ? `${REGION_CODES[region]} · ${rank === 0 ? "Neueste" : `${rank + 1}. jüngste`} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
+  }).filter(Boolean));
+  const partyColumns = selectedParties.length > 5 ? 2 : 1;
+  const regionColumns = selectedRegions.length > 8 ? 2 : 1;
+  const pollColumns = selectedPolls.length > 10 ? 2 : 1;
+  const legendRows = Math.max(
+    Math.ceil(selectedParties.length / partyColumns),
+    Math.ceil(selectedRegions.length / regionColumns),
+    Math.ceil(selectedPolls.length / pollColumns)
+  );
+  const headerHeight = Math.max(115, 58 + legendRows * 10);
   const footerHeight = 66;
-  const legendWidth = 520;
-  const documentWidth = viewBox.width + legendWidth;
+  const documentWidth = Math.max(1200, viewBox.width);
   const documentHeight = headerHeight + viewBox.height + footerHeight;
   const exportHeight = 1350;
-  const exportWidth = Math.max(1080, Math.round(exportHeight * documentWidth / documentHeight));
+  const exportWidth = Math.min(12000, Math.max(1080, Math.round(exportHeight * documentWidth / documentHeight)));
   const documentSvg = svgEl("svg", {
     xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${documentWidth} ${documentHeight}`,
     width: exportWidth, height: exportHeight
@@ -600,44 +613,33 @@ async function exportChartAsJpeg() {
   const secondStamp = new Intl.DateTimeFormat("de-DE", {
     weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
   }).format(now);
-  const headerX = documentWidth - 18;
-  addText("Sonntagsfragen", { x: headerX, y: 46, "text-anchor": "end", "font-family": "Georgia, serif", "font-size": 42, "font-weight": 500 });
-  addText("visualizer by charavision", { x: headerX, y: 61, "text-anchor": "end", fill: "#a8bfd9", "font-size": 9, "font-weight": 700, "letter-spacing": ".08em" });
-  addText(minuteStamp, { x: headerX, y: 78, "text-anchor": "end", fill: "#8fa6c1", "font-size": 9 });
+  const headerX = 18;
+  addText("Sonntagsfragen", { x: headerX, y: 46, style: "font-family: Georgia, serif", "font-size": 42, "font-weight": 500, "letter-spacing": "-.06em" });
+  addText("visualizer by charavision", { x: headerX + 17, y: 61, fill: "#a8bfd9", "font-size": 9, "font-weight": 700, "letter-spacing": ".08em" });
+  addText(minuteStamp, { x: headerX, y: 80, fill: "#8fa6c1", "font-size": 9 });
 
-  clone.setAttribute("x", 0);
+  clone.setAttribute("x", (documentWidth - viewBox.width) / 2);
   clone.setAttribute("y", headerHeight);
   clone.setAttribute("width", viewBox.width);
   clone.setAttribute("height", viewBox.height);
   documentSvg.append(clone);
-  documentSvg.append(svgEl("line", { x1: viewBox.width + 1, y1: headerHeight + 18, x2: viewBox.width + 1, y2: headerHeight + viewBox.height - 18, stroke: "#2a4165", "stroke-width": 1 }));
 
-  const selectedRegions = [...state.regions];
-  const selectedParties = [...state.parties];
-  const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
-    const poll = (state.data.polls[region] || [])[rank];
-    return poll ? `${REGION_CODES[region]} · ${rank === 0 ? "Neueste" : `${rank + 1}. jüngste`} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
-  }).filter(Boolean));
-  const legendLeft = viewBox.width + 18;
-  const legendColumnWidth = (legendWidth - 44) / 2;
-  let legendY = headerHeight + 32;
-  const addLegendSection = (title, items, columns = 1, swatches = false) => {
-    addText(title, { x: legendLeft, y: legendY, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".08em" });
-    legendY += 16;
+  const addLegendSection = (x, width, title, items, columns = 1, swatches = false) => {
+    addText(title, { x, y: 27, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".08em" });
     const rows = Math.ceil(items.length / columns);
+    const columnWidth = width / columns;
     items.forEach((item, index) => {
       const column = Math.floor(index / rows);
       const row = index % rows;
-      const x = legendLeft + column * legendColumnWidth;
-      const y = legendY + row * 12;
-      if (swatches) documentSvg.append(svgEl("rect", { x, y: y - 7, width: 3, height: 8, fill: PARTY_META[item].color }));
-      addText(item, { x: x + (swatches ? 8 : 0), y, fill: "#dce8f7", "font-size": 8 });
+      const itemX = x + column * columnWidth;
+      const y = 43 + row * 10;
+      if (swatches) documentSvg.append(svgEl("rect", { x: itemX, y: y - 6, width: 3, height: 7, fill: PARTY_META[item].color }));
+      addText(item, { x: itemX + (swatches ? 7 : 0), y, fill: "#dce8f7", "font-size": 7 });
     });
-    legendY += rows * 12 + 12;
   };
-  addLegendSection("PARTEIEN", selectedParties, selectedParties.length > 5 ? 2 : 1, true);
-  addLegendSection("PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), selectedRegions.length > 8 ? 2 : 1);
-  addLegendSection("UMFRAGEDATEN", selectedPolls, selectedPolls.length > 10 ? 2 : 1);
+  addLegendSection(330, 150, "PARTEIEN", selectedParties, partyColumns, true);
+  addLegendSection(500, 220, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), regionColumns);
+  addLegendSection(740, documentWidth - 758, "UMFRAGEDATEN", selectedPolls, pollColumns);
 
   const footerCenter = documentWidth / 2;
   const footerY = headerHeight + viewBox.height + 20;
@@ -659,7 +661,10 @@ async function exportChartAsJpeg() {
     context.fillStyle = "#081326";
     context.fillRect(0, 0, exportWidth, exportHeight);
     context.drawImage(image, 0, 0, exportWidth, exportHeight);
-    const jpeg = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", .94));
+    const jpeg = await new Promise((resolve, reject) => canvas.toBlob(
+      blob => blob ? resolve(blob) : reject(new Error("Die Bildgröße konnte nicht verarbeitet werden.")),
+      "image/jpeg", .94
+    ));
     const downloadUrl = URL.createObjectURL(jpeg);
     const link = document.createElement("a");
     link.href = downloadUrl;
