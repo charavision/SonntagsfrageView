@@ -741,45 +741,61 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const { width, height, columns, rows } = layout;
   const page = svgEl("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${width} ${height}`, width, height });
   const defs = svgEl("defs");
-  const glowBlur = svgEl("filter", { id: "cluster-glow-blur", x: "-30%", y: "-30%", width: "160%", height: "160%" });
-  glowBlur.append(svgEl("feGaussianBlur", { stdDeviation: "24" }));
-  defs.append(glowBlur);
-  clusters.forEach((_, index) => {
-    const gradient = svgEl("radialGradient", { id: `cluster-glow-${index}`, cx: "50%", cy: "35%", r: "72%" });
-    gradient.append(svgEl("stop", { offset: "0", "stop-color": "#244f80", "stop-opacity": ".42" }), svgEl("stop", { offset: ".62", "stop-color": "#132d50", "stop-opacity": ".18" }), svgEl("stop", { offset: "1", "stop-color": "#081326", "stop-opacity": "0" }));
-    defs.append(gradient);
-  });
+  const pageBase = svgEl("linearGradient", { id: "page-base", x1: "0", y1: "0", x2: "1", y2: "1" });
+  pageBase.append(svgEl("stop", { offset: "0", "stop-color": "#172744" }), svgEl("stop", { offset: ".7", "stop-color": "#081326" }), svgEl("stop", { offset: "1", "stop-color": "#050d1b" }));
+  const pageGlow = svgEl("radialGradient", { id: "page-glow", cx: "50%", cy: "28%", r: "68%" });
+  pageGlow.append(svgEl("stop", { offset: "0", "stop-color": "#2a67a4", "stop-opacity": ".28" }), svgEl("stop", { offset: ".58", "stop-color": "#17385e", "stop-opacity": ".12" }), svgEl("stop", { offset: "1", "stop-color": "#081326", "stop-opacity": "0" }));
+  defs.append(pageBase, pageGlow);
   page.append(defs);
-  page.append(svgEl("rect", { width, height, fill: "#081326" }));
-  const text = (value, attrs = {}) => { const node = svgEl("text", { fill: "#f4f8ff", ...attrs }); node.textContent = value; page.append(node); return node; };
+  page.append(svgEl("rect", { width, height, fill: "url(#page-base)" }));
+  page.append(svgEl("rect", { width, height, fill: "url(#page-glow)" }));
+  const text = (value, attrs = {}) => { const node = svgEl("text", { fill: "#f4f8ff", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', ...attrs }); node.textContent = value; page.append(node); return node; };
   const now = new Date();
-  text("Sonntagsfragen", { x: 42, y: 78, style: "font-family: Georgia, serif", "font-size": 58, "font-weight": 500, "letter-spacing": "-.06em" });
-  const creator = text("", { x: 150, y: 98, "text-anchor": "middle", fill: "#7f95b2", "font-size": 8, "letter-spacing": ".04em" });
+  const landscapeHeader = width > 1400;
+  const brandSize = landscapeHeader ? 72 : 58;
+  const legendStart = landscapeHeader ? 650 : 470;
+  text("Sonntagsfragen", { x: 42, y: 91, style: "font-family: Georgia, 'Times New Roman', serif", "font-size": brandSize, "font-weight": 500, "letter-spacing": "-.06em" });
+  const creator = text("", { x: 42 + brandSize * 1.92, y: 112, "text-anchor": "middle", fill: "#7f95b2", "font-size": 8, "font-weight": 400, "letter-spacing": ".04em" });
   const creatorPrefix = svgEl("tspan"); creatorPrefix.textContent = "visualizer by ";
   const creatorName = svgEl("tspan", { fill: "#b9dff1", "font-weight": 800 }); creatorName.textContent = "charavision";
   creator.append(creatorPrefix, creatorName);
-  text(new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now), { x: width - 42, y: 48, "text-anchor": "end", fill: "#8fa6c1", "font-size": 14 });
-  text(configurationCode(), { x: width - 42, y: 72, "text-anchor": "end", fill: "#b9cee5", "font-size": 14, style: "font-family: ui-monospace, monospace" });
-  text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: width - 42, y: 92, "text-anchor": "end", fill: "#8fa6c1", "font-size": 11 });
-  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: 122, fill: "#59d9ff", "font-size": 14, "font-weight": 700 });
+  const minuteStamp = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now);
+  text(minuteStamp, { x: legendStart, y: 28, fill: "#8fa6c1", "font-size": 10 });
+  text(configurationCode(), { x: legendStart + (landscapeHeader ? 205 : 185), y: 28, fill: "#b9cee5", "font-size": 10, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: legendStart + (landscapeHeader ? 330 : 305), y: 28, fill: "#8fa6c1", "font-size": 9 });
+  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: 151, fill: "#59d9ff", "font-size": 11, "font-weight": 700 });
   const selectedRegions = [...state.regions], selectedParties = [...state.parties];
   const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
     const poll = (state.data.polls[region] || [])[rank];
     return poll ? `${REGION_CODES[region]} · ${rank + 1}. · ${poll.institute} · ${formatDate(poll.date)}` : null;
   }).filter(Boolean));
-  const headerLegend = (x, title, items, columns, colorItems = false) => {
-    text(title, { x, y: 142, fill: "#59d9ff", "font-size": 10, "font-weight": 800, "letter-spacing": ".06em" });
-    const rows = Math.ceil(items.length / columns), columnWidth = x < 650 ? 78 : x < 880 ? 105 : 120;
+  const headerLegend = (x, title, items, columns, columnWidth, colorItems = false) => {
+    text(title, { x, y: 54, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".06em" });
+    const rows = Math.ceil(items.length / columns);
     items.forEach((item, index) => {
-      const column = Math.floor(index / rows), row = index % rows, itemX = x + column * columnWidth, itemY = 157 + row * 7;
-      if (colorItems) page.append(svgEl("rect", { x: itemX, y: itemY - 5, width: 3, height: 5, fill: getComputedStyle(document.documentElement).getPropertyValue(PARTY_META[item].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[item].glow }));
-      text(item, { x: itemX + (colorItems ? 6 : 0), y: itemY, fill: "#dce8f7", "font-size": 6 });
+      const column = Math.floor(index / rows), row = index % rows, itemX = x + column * columnWidth, itemY = 70 + row * 9;
+      if (colorItems) page.append(svgEl("rect", { x: itemX, y: itemY - 6, width: 4, height: 7, fill: getComputedStyle(document.documentElement).getPropertyValue(PARTY_META[item].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[item].glow }));
+      text(item, { x: itemX + (colorItems ? 8 : 0), y: itemY, fill: "#dce8f7", "font-size": colorItems ? 7.5 : 7 });
     });
   };
-  headerLegend(480, "PARTEIEN", selectedParties, 2, true);
-  headerLegend(650, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 2);
-  headerLegend(880, "UMFRAGEDATEN", selectedPolls, selectedPolls.length > 20 ? 3 : 2);
-  const gapX = 18, gapY = 18, left = 42, top = 292;
+  const partyX = legendStart;
+  const regionX = partyX + (landscapeHeader ? 130 : 115);
+  const pollsX = regionX + (landscapeHeader ? 230 : 205);
+  const pollWidth = Math.max(105, (width - pollsX - 42) / (selectedPolls.length > 20 ? 3 : 2));
+  headerLegend(partyX, "PARTEIEN", selectedParties, 1, 0, true);
+  headerLegend(regionX, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 1, 0);
+  headerLegend(pollsX, "UMFRAGEDATEN", selectedPolls, selectedPolls.length > 20 ? 3 : 2, pollWidth);
+  text("TRANSPARENZ", { x: partyX, y: 172, fill: "#59d9ff", "font-size": 9, "font-weight": 800, "letter-spacing": ".06em" });
+  [
+    { label: "Neueste", fill: .68, stroke: 1 },
+    { label: "2. jüngste", fill: .34, stroke: .7 },
+    { label: "3. jüngste", fill: .14, stroke: .4 }
+  ].forEach((entry, index) => {
+    const itemY = 188 + index * 13;
+    page.append(svgEl("rect", { x: partyX, y: itemY - 8, width: 18, height: 9, rx: 1, fill: "#59b8ff", "fill-opacity": entry.fill, stroke: "#9bdcff", "stroke-opacity": entry.stroke, "stroke-width": 1 }));
+    text(entry.label, { x: partyX + 25, y: itemY, fill: "#dce8f7", "font-size": 7.5 });
+  });
+  const gapX = 18, gapY = 18, left = 42, top = 280;
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
   const tileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
   const allValues = clusters.flatMap(cluster => cluster.bars.map(({ party, item }) => Number(item.poll.values[party] || 0)));
@@ -788,7 +804,6 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   clusters.forEach((cluster, index) => {
     const column = index % columns, row = Math.floor(index / columns);
     const x = left + column * (tileWidth + gapX), y = top + row * (tileHeight + gapY);
-    page.append(svgEl("ellipse", { cx: x + tileWidth / 2, cy: y + tileHeight * .43, rx: tileWidth * .72, ry: tileHeight * .68, fill: `url(#cluster-glow-${index})`, filter: "url(#cluster-glow-blur)" }));
     text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 15, "font-weight": 800 });
     const plot = { left: x + 34, right: x + tileWidth - 12, top: y + 48, bottom: y + tileHeight - 54 };
     page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
@@ -806,7 +821,9 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const barX = plot.left + slot * barIndex + (slot - barWidth) / 2;
       const barY = plot.bottom - barHeight;
       const color = rootStyle.getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow;
-      page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": .62, stroke: PARTY_META[party].glow, "stroke-width": 1.5 }));
+      const fillOpacity = item.average ? .72 : [.68, .34, .14][item.rank] ?? .14;
+      const strokeOpacity = item.average ? 1 : [1, .7, .4][item.rank] ?? .4;
+      page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": fillOpacity, stroke: PARTY_META[party].glow, "stroke-opacity": strokeOpacity, "stroke-width": 1.5 }));
       text(`${item.average ? "Ø " : ""}${formatPercent(value, false, true).replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
       const label = state.groupBy === "region" ? `${partyDisplayLabel(party, item.region)}${item.average ? "" : ` ${item.rank + 1}`}` : `${REGION_CODES[item.region]}${item.average ? "" : ` ${item.rank + 1}`}`;
       const partyBarCount = cluster.bars.filter(bar => bar.party === party).length;
