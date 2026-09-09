@@ -132,13 +132,13 @@ function fadeIn(element, enabled, delay = 180) {
   );
 }
 
-function growBar(element, center, baseline, opacity, enabled) {
+function growBar(element, center, baseline, opacity, enabled, delay) {
   if (!enabled || !element.animate) return;
   element.style.transformBox = "view-box";
   element.style.transformOrigin = `${center}px ${baseline}px`;
   element.animate(
     [{ transform: "scaleY(0)", opacity: 0 }, { transform: "scaleY(1)", opacity }],
-    { duration: 820, delay: 90, easing: "cubic-bezier(.16, 1, .3, 1)", fill: "both" }
+    { duration: 820, delay, easing: "cubic-bezier(.16, 1, .3, 1)", fill: "both" }
   );
 }
 
@@ -152,6 +152,9 @@ function render(animate = true) {
   const motionEnabled = animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const oldLayout = state.chartLayout;
   const nextLayout = new Map();
+  const hasExistingBars = [...oldLayout.keys()].some(key => !key.startsWith("party:"));
+  const newBarDelay = hasExistingBars ? 820 : 80;
+  const newLabelDelay = hasExistingBars ? 1220 : 430;
   const oneRegion = selectedRegions.length === 1;
   els.title.textContent = oneRegion ? selectedRegions[0] : `${selectedRegions.length} Parlamente im Vergleich`;
   els.kicker.textContent = oneRegion ? (selectedRegions[0] === "Bundestag" ? "Bundestagswahl" : "Landtagswahl") : "Bund & Länder";
@@ -166,13 +169,13 @@ function render(animate = true) {
   }
 
   const compact = window.innerWidth < 700;
-  const margin = { top: 62, right: 34, bottom: 142, left: 64 };
+  const margin = { top: 62, right: 34, bottom: 176, left: 64 };
   const totalBarCount = parties.length * series.length;
   const availableWidth = Math.max(320, els.scroll.clientWidth - 2);
-  const width = totalBarCount <= 10
+  const width = totalBarCount <= 20
     ? availableWidth
     : Math.max(availableWidth, margin.left + margin.right + totalBarCount * (compact ? 46 : 58) + parties.length * 20);
-  const height = compact ? 480 : 560;
+  const height = compact ? 520 : 590;
   const innerH = height - margin.top - margin.bottom;
   const chartW = width - margin.left - margin.right;
   const groupWidth = chartW / parties.length;
@@ -193,10 +196,11 @@ function render(animate = true) {
     label.textContent = `${tick} %`;
     els.chart.append(label);
   }
+  els.chart.append(svgEl("line", { x1: margin.left, x2: margin.left, y1: margin.top, y2: height - 18, class: "axis-line" }));
 
   const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12)) / series.length;
   const barGap = series.length === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
-  const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : 58;
+  const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : 34;
   const barWidth = Math.max(10, Math.min(maxBarWidth, availablePerBar - barGap));
   parties.forEach((party, partyIndex) => {
     const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
@@ -218,11 +222,11 @@ function render(animate = true) {
       bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, party, value));
       bar.addEventListener("pointerleave", hideTooltip);
       els.chart.append(bar);
-      old ? animateX(bar, old.x, x, motionEnabled) : growBar(bar, x + barWidth / 2, margin.top + innerH, opacity, motionEnabled);
+      old ? animateX(bar, old.x, x, motionEnabled) : growBar(bar, x + barWidth / 2, margin.top + innerH, opacity, motionEnabled, newBarDelay);
       const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
       valueLabel.textContent = formatPercent(value);
       els.chart.append(valueLabel);
-      old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, 430);
+      old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
       const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
       deltaLine.textContent = formatPercent(delta, true);
@@ -233,20 +237,30 @@ function render(animate = true) {
         deltaLabel.append(newLine);
       }
       els.chart.append(deltaLabel);
-      old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, 320);
+      old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, newLabelDelay);
       const regionLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 51, "text-anchor": "middle", class: "region-label" });
       regionLabel.textContent = REGION_CODES[item.region] || item.region;
       els.chart.append(regionLabel);
-      old ? animateX(regionLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabel, motionEnabled, 320);
+      old ? animateX(regionLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabel, motionEnabled, newLabelDelay);
       nextLayout.set(key, { x, center: x + barWidth / 2 });
     });
     const label = svgEl("text", { x: center, y: height - margin.bottom + 82, "text-anchor": "middle", class: "poll-label" });
     label.textContent = party;
     const oldParty = oldLayout.get(`party:${party}`);
     els.chart.append(label);
-    oldParty ? animateX(label, oldParty.center, center, motionEnabled) : fadeIn(label, motionEnabled, 320);
+    oldParty ? animateX(label, oldParty.center, center, motionEnabled) : fadeIn(label, motionEnabled, newLabelDelay);
     nextLayout.set(`party:${party}`, { center });
   });
+  const legend = svgEl("text", { x: margin.left + 14, y: compact ? height - 34 : height - 22, class: "chart-legend" });
+  const legendLines = compact
+    ? ["OBEN: Umfragewert · ±: Veränderung zur letzten Wahl", "NEW: neuer Einzug · BUND/BW/…: Parlament"]
+    : ["OBEN: Umfragewert  ·  ±: Veränderung zur letzten Wahl  ·  NEW: neuer Einzug  ·  BUND/BW/…: Parlament"];
+  legendLines.forEach((text, index) => {
+    const line = svgEl("tspan", { x: margin.left + 14, dy: index ? 14 : 0 });
+    line.textContent = text;
+    legend.append(line);
+  });
+  els.chart.append(legend);
   state.chartLayout = nextLayout;
 }
 
