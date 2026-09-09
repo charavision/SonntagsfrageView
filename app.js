@@ -259,8 +259,8 @@ function render(animate = true) {
   const height = compact ? 520 : 590;
   const innerH = height - margin.top - margin.bottom;
   const baselineY = margin.top + innerH;
-  const floorBackY = baselineY - (compact ? 36 : 44);
-  const floorFrontY = Math.min(height - 2, baselineY + (compact ? 118 : 142));
+  const floorBackY = baselineY - (compact ? 18 : 44);
+  const floorFrontY = Math.min(height - 2, baselineY + (compact ? 72 : 142));
   const chartW = width - margin.left - margin.right;
   const groupWidth = chartW / parties.length;
   const maxValue = Math.max(50, ...series.flatMap(item => parties.map(party => item.poll.values[party] || 0)));
@@ -314,8 +314,8 @@ function render(animate = true) {
   const floorLeft = axisX;
   const floorRight = width - margin.right;
   const floorCenter = (floorLeft + floorRight) / 2;
-  const floorBackScale = compact ? .93 : .82;
-  const floorFrontScale = compact ? 1.22 : 1.4;
+  const floorBackScale = compact ? .86 : .82;
+  const floorFrontScale = compact ? 1.62 : 1.4;
   const perspectiveFloorLines = [];
   const perspectiveFloorRows = [];
   for (let index = 0; index <= 18; index += 1) {
@@ -330,11 +330,11 @@ function render(animate = true) {
     perspectiveFloorLines.push({ line, axisX: axisPointX, ratio: index / 18 });
   }
   const floorRows = [
-    [floorBackY, compact ? .93 : .82],
-    [baselineY - (compact ? 24 : 29), compact ? .955 : .88],
-    [baselineY - (compact ? 12 : 14), compact ? .98 : .94],
+    [floorBackY, floorBackScale],
+    [baselineY - (compact ? 12 : 29), compact ? .91 : .88],
+    [baselineY - (compact ? 6 : 14), compact ? .955 : .94],
     [baselineY, 1],
-    [baselineY + (compact ? 42 : 50), compact ? 1.08 : 1.14],
+    [baselineY + (compact ? 36 : 50), compact ? 1.31 : 1.14],
     [floorFrontY, floorFrontScale]
   ];
   floorRows.forEach(([y, scale], index) => {
