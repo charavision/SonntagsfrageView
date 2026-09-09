@@ -242,19 +242,32 @@ function render(animate = true) {
       const y = margin.top + innerH - h;
       const fillOpacity = [.68, .34, .16][item.rank];
       const strokeOpacity = [1, .78, .56][item.rank];
+      const glowOutline = svgEl("rect", {
+        x, y, width: barWidth, height: h,
+        fill: "none",
+        stroke: PARTY_META[party].glow,
+        "stroke-opacity": strokeOpacity,
+        filter: `url(#bar-glow-${partyIndex})`,
+        class: "bar-glow", rx: 3
+      });
       const bar = svgEl("rect", {
         x, y, width: barWidth, height: h,
         fill: PARTY_META[party].color,
         stroke: PARTY_META[party].glow,
         "fill-opacity": fillOpacity,
         "stroke-opacity": strokeOpacity,
-        filter: `url(#bar-glow-${partyIndex})`,
         class: "bar", rx: 3
       });
       bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, partyDisplayLabel(party, item.region), value));
       bar.addEventListener("pointerleave", hideTooltip);
-      els.chart.append(bar);
-      old ? animateX(bar, old.x, x, motionEnabled) : growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
+      els.chart.append(glowOutline, bar);
+      if (old) {
+        animateX(glowOutline, old.x, x, motionEnabled);
+        animateX(bar, old.x, x, motionEnabled);
+      } else {
+        growBar(glowOutline, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
+        growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
+      }
       const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
       valueLabel.textContent = formatPercent(value);
       els.chart.append(valueLabel);
