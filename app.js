@@ -551,6 +551,16 @@ async function exportChartAsJpeg() {
   els.exportMessage.textContent = "JPEG wird erstellt …";
   const clone = els.chart.cloneNode(true);
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const originalTexts = [...els.chart.querySelectorAll("text")];
+  const clonedTexts = [...clone.querySelectorAll("text")];
+  clonedTexts.forEach((text, index) => {
+    const computed = getComputedStyle(originalTexts[index]);
+    text.style.fontFamily = computed.fontFamily;
+    text.style.fontSize = computed.fontSize;
+    text.style.fontWeight = computed.fontWeight;
+    text.style.fontStyle = computed.fontStyle;
+    text.style.letterSpacing = computed.letterSpacing;
+  });
   const viewBox = els.chart.viewBox.baseVal;
   const exportHeight = 1080;
   const exportWidth = Math.max(1080, Math.round(exportHeight * viewBox.width / viewBox.height));
@@ -560,7 +570,7 @@ async function exportChartAsJpeg() {
   clone.insertBefore(background, clone.firstChild);
   const css = [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules].map(rule => rule.cssText); } catch { return []; } }).join("\n");
   const style = svgEl("style");
-  style.textContent = css;
+  style.textContent = `svg, text { font-family: ${getComputedStyle(document.body).fontFamily}; }\n${css}`;
   clone.insertBefore(style, clone.firstChild);
   const rootStyle = getComputedStyle(document.documentElement);
   let source = new XMLSerializer().serializeToString(clone).replace(/var\((--[\w-]+)\)/g, (_, name) => rootStyle.getPropertyValue(name).trim());
