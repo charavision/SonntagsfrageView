@@ -1,13 +1,13 @@
 const PARTY_META = {
-  "CDU/CSU": { color: "var(--cdu)", label: "CDU/CSU" },
-  "SPD": { color: "var(--spd)", label: "SPD" },
-  "GRÜNE": { color: "var(--gruene)", label: "GRÜNE" },
-  "FDP": { color: "var(--fdp)", label: "FDP" },
-  "LINKE": { color: "var(--linke)", label: "LINKE" },
-  "AfD": { color: "var(--afd)", label: "AfD" },
-  "BSW": { color: "var(--bsw)", label: "BSW" },
-  "FW": { color: "var(--fw)", label: "FW" },
-  "Sonstige": { color: "var(--sonstige)", label: "Sonstige" }
+  "CDU/CSU": { color: "var(--cdu)", glow: "#eef3f8", label: "CDU/CSU" },
+  "SPD": { color: "var(--spd)", glow: "#ff4c56", label: "SPD" },
+  "GRÜNE": { color: "var(--gruene)", glow: "#55e878", label: "GRÜNE" },
+  "FDP": { color: "var(--fdp)", glow: "#ffe66a", label: "FDP" },
+  "LINKE": { color: "var(--linke)", glow: "#c96bff", label: "LINKE" },
+  "AfD": { color: "var(--afd)", glow: "#58b5ff", label: "AfD" },
+  "BSW": { color: "var(--bsw)", glow: "#e05282", label: "BSW" },
+  "FW": { color: "var(--fw)", glow: "#ffb25e", label: "FW" },
+  "Sonstige": { color: "var(--sonstige)", glow: "#d9e0e8", label: "Sonstige" }
 };
 
 const REGION_CODES = {
@@ -197,7 +197,18 @@ function render(animate = true) {
   els.chart.setAttribute("height", height);
 
   const defs = svgEl("defs");
-  defs.innerHTML = `<filter id="bar-glow" x="-80%" y="-30%" width="260%" height="180%"><feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  defs.innerHTML = parties.map((party, index) => {
+    const glow = PARTY_META[party].glow;
+    return `<filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="9" result="wide-blur"/>
+      <feFlood flood-color="${glow}" flood-opacity=".62" result="wide-color"/>
+      <feComposite in="wide-color" in2="wide-blur" operator="in" result="wide-glow"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3.5" result="close-blur"/>
+      <feFlood flood-color="${glow}" flood-opacity="1" result="close-color"/>
+      <feComposite in="close-color" in2="close-blur" operator="in" result="close-glow"/>
+      <feMerge><feMergeNode in="wide-glow"/><feMergeNode in="close-glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>`;
+  }).join("");
   els.chart.append(defs);
 
   for (let tick = 0; tick <= yMax; tick += 10) {
@@ -234,9 +245,10 @@ function render(animate = true) {
       const bar = svgEl("rect", {
         x, y, width: barWidth, height: h,
         fill: PARTY_META[party].color,
-        stroke: PARTY_META[party].color,
+        stroke: PARTY_META[party].glow,
         "fill-opacity": fillOpacity,
         "stroke-opacity": strokeOpacity,
+        filter: `url(#bar-glow-${partyIndex})`,
         class: "bar", rx: 3
       });
       bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, partyDisplayLabel(party, item.region), value));
