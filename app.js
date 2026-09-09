@@ -254,14 +254,15 @@ function render(animate = true) {
       nextLayout.set(key, { x, center: x + barWidth / 2 });
     });
 
-    // Most party groups get one shared label. The Union group is split only
-    // where the correct name changes between Bundestag, Bavaria and other states.
+    // A multi-parliament Union comparison shares CDU/CSU. With one parliament,
+    // the label is CDU, CSU for Bavaria, or CDU/CSU for the Bundestag.
     const partyLabelY = height - margin.bottom + (compact ? 96 : 82);
+    const sharedUnionLabel = party === "CDU/CSU" && selectedRegions.length > 1;
     let labelStart = 0;
     while (labelStart < series.length) {
-      const displayLabel = partyDisplayLabel(party, series[labelStart].region);
+      const displayLabel = sharedUnionLabel ? "CDU/CSU" : partyDisplayLabel(party, series[labelStart].region);
       let labelEnd = labelStart + 1;
-      while (labelEnd < series.length && partyDisplayLabel(party, series[labelEnd].region) === displayLabel) labelEnd += 1;
+      while (labelEnd < series.length && (sharedUnionLabel || partyDisplayLabel(party, series[labelEnd].region) === displayLabel)) labelEnd += 1;
       const firstCenter = startX + labelStart * (barWidth + barGap) + barWidth / 2;
       const lastCenter = startX + (labelEnd - 1) * (barWidth + barGap) + barWidth / 2;
       const labelCenter = (firstCenter + lastCenter) / 2;
