@@ -52,8 +52,8 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .choice input:checked + label { border-color: #59d9ff; background: linear-gradient(135deg, rgba(37,105,154,.82), rgba(16,48,82,.96)); color: white; box-shadow: 0 0 18px rgba(89,217,255,.14); }
 .party-choice label::before { width: 10px; height: 10px; margin-right: 7px; background: var(--party-color); content: ""; }
 .party-choice input:checked + label { border-color: var(--party-color); background: color-mix(in srgb, var(--party-color) 28%, #101f38); color: var(--ink); box-shadow: 0 0 14px color-mix(in srgb, var(--party-color) 22%, transparent); }
-#party-cdu-csu + label { border-color: rgba(225,234,244,.56); box-shadow: 0 0 9px rgba(238,243,248,.18), inset 0 0 0 1px rgba(255,255,255,.04); }
-#party-cdu-csu:checked + label { border-color: #eef3f8; box-shadow: 0 0 16px rgba(238,243,248,.42), inset 0 0 0 1px rgba(255,255,255,.08); }
+#party-cdu-csu + label { border-color: rgba(174,184,196,.4); box-shadow: 0 0 7px rgba(154,164,176,.1); }
+#party-cdu-csu:checked + label { border-color: #9da6b1; box-shadow: 0 0 10px rgba(157,166,177,.22), inset 0 0 0 1px rgba(255,255,255,.04); }
 .poll-picker { margin-top: 24px; }
 .poll-picker .control-heading span { color: var(--muted); font-size: 12px; }
 .poll-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -99,8 +99,8 @@ footer a { color: inherit; }
   .region-code { font-size: 10px; }
   .next-election, .region-legend { font-size: 8px; }
   .party-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
-  .party-choice label { justify-content: center; gap: 3px; min-height: 34px; padding: 5px 4px; font-size: 10px; white-space: nowrap; }
-  .party-choice label::before { width: 7px; height: 7px; margin-right: 2px; }
+  .party-choice label { justify-content: center; gap: 4px; min-height: 34px; padding: 5px 3px; font-size: 8.5px; white-space: nowrap; }
+  .party-choice label::before { flex: 0 0 3px; width: 3px; height: 18px; margin-right: 1px; border-radius: 2px; }
   .poll-options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
   .poll-choice label { gap: 5px; min-height: 48px; padding: 6px 5px; }
   .poll-choice label::before { width: 5px; height: 27px; }

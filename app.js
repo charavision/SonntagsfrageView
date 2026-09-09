@@ -1,5 +1,5 @@
 const PARTY_META = {
-  "CDU/CSU": { color: "var(--cdu)", glow: "#eef3f8", label: "CDU/CSU" },
+  "CDU/CSU": { color: "var(--cdu)", glow: "#aab1ba", label: "CDU/CSU" },
   "SPD": { color: "var(--spd)", glow: "#ff4c56", label: "SPD" },
   "GRÜNE": { color: "var(--gruene)", glow: "#55e878", label: "GRÜNE" },
   "FDP": { color: "var(--fdp)", glow: "#ffe66a", label: "FDP" },
@@ -199,12 +199,13 @@ function render(animate = true) {
   const defs = svgEl("defs");
   defs.innerHTML = parties.map((party, index) => {
     const glow = PARTY_META[party].glow;
+    const union = party === "CDU/CSU";
     return `<filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="9" result="wide-blur"/>
-      <feFlood flood-color="${glow}" flood-opacity=".62" result="wide-color"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="${union ? 6 : 9}" result="wide-blur"/>
+      <feFlood flood-color="${glow}" flood-opacity="${union ? ".34" : ".62"}" result="wide-color"/>
       <feComposite in="wide-color" in2="wide-blur" operator="in" result="wide-glow"/>
-      <feGaussianBlur in="SourceAlpha" stdDeviation="3.5" result="close-blur"/>
-      <feFlood flood-color="${glow}" flood-opacity="1" result="close-color"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="${union ? 2.5 : 3.5}" result="close-blur"/>
+      <feFlood flood-color="${glow}" flood-opacity="${union ? ".72" : "1"}" result="close-color"/>
       <feComposite in="close-color" in2="close-blur" operator="in" result="close-glow"/>
       <feMerge><feMergeNode in="wide-glow"/><feMergeNode in="close-glow"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`;
