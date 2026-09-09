@@ -127,17 +127,13 @@ footer a { color: inherit; }
   .poll-choice label strong { font-size: 10px; line-height: 1.1; }
   .poll-choice label small { display: none; }
   .chart-section { padding-right: 8px; padding-left: 8px; }
-  .chart-scroll { border-radius: 18px; }
-  .chart-scroll::before {
-    position: absolute;
-    z-index: 0;
-    top: 329px;
-    right: 0;
-    left: 0;
-    height: 60px;
-    background: url("mobile-grid.svg") center / 100% 100% no-repeat;
-    content: "";
-    pointer-events: none;
+  .chart-scroll {
+    border-radius: 18px;
+    background-image: url("mobile-grid.svg"), radial-gradient(circle at 50% 18%, rgba(42,103,164,.28), transparent 42%), linear-gradient(160deg, #172744 0%, #081326 70%, #050d1b 100%);
+    background-position: center 329px, center, center;
+    background-size: 100% 60px, auto, auto;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-attachment: scroll, scroll, scroll;
   }
   #chart { min-height: 480px; }
   .axis-label { font-size: 10px; }
