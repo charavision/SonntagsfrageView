@@ -752,17 +752,16 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const text = (value, attrs = {}) => { const node = svgEl("text", { fill: "#f4f8ff", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', ...attrs }); node.textContent = value; page.append(node); return node; };
   const now = new Date();
   const landscapeHeader = width > 1400;
-  const brandSize = landscapeHeader ? 72 : 58;
   const legendStart = landscapeHeader ? 650 : 470;
-  text("Sonntagsfragen", { x: 42, y: 91, style: "font-family: Georgia, 'Times New Roman', serif", "font-size": brandSize, "font-weight": 500, "letter-spacing": "-.06em" });
-  const creator = text("", { x: 42 + brandSize * 1.92, y: 112, "text-anchor": "middle", fill: "#7f95b2", "font-size": 8, "font-weight": 400, "letter-spacing": ".04em" });
+  text("Sonntagsfragen", { x: 42, y: 88, style: "font-family: Georgia, serif", "font-size": 64, "font-weight": 500, "letter-spacing": "-.06em" });
+  const creator = text("", { x: 150, y: 106, "text-anchor": "middle", fill: "#7f95b2", "font-size": 6.5, "font-weight": 400, "letter-spacing": ".04em" });
   const creatorPrefix = svgEl("tspan"); creatorPrefix.textContent = "visualizer by ";
   const creatorName = svgEl("tspan", { fill: "#b9dff1", "font-weight": 800 }); creatorName.textContent = "charavision";
   creator.append(creatorPrefix, creatorName);
   const minuteStamp = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now);
-  text(minuteStamp, { x: legendStart, y: 28, fill: "#8fa6c1", "font-size": 10 });
-  text(configurationCode(), { x: legendStart + (landscapeHeader ? 205 : 185), y: 28, fill: "#b9cee5", "font-size": 10, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
-  text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: legendStart + (landscapeHeader ? 330 : 305), y: 28, fill: "#8fa6c1", "font-size": 9 });
+  text(minuteStamp, { x: 42, y: 132, fill: "#8fa6c1", "font-size": 9 });
+  text(configurationCode(), { x: 248, y: 132, fill: "#b9cee5", "font-size": 9, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: 365, y: 132, fill: "#8fa6c1", "font-size": 8.5 });
   text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: 151, fill: "#59d9ff", "font-size": 11, "font-weight": 700 });
   const selectedRegions = [...state.regions], selectedParties = [...state.parties];
   const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
