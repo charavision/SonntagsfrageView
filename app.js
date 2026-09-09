@@ -243,7 +243,15 @@ function render(animate = true) {
       }
       els.chart.append(deltaLabel);
       old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, newLabelDelay);
-      const regionLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 51, "text-anchor": "middle", class: "region-label" });
+      const regionLabelX = x + barWidth / 2;
+      const regionLabelY = margin.top + innerH + 51;
+      const regionLabel = svgEl("text", {
+        x: regionLabelX,
+        y: regionLabelY,
+        "text-anchor": compact ? "end" : "middle",
+        class: `region-label${compact ? " mobile-region-label" : ""}`,
+        ...(compact ? { transform: `rotate(-90 ${regionLabelX} ${regionLabelY})` } : {})
+      });
       regionLabel.textContent = REGION_CODES[item.region] || item.region;
       els.chart.append(regionLabel);
       old ? animateX(regionLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabel, motionEnabled, newLabelDelay);
@@ -253,9 +261,9 @@ function render(animate = true) {
     const label = svgEl("text", {
       x: center,
       y: partyLabelY,
-      "text-anchor": compact ? "start" : "middle",
+      "text-anchor": compact ? "end" : "middle",
       class: `poll-label${compact ? " mobile-party-label" : ""}`,
-      ...(compact ? { transform: `rotate(55 ${center} ${partyLabelY})` } : {})
+      ...(compact ? { transform: `rotate(-90 ${center} ${partyLabelY})` } : {})
     });
     label.textContent = party;
     const oldParty = oldLayout.get(`party:${party}`);
