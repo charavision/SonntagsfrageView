@@ -557,8 +557,10 @@ function applyConfigurationCode(text) {
   render(false);
 }
 
-async function exportChartAsJpeg() {
-  els.exportMessage.textContent = "JPEG wird erstellt …";
+async function exportChartImage(format = "jpeg") {
+  const isPng = format === "png";
+  const formatLabel = isPng ? "PNG" : "JPEG";
+  els.exportMessage.textContent = `${formatLabel} wird erstellt …`;
   const clone = els.chart.cloneNode(true);
   const originalTexts = [...els.chart.querySelectorAll("text")];
   const clonedTexts = [...clone.querySelectorAll("text")];
@@ -589,8 +591,8 @@ async function exportChartAsJpeg() {
   const footerHeight = 66;
   const documentWidth = Math.max(1600, viewBox.width);
   const documentHeight = headerHeight + viewBox.height + footerHeight;
-  const exportHeight = 1350;
-  const exportWidth = Math.min(12000, Math.max(1080, Math.round(exportHeight * documentWidth / documentHeight)));
+  const exportHeight = 2160;
+  const exportWidth = Math.min(16000, Math.max(1728, Math.round(exportHeight * documentWidth / documentHeight)));
   const documentSvg = svgEl("svg", {
     xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${documentWidth} ${documentHeight}`,
     width: exportWidth, height: exportHeight
@@ -663,14 +665,14 @@ async function exportChartAsJpeg() {
     context.fillStyle = "#081326";
     context.fillRect(0, 0, exportWidth, exportHeight);
     context.drawImage(image, 0, 0, exportWidth, exportHeight);
-    const jpeg = await new Promise((resolve, reject) => canvas.toBlob(
+    const imageBlob = await new Promise((resolve, reject) => canvas.toBlob(
       blob => blob ? resolve(blob) : reject(new Error("Die Bildgröße konnte nicht verarbeitet werden.")),
-      "image/jpeg", .94
+      isPng ? "image/png" : "image/jpeg", isPng ? undefined : .94
     ));
-    const downloadUrl = URL.createObjectURL(jpeg);
+    const downloadUrl = URL.createObjectURL(imageBlob);
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.download = `sonntagsfragen-${configurationCode()}.jpg`;
+    link.download = `sonntagsfragen-${configurationCode()}.${isPng ? "png" : "jpg"}`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
     els.exportMessage.textContent = `${exportWidth} × ${exportHeight} Pixel`;
@@ -703,7 +705,8 @@ fetch("data/polls.json", { cache: "no-store" })
       await navigator.clipboard.writeText(els.outputCode.textContent);
       els.codeMessage.textContent = "Code kopiert.";
     });
-    document.querySelector("#export-jpeg").addEventListener("click", () => exportChartAsJpeg().catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
+    document.querySelector("#export-jpeg").addEventListener("click", () => exportChartImage("jpeg").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
+    document.querySelector("#export-png").addEventListener("click", () => exportChartImage("png").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
     window.addEventListener("resize", () => render(false));
     let perspectiveFrame = 0;
     els.scroll.addEventListener("scroll", () => {
