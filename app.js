@@ -23,7 +23,7 @@ const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
-  kicker: document.querySelector("#chart-kicker"), meta: document.querySelector("#chart-meta"),
+  meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
   chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
@@ -244,8 +244,6 @@ function render(animate = true) {
   const newLabelDelay = hasExistingBars ? 1220 : 430;
   const oneRegion = selectedRegions.length === 1;
   els.title.textContent = oneRegion ? selectedRegions[0] : `${selectedRegions.length} Parlamente im Vergleich`;
-  els.kicker.hidden = !oneRegion;
-  els.kicker.textContent = oneRegion ? (selectedRegions[0] === "Bundestag" ? "Bundestagswahl" : "Landtagswahl") : "";
   els.meta.textContent = state.averageMode ? `Durchschnitt aus ${rawSeries.length} Umfragen` : series.length === 1 ? `${series[0].poll.institute} · ${formatDate(series[0].poll.date)}` : `${series.length} Umfragen aus ${selectedRegions.length} Parlamenten`;
   els.description.textContent = state.averageMode ? `Nach Parteien gruppiertes Balkendiagramm mit Durchschnittswerten aus ${rawSeries.length} Umfragen.` : `Nach Parteien gruppiertes Balkendiagramm mit ${series.length} Umfragen aus ${selectedRegions.length} Parlamenten.`;
   els.chart.replaceChildren();
@@ -447,7 +445,7 @@ function render(animate = true) {
         growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
       }
       const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
-      valueLabel.textContent = `${item.average ? "Ø " : ""}${formatPercent(value, false, compact)}`;
+      valueLabel.textContent = `${item.average ? "Ø " : ""}${formatPercent(value, false, compact).replace(" %", "")}`;
       els.chart.append(valueLabel);
       old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
@@ -529,6 +527,9 @@ function render(animate = true) {
     legend.textContent = text;
     els.chart.append(legend);
   });
+  const unitLabel = svgEl("text", { x: (axisX + width - margin.right) / 2, y: height - 6, "text-anchor": "middle", class: "chart-unit-label" });
+  unitLabel.textContent = "Werte in %";
+  els.chart.append(unitLabel);
   state.chartLayout = nextLayout;
   state.perspective = {
     floorLines: perspectiveFloorLines, floorRows: perspectiveFloorRows, bars: perspectiveBars,
@@ -659,6 +660,7 @@ async function exportChartImage(format = "jpeg") {
   creator.append(creatorPrefix, creatorName);
   addHeaderText(minuteStamp, { x: headerMetaX, y: 54 + headerOffsetY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
   addHeaderText(configurationCode(), { x: headerMetaX, y: 70 + headerOffsetY, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  addHeaderText(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: headerMetaX, y: 84 + headerOffsetY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 7, "font-weight": 400 });
 
   clone.setAttribute("x", (documentWidth - viewBox.width) / 2);
   clone.setAttribute("y", headerHeight);
