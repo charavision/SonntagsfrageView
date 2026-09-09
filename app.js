@@ -18,14 +18,14 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, groupBy: "party", a4Mode: true, chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, fullRegionNames: false, groupBy: "party", a4Mode: true, chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
   exportMessage: document.querySelector("#export-message"), exportSummary: document.querySelector("#export-summary")
@@ -68,7 +68,7 @@ function configurationCode() {
   let value = rankOrdered([...state.regions], state.data.regions);
   value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n);
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n);
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
@@ -255,10 +255,16 @@ function render(animate = true) {
   }
 
   const compact = state.mobileView || window.innerWidth < 900;
+  const regionRunCounts = selectedRegions.map(region => {
+    const polls = series.filter(item => item.region === region).length;
+    return state.groupBy === "region" ? polls * parties.length : polls;
+  });
+  const needsVerticalRegionNames = compact && state.fullRegionNames && regionRunCounts.some(count => count < 3);
+  const needsWrappedRegionNames = state.fullRegionNames && regionRunCounts.some(count => count < 4);
   // On phones the scale sits on the actual edge while the bars retain a small
   // inset, so the first bar never collides with the tick labels.
   const axisX = compact ? 1 : 160;
-  const margin = { top: 62, right: compact ? 12 : 34, bottom: 176, left: compact ? 48 : 160 };
+  const margin = { top: 62, right: compact ? 12 : 34, bottom: needsVerticalRegionNames ? 250 : needsWrappedRegionNames ? 205 : 176, left: compact ? 48 : 160 };
   const totalBarCount = parties.length * series.length;
   const availableWidth = Math.max(320, els.scroll.clientWidth - 2);
   const visibleBarLimit = compact ? 9 : 20;
@@ -470,7 +476,7 @@ function render(animate = true) {
     nextLayout.set(group.key, { center });
   });
 
-  const appendGroupedLabels = (labelFor, y, className) => {
+  const appendGroupedLabels = (labelFor, y, className, labelKind = "party") => {
     let start = 0;
     while (start < displayedBars.length) {
       const text = labelFor(displayedBars[start]);
@@ -478,8 +484,11 @@ function render(animate = true) {
       while (end < displayedBars.length && labelFor(displayedBars[end]) === text) end += 1;
       const count = end - start;
       const x = (displayedBars[start].center + displayedBars[end - 1].center) / 2;
-      const stackedUnion = !compact && text === "CDU/CSU" && count === 1 && parties.length > 1;
-      const rotate = compact && count === 1 && !stackedUnion;
+      const stackedUnion = labelKind === "party" && !compact && text === "CDU/CSU" && count === 1 && parties.length > 1;
+      const rotateParty = labelKind === "party" && compact && count === 1 && !stackedUnion;
+      const rotateRegion = labelKind === "region" && state.fullRegionNames && compact && count < 3;
+      const rotate = rotateParty || rotateRegion;
+      const wrapRegion = labelKind === "region" && state.fullRegionNames && count < 4 && text.includes("-");
       const label = svgEl("text", {
         x, y: stackedUnion ? y - 5 : y, "text-anchor": "middle",
         class: `${className}${compact ? ` mobile-${className}` : ""}`,
@@ -489,6 +498,11 @@ function render(animate = true) {
         const firstLine = svgEl("tspan", { x }); firstLine.textContent = "CDU/";
         const secondLine = svgEl("tspan", { x, dy: 11 }); secondLine.textContent = "CSU";
         label.append(firstLine, secondLine);
+      } else if (wrapRegion) {
+        const split = text.indexOf("-") + 1;
+        const firstLine = svgEl("tspan", { x }); firstLine.textContent = text.slice(0, split);
+        const secondLine = svgEl("tspan", { x, dy: compact ? 9 : 12 }); secondLine.textContent = text.slice(split);
+        label.append(firstLine, secondLine);
       } else label.textContent = text;
       const labelGroup = svgEl("g");
       labelGroup.append(label);
@@ -497,13 +511,13 @@ function render(animate = true) {
       start = end;
     }
   };
-  appendGroupedLabels(bar => REGION_CODES[bar.region] || bar.region, margin.top + innerH + 51, "region-label");
-  appendGroupedLabels(bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region), height - margin.bottom + (compact ? 96 : 82), "party-label");
+  appendGroupedLabels(bar => state.fullRegionNames ? bar.region : REGION_CODES[bar.region] || bar.region, margin.top + innerH + (needsVerticalRegionNames ? 92 : 51), "region-label", "region");
+  appendGroupedLabels(bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region), margin.top + innerH + (needsVerticalRegionNames ? 174 : compact ? 96 : 82), "party-label");
   const legendX = compact ? margin.left / 2 : margin.left - 10;
   [
-    ["Veränderung", margin.top + innerH + 20],
-    ["Parlament", margin.top + innerH + 51],
-    ["Partei", height - margin.bottom + (compact ? 96 : 82)]
+    ["Veränderung*", margin.top + innerH + 20],
+    ["Parlament", margin.top + innerH + (needsVerticalRegionNames ? 92 : 51)],
+    ["Partei", margin.top + innerH + (needsVerticalRegionNames ? 174 : compact ? 96 : 82)]
   ].forEach(([text, y]) => {
     const legend = svgEl("text", { x: legendX, y, "text-anchor": compact ? "middle" : "end", class: "chart-legend" });
     legend.textContent = text;
@@ -543,11 +557,12 @@ function applyConfigurationCode(text) {
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 15) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 31) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
   state.a4Mode = Boolean(mode & 8);
+  state.fullRegionNames = Boolean(mode & 16);
   value %= legacySpace;
   const pollMask = Number(value % 7n) + 1;
   value /= 7n;
@@ -559,6 +574,7 @@ function applyConfigurationCode(text) {
   state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
   document.querySelector("#average-mode").checked = state.averageMode;
   els.mobileView.checked = state.mobileView;
+  els.fullRegionNames.checked = state.fullRegionNames;
   document.querySelector(`#cluster-${state.groupBy}`).checked = true;
   document.querySelector("#a4-mode").checked = state.a4Mode;
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
@@ -587,7 +603,7 @@ async function exportChartImage(format = "jpeg") {
   const selectedParties = [...state.parties];
   const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
     const poll = (state.data.polls[region] || [])[rank];
-    return poll ? `${REGION_CODES[region]} · ${rank === 0 ? "Neueste" : `${rank + 1}. jüngste`} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
+    return poll ? `${state.fullRegionNames ? region : REGION_CODES[region]} · ${rank === 0 ? "Neueste" : `${rank + 1}. jüngste`} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
   }).filter(Boolean));
   const partyColumns = selectedParties.length > 5 ? 2 : 1;
   const regionColumns = selectedRegions.length > 8 ? 2 : 1;
@@ -669,7 +685,7 @@ async function exportChartImage(format = "jpeg") {
     });
   };
   addLegendSection(700, 145, "PARTEIEN", selectedParties, partyColumns, true);
-  addLegendSection(865, 235, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), regionColumns);
+  addLegendSection(865, 235, "PARLAMENTE", selectedRegions.map(region => state.fullRegionNames ? region : REGION_CODES[region]), regionColumns);
   addLegendSection(1120, 460, "UMFRAGEDATEN", selectedPolls, pollColumns);
 
   const footerCenter = documentWidth / 2;
@@ -734,8 +750,8 @@ function a4ExportClusters() {
 function a4LayoutFor(clusters) {
   const largestCluster = Math.max(0, ...clusters.map(cluster => cluster.bars.length));
   if (largestCluster > 34) return { width: 1754, height: 1240, columns: 1, rows: 2, capacity: 2, landscape: true };
-  if (largestCluster > 17) return { width: 1240, height: 1754, columns: 1, rows: 4, capacity: 4, landscape: false };
-  return { width: 1240, height: 1754, columns: 2, rows: 4, capacity: 8, landscape: false };
+  if (largestCluster > 17) return { width: 1240, height: 1754, columns: 1, rows: state.fullRegionNames ? 3 : 4, capacity: state.fullRegionNames ? 3 : 4, landscape: false };
+  return { width: 1240, height: 1754, columns: 2, rows: state.fullRegionNames ? 3 : 4, capacity: state.fullRegionNames ? 6 : 8, landscape: false };
 }
 
 function updateExportSummary() {
@@ -762,9 +778,8 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const text = (value, attrs = {}) => { const node = svgEl("text", { fill: "#f4f8ff", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', ...attrs }); node.textContent = value; page.append(node); return node; };
   const now = new Date();
   const landscapeHeader = width > 1400;
-  const brandSize = landscapeHeader ? 104 : 72;
-  const brandY = landscapeHeader ? 116 : 92;
-  const legendStart = landscapeHeader ? 880 : 520;
+  const brandSize = landscapeHeader ? 118 : 84;
+  const brandY = landscapeHeader ? 128 : 102;
   text("Sonntagsfragen", { x: 42, y: brandY, style: "font-family: Georgia, serif", "font-size": brandSize, "font-weight": 500, "letter-spacing": "-.06em" });
   const creator = text("", { x: 42 + brandSize * 1.55, y: brandY + brandSize * .2, "text-anchor": "middle", fill: "#7f95b2", "font-size": brandSize * .096, "font-weight": 400, "letter-spacing": ".04em" });
   const creatorPrefix = svgEl("tspan"); creatorPrefix.textContent = "visualizer by ";
@@ -777,9 +792,8 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   text(minuteStamp, { x: 42, y: metaY, fill: "#8fa6c1", "font-size": 9 });
   text(configurationCode(), { x: 208, y: metaY, fill: "#b9cee5", "font-size": 9, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
   text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: 315, y: metaY, fill: "#8fa6c1", "font-size": 8.5 });
-  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: metaY + 27, fill: "#59d9ff", "font-size": 11, "font-weight": 700 });
   const selectedRegions = [...state.regions], selectedParties = [...state.parties];
-  const selectedPollGroups = [...state.selectedPollRanks].sort().map(rank => ({
+  const rankedPollGroups = [...state.selectedPollRanks].sort().map(rank => ({
     rank,
     label: rank === 0 ? "Neueste Umfragen" : `${rank + 1}. jüngste Umfragen`,
     fill: [.68, .34, .14][rank],
@@ -789,29 +803,47 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
     }).filter(Boolean)
   }));
-  const headerLegend = (x, title, items, columns, columnWidth, colorItems = false) => {
-    text(title, { x, y: 54, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".06em" });
+  const selectedPollGroups = state.averageMode ? [{
+    label: "Verwendete Umfragen", noSwatch: true,
+    items: rankedPollGroups.flatMap(group => group.items)
+  }] : rankedPollGroups;
+  const headerLegend = (x, y, title, items, columns, columnWidth, colorItems = false) => {
+    text(title, { x, y, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
     const rows = Math.ceil(items.length / columns);
     items.forEach((item, index) => {
-      const column = Math.floor(index / rows), row = index % rows, itemX = x + column * columnWidth, itemY = 70 + row * 9;
+      const column = Math.floor(index / rows), row = index % rows, itemX = x + column * columnWidth, itemY = y + 19 + row * 12;
       if (colorItems) page.append(svgEl("rect", { x: itemX, y: itemY - 6, width: 4, height: 7, fill: getComputedStyle(document.documentElement).getPropertyValue(PARTY_META[item].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[item].glow }));
-      text(item, { x: itemX + (colorItems ? 8 : 0), y: itemY, fill: "#dce8f7", "font-size": colorItems ? 7.5 : 7 });
+      text(item, { x: itemX + (colorItems ? 8 : 0), y: itemY, fill: "#dce8f7", "font-size": 10.7 });
     });
   };
-  const partyX = legendStart;
-  const regionX = partyX + 105;
-  const pollsX = regionX + (landscapeHeader ? 190 : 185);
-  headerLegend(partyX, "PARTEIEN", selectedParties, 1, 0, true);
-  headerLegend(regionX, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 1, 0);
-  text("UMFRAGEDATEN", { x: pollsX, y: 54, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".06em" });
-  const pollGroupWidth = (width - pollsX - 42) / Math.max(1, selectedPollGroups.length);
-  selectedPollGroups.forEach((group, groupIndex) => {
-    const groupX = pollsX + groupIndex * pollGroupWidth;
-    page.append(svgEl("rect", { x: groupX, y: 64, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
-    text(group.label, { x: groupX + 24, y: 72, fill: "#dce8f7", "font-size": 7.5, "font-weight": 700 });
-    group.items.forEach((item, itemIndex) => text(item, { x: groupX, y: 86 + itemIndex * 9, fill: "#dce8f7", "font-size": 6.5 }));
+  const leftLegendWidth = landscapeHeader ? 800 : 570;
+  const partyX = 42;
+  const partyY = metaY + 29;
+  text("PARTEIEN", { x: partyX, y: partyY, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
+  const partySlot = leftLegendWidth / Math.max(1, selectedParties.length);
+  selectedParties.forEach((party, index) => {
+    const itemX = partyX + index * partySlot;
+    page.append(svgEl("rect", { x: itemX, y: partyY + 11, width: 4, height: 9, fill: getComputedStyle(document.documentElement).getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow }));
+    text(party, { x: itemX + 8, y: partyY + 20, fill: "#dce8f7", "font-size": 10.7 });
   });
-  const gapX = 18, gapY = 18, left = 42, top = 280;
+  text("* = Veränderung zur aktuellen Sitzverteilung", { x: partyX, y: partyY + 43, fill: "#8fa6c1", "font-size": 8 });
+  const rightLegendX = landscapeHeader ? 900 : 650;
+  const rightLegendWidth = width - rightLegendX - 42;
+  const pollsY = 54;
+  text("UMFRAGEDATEN", { x: rightLegendX, y: pollsY, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
+  const pollGroupWidth = rightLegendWidth / Math.max(1, selectedPollGroups.length);
+  selectedPollGroups.forEach((group, groupIndex) => {
+    const groupX = rightLegendX + groupIndex * pollGroupWidth;
+    if (!group.noSwatch) page.append(svgEl("rect", { x: groupX, y: pollsY + 10, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
+    text(group.label, { x: groupX + (group.noSwatch ? 0 : 24), y: pollsY + 19, fill: "#dce8f7", "font-size": 10.7, "font-weight": 700 });
+    group.items.forEach((item, itemIndex) => text(item, { x: groupX, y: pollsY + 35 + itemIndex * 11, fill: "#dce8f7", "font-size": 9.33 }));
+  });
+  const pollLegendRows = Math.max(0, ...selectedPollGroups.map(group => group.items.length));
+  const regionsY = pollsY + 58 + pollLegendRows * 11;
+  headerLegend(rightLegendX, regionsY, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 3, rightLegendWidth / 3);
+  const regionLegendRows = Math.ceil(selectedRegions.length / 3);
+  const gapX = 18, gapY = 18, left = 42, top = Math.max(landscapeHeader ? 315 : 340, regionsY + 45 + regionLegendRows * 12, partyY + 72);
+  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: top - 24, fill: "#59d9ff", "font-size": 18, "font-weight": 800 });
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
   const tileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
   const allValues = clusters.flatMap(cluster => cluster.bars.map(({ party, item }) => Number(item.poll.values[party] || 0)));
@@ -820,15 +852,27 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   clusters.forEach((cluster, index) => {
     const column = index % columns, row = Math.floor(index / columns);
     const x = left + column * (tileWidth + gapX), y = top + row * (tileHeight + gapY);
-    text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 15, "font-weight": 800 });
-    const plot = { left: x + 34, right: x + tileWidth - 12, top: y + 48, bottom: y + tileHeight - (cluster.bars.length > 34 ? 106 : 88) };
+    text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 18, "font-weight": 800 });
+    text(minuteStamp, { x: x + 16, y: y + 43, fill: "#8fa6c1", "font-size": 10.7 });
+    const plotWidth = tileWidth - 52;
+    const pollNotes = [...new Map(cluster.bars.map(({ item }) => {
+      const key = `${item.region}|${item.average ? "average" : item.rank}`;
+      const label = item.average ? `${REGION_CODES[item.region]} · Durchschnitt` : `${REGION_CODES[item.region]} ${item.rank + 1} · ${item.poll.institute} · ${formatDate(item.poll.date)}`;
+      return [key, label];
+    })).values()];
+    const noteColumns = Math.max(1, Math.min(6, pollNotes.length, Math.floor(plotWidth / 145)));
+    const noteRows = Math.ceil(pollNotes.length / noteColumns);
+    const lowerLegendSpace = Math.max(160, 103 + noteRows * 11);
+    const plot = { left: x + 40, right: x + tileWidth - 12, top: y + 62, bottom: y + tileHeight - lowerLegendSpace };
     page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
     page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
     [0, .5, 1].forEach(fraction => {
       const lineY = plot.bottom - fraction * (plot.bottom - plot.top);
       page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: lineY, y2: lineY, stroke: "#9bb4d0", "stroke-opacity": .2 }));
-      text(`${Math.round(yMax * fraction)}`, { x: plot.left - 6, y: lineY + 4, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8 });
+      text(`${Math.round(yMax * fraction)}`, { x: plot.left - 6, y: lineY + 4, "text-anchor": "end", fill: "#8fa6c1", "font-size": 10.7 });
     });
+    const fiftyY = plot.bottom - Math.min(1, 50 / yMax) * (plot.bottom - plot.top) + 14;
+    text("Werte in %", { x: (plot.left + plot.right) / 2, y: fiftyY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 10.7 });
     const slot = (plot.right - plot.left) / Math.max(1, cluster.bars.length);
     const barWidth = Math.max(2, Math.min(34, slot * .68));
     cluster.bars.forEach(({ party, item }, barIndex) => {
@@ -841,7 +885,11 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const strokeOpacity = item.average ? 1 : [1, .7, .4][item.rank] ?? .4;
       page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": fillOpacity, stroke: PARTY_META[party].glow, "stroke-opacity": strokeOpacity, "stroke-width": 1.5 }));
       text(`${item.average ? "Ø " : ""}${formatPercent(value, false, true).replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
+      const electionValue = Number(state.data.elections?.[item.region]?.values?.[party] || 0);
+      const delta = value - electionValue;
+      text(formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
     });
+    text("Veränderung*", { x: plot.left - 5, y: plot.bottom + 19, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8, "font-weight": 700 });
     let runStart = 0;
     while (runStart < cluster.bars.length) {
       const runKey = state.groupBy === "party" ? cluster.bars[runStart].item.region : cluster.bars[runStart].party;
@@ -852,25 +900,33 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         runEnd += 1;
       }
       const runCenter = plot.left + slot * ((runStart + runEnd + 1) / 2);
-      const runLabel = state.groupBy === "party" ? REGION_CODES[runKey] : partyDisplayLabel(runKey, cluster.bars[runStart].item.region);
-      text(runLabel, { x: runCenter, y: plot.bottom + 16, "text-anchor": "middle", fill: "#a8bfd9", "font-size": cluster.bars.length > 34 ? 6 : 7.5, "font-weight": 700 });
+      const runCount = runEnd - runStart + 1;
+      const runLabel = state.groupBy === "party" ? (state.fullRegionNames ? runKey : REGION_CODES[runKey]) : partyDisplayLabel(runKey, cluster.bars[runStart].item.region);
+      const runWidth = slot * runCount;
+      const hyphenIndex = runLabel.indexOf("-");
+      const wrappedParts = hyphenIndex >= 0 ? [runLabel.slice(0, hyphenIndex + 1), runLabel.slice(hyphenIndex + 1)] : [runLabel];
+      const fullLabelWidth = runLabel.length * 6.25;
+      const wrappedLabelWidth = Math.max(...wrappedParts.map(part => part.length * 6.25));
+      const forcedMobileRotation = state.groupBy === "party" && state.fullRegionNames && state.mobileView && runCount < 3;
+      const wrapRegion = state.groupBy === "party" && state.fullRegionNames && runCount < 4 && hyphenIndex >= 0;
+      const rotateRegion = state.groupBy === "party" && state.fullRegionNames && (forcedMobileRotation || fullLabelWidth > runWidth - 6 || (wrapRegion && wrappedLabelWidth > runWidth - 6));
+      const labelY = plot.bottom + 46;
+      const labelNode = text("", { x: runCenter, y: labelY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9.33, "font-weight": 700, ...(rotateRegion ? { transform: `rotate(-90 ${runCenter} ${labelY})` } : {}) });
+      if (wrapRegion) {
+        const split = hyphenIndex + 1;
+        const firstLine = svgEl("tspan", { x: runCenter }); firstLine.textContent = runLabel.slice(0, split);
+        const secondLine = svgEl("tspan", { x: runCenter, dy: 10.5 }); secondLine.textContent = runLabel.slice(split);
+        labelNode.append(firstLine, secondLine);
+      } else labelNode.textContent = runLabel;
       runStart = runEnd + 1;
     }
-    const pollNotes = [...new Map(cluster.bars.map(({ item }) => {
-      const key = `${item.region}|${item.average ? "average" : item.rank}`;
-      const label = item.average ? `${REGION_CODES[item.region]} · Durchschnitt` : `${REGION_CODES[item.region]} ${item.rank + 1} · ${item.poll.institute} · ${formatDate(item.poll.date)}`;
-      return [key, label];
-    })).values()];
-    const noteColumns = Math.max(1, Math.min(6, pollNotes.length));
-    const noteRows = Math.ceil(pollNotes.length / noteColumns);
     const noteColumnWidth = (plot.right - plot.left) / noteColumns;
-    text("Verwendete Umfragen", { x: plot.left, y: plot.bottom + 34, fill: "#8fa6c1", "font-size": 6.5, "font-weight": 700, "letter-spacing": ".03em" });
+    text("Verwendete Umfragen", { x: plot.left, y: plot.bottom + 76, fill: "#8fa6c1", "font-size": 9.33, "font-weight": 700, "letter-spacing": ".03em" });
     pollNotes.forEach((note, noteIndex) => {
       const noteColumn = Math.floor(noteIndex / noteRows), noteRow = noteIndex % noteRows;
-      text(note, { x: plot.left + noteColumn * noteColumnWidth, y: plot.bottom + 47 + noteRow * 7, fill: "#9bb0c9", "font-size": 6 });
+      text(note, { x: plot.left + noteColumn * noteColumnWidth, y: plot.bottom + 91 + noteRow * 11, fill: "#9bb0c9", "font-size": 9.33 });
     });
   });
-  text("Werte in %", { x: width / 2, y: height - 92, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 11 });
   const footerStamp = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(now);
   text(footerStamp, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
   text("Quelle der Daten: Wahlrecht.de", { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
@@ -970,6 +1026,10 @@ fetch("data/polls.json", { cache: "no-store" })
     });
     els.mobileView.addEventListener("change", event => {
       state.mobileView = event.currentTarget.checked;
+      render(false);
+    });
+    els.fullRegionNames.addEventListener("change", event => {
+      state.fullRegionNames = event.currentTarget.checked;
       render(false);
     });
     document.querySelectorAll('input[name="cluster-mode"]').forEach(input => input.addEventListener("change", event => {
