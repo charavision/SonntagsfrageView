@@ -732,8 +732,8 @@ function a4ExportClusters() {
 
 function a4LayoutFor(clusters) {
   const largestCluster = Math.max(0, ...clusters.map(cluster => cluster.bars.length));
-  if (largestCluster > 30) return { width: 1754, height: 1240, columns: 4, rows: 1, capacity: 4, landscape: true };
-  if (largestCluster > 18) return { width: 1240, height: 1754, columns: 1, rows: 4, capacity: 4, landscape: false };
+  if (largestCluster > 34) return { width: 1754, height: 1240, columns: 2, rows: 1, capacity: 2, landscape: true };
+  if (largestCluster > 17) return { width: 1240, height: 1754, columns: 1, rows: 4, capacity: 4, landscape: false };
   return { width: 1240, height: 1754, columns: 3, rows: 4, capacity: 12, landscape: false };
 }
 
@@ -741,6 +741,9 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const { width, height, columns, rows } = layout;
   const page = svgEl("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${width} ${height}`, width, height });
   const defs = svgEl("defs");
+  const glowBlur = svgEl("filter", { id: "cluster-glow-blur", x: "-30%", y: "-30%", width: "160%", height: "160%" });
+  glowBlur.append(svgEl("feGaussianBlur", { stdDeviation: "24" }));
+  defs.append(glowBlur);
   clusters.forEach((_, index) => {
     const gradient = svgEl("radialGradient", { id: `cluster-glow-${index}`, cx: "50%", cy: "35%", r: "72%" });
     gradient.append(svgEl("stop", { offset: "0", "stop-color": "#244f80", "stop-opacity": ".42" }), svgEl("stop", { offset: ".62", "stop-color": "#132d50", "stop-opacity": ".18" }), svgEl("stop", { offset: "1", "stop-color": "#081326", "stop-opacity": "0" }));
@@ -751,10 +754,32 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const text = (value, attrs = {}) => { const node = svgEl("text", { fill: "#f4f8ff", ...attrs }); node.textContent = value; page.append(node); return node; };
   const now = new Date();
   text("Sonntagsfragen", { x: 42, y: 78, style: "font-family: Georgia, serif", "font-size": 58, "font-weight": 500, "letter-spacing": "-.06em" });
-  text(new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now), { x: 1198, y: 48, "text-anchor": "end", fill: "#8fa6c1", "font-size": 14 });
-  text(configurationCode(), { x: 1198, y: 72, "text-anchor": "end", fill: "#b9cee5", "font-size": 14, style: "font-family: ui-monospace, monospace" });
-  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: 112, fill: "#59d9ff", "font-size": 14, "font-weight": 700 });
-  const gapX = 18, gapY = 18, left = 42, top = 142;
+  const creator = text("", { x: 150, y: 98, "text-anchor": "middle", fill: "#7f95b2", "font-size": 8, "letter-spacing": ".04em" });
+  const creatorPrefix = svgEl("tspan"); creatorPrefix.textContent = "visualizer by ";
+  const creatorName = svgEl("tspan", { fill: "#b9dff1", "font-weight": 800 }); creatorName.textContent = "charavision";
+  creator.append(creatorPrefix, creatorName);
+  text(new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now), { x: width - 42, y: 48, "text-anchor": "end", fill: "#8fa6c1", "font-size": 14 });
+  text(configurationCode(), { x: width - 42, y: 72, "text-anchor": "end", fill: "#b9cee5", "font-size": 14, style: "font-family: ui-monospace, monospace" });
+  text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: width - 42, y: 92, "text-anchor": "end", fill: "#8fa6c1", "font-size": 11 });
+  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: 122, fill: "#59d9ff", "font-size": 14, "font-weight": 700 });
+  const selectedRegions = [...state.regions], selectedParties = [...state.parties];
+  const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+    const poll = (state.data.polls[region] || [])[rank];
+    return poll ? `${REGION_CODES[region]} · ${rank + 1}. · ${poll.institute} · ${formatDate(poll.date)}` : null;
+  }).filter(Boolean));
+  const headerLegend = (x, title, items, columns, colorItems = false) => {
+    text(title, { x, y: 142, fill: "#59d9ff", "font-size": 10, "font-weight": 800, "letter-spacing": ".06em" });
+    const rows = Math.ceil(items.length / columns), columnWidth = x < 650 ? 78 : x < 880 ? 105 : 120;
+    items.forEach((item, index) => {
+      const column = Math.floor(index / rows), row = index % rows, itemX = x + column * columnWidth, itemY = 157 + row * 7;
+      if (colorItems) page.append(svgEl("rect", { x: itemX, y: itemY - 5, width: 3, height: 5, fill: getComputedStyle(document.documentElement).getPropertyValue(PARTY_META[item].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[item].glow }));
+      text(item, { x: itemX + (colorItems ? 6 : 0), y: itemY, fill: "#dce8f7", "font-size": 6 });
+    });
+  };
+  headerLegend(480, "PARTEIEN", selectedParties, 2, true);
+  headerLegend(650, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 2);
+  headerLegend(880, "UMFRAGEDATEN", selectedPolls, selectedPolls.length > 20 ? 3 : 2);
+  const gapX = 18, gapY = 18, left = 42, top = 292;
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
   const tileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
   const allValues = clusters.flatMap(cluster => cluster.bars.map(({ party, item }) => Number(item.poll.values[party] || 0)));
@@ -763,7 +788,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   clusters.forEach((cluster, index) => {
     const column = index % columns, row = Math.floor(index / columns);
     const x = left + column * (tileWidth + gapX), y = top + row * (tileHeight + gapY);
-    page.append(svgEl("rect", { x, y, width: tileWidth, height: tileHeight, fill: `url(#cluster-glow-${index})` }));
+    page.append(svgEl("ellipse", { cx: x + tileWidth / 2, cy: y + tileHeight * .43, rx: tileWidth * .72, ry: tileHeight * .68, fill: `url(#cluster-glow-${index})`, filter: "url(#cluster-glow-blur)" }));
     text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 15, "font-weight": 800 });
     const plot = { left: x + 34, right: x + tileWidth - 12, top: y + 48, bottom: y + tileHeight - 54 };
     page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
@@ -791,9 +816,12 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       } else text(label, { x: barX + barWidth / 2, y: plot.bottom + 12, "text-anchor": "end", transform: `rotate(-90 ${barX + barWidth / 2} ${plot.bottom + 12})`, fill: "#a8bfd9", "font-size": cluster.bars.length > 18 ? 6 : 8 });
     });
   });
-  text("Werte in %", { x: width / 2, y: height - 82, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 11 });
-  text(`Quelle der Daten: Wahlrecht.de · © charavision`, { x: 42, y: height - 39, fill: "#8fa6c1", "font-size": 11 });
-  text(`Seite ${pageNumber} / ${pageCount}`, { x: width - 42, y: height - 39, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
+  text("Werte in %", { x: width / 2, y: height - 92, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 11 });
+  const footerStamp = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(now);
+  text(footerStamp, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
+  text("Quelle der Daten: Wahlrecht.de", { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
+  text("© charavision", { x: width / 2, y: height - 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 9, "font-weight": 700 });
+  text(`Seite ${pageNumber} / ${pageCount}`, { x: width - 42, y: height - 30, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
   return page;
 }
 
