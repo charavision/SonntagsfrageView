@@ -40,6 +40,11 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .controls { margin-top: 18px; padding: 26px clamp(18px, 3vw, 34px) 30px; border: 1px solid var(--line); border-radius: 22px; background: rgba(13,29,53,.78); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); backdrop-filter: blur(18px); }
 .control-group + .control-group { margin-top: 24px; }
 .control-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.cluster-heading { display: flex; align-items: center; gap: 8px; }
+.cluster-choice label { display: grid; place-items: center; width: 18px; min-height: 18px; padding: 0; border-radius: 4px; }
+.cluster-choice label::after { color: #071225; content: ""; font-size: 12px; font-weight: 900; }
+.cluster-choice input:checked + label { border-color: var(--accent); background: var(--accent); }
+.cluster-choice input:checked + label::after { content: "✓"; }
 .control-heading h2, .chart-heading h2 { margin: 0; font-size: 18px; }
 .text-button { padding: 2px; border: 0; color: var(--accent); background: transparent; cursor: pointer; font-size: 13px; font-weight: 700; }
 .option-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); grid-auto-rows: 1fr; gap: 7px; }
@@ -99,6 +104,7 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .chart-legend { fill: #8fa6c1; font-size: 9px; font-weight: 700; letter-spacing: .025em; }
 .chart-unit-label { fill: #8fa6c1; font-size: 9px; font-weight: 400; letter-spacing: .025em; }
 .poll-label { fill: #e8f0fa; font-size: 12px; font-weight: 700; }
+.party-label { fill: #e8f0fa; font-size: 12px; font-weight: 700; }
 .bar-glow { stroke-width: 1.43; pointer-events: none; }
 .bar { stroke-width: 1.43; transition: fill-opacity .15s, stroke-opacity .15s, stroke-width .15s; }
 .bar:hover { fill-opacity: .84; stroke-opacity: 1; stroke-width: 1.77; }

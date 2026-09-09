@@ -18,7 +18,7 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, groupBy: "party", chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -68,7 +68,7 @@ function configurationCode() {
   let value = rankOrdered([...state.regions], state.data.regions);
   value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n);
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n);
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
@@ -272,7 +272,10 @@ function render(animate = true) {
   const floorBackY = baselineY - (compact ? 18 : 44);
   const floorFrontY = Math.min(height - 2, baselineY + (compact ? 72 : 142));
   const chartW = width - margin.left - margin.right;
-  const groupWidth = chartW / parties.length;
+  const groupedBars = state.groupBy === "region"
+    ? selectedRegions.map(region => ({ key: `region:${region}`, bars: parties.flatMap(party => series.filter(item => item.region === region).map(item => ({ party, item }))) })).filter(group => group.bars.length)
+    : parties.map(party => ({ key: `party:${party}`, bars: series.map(item => ({ party, item })) }));
+  const groupWidth = chartW / groupedBars.length;
   const maxValue = Math.max(50, ...series.flatMap(item => parties.map(party => item.poll.values[party] || 0)));
   const yMax = Math.ceil(maxValue / 10) * 10;
   els.chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
@@ -376,17 +379,19 @@ function render(animate = true) {
   }
   els.chart.append(svgEl("line", { x1: axisX, x2: axisX, y1: margin.top, y2: height - 18, class: "axis-line" }));
 
-  const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12)) / series.length;
-  const barGap = series.length === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
+  const maxBarsPerGroup = Math.max(...groupedBars.map(group => group.bars.length));
+  const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12)) / maxBarsPerGroup;
+  const barGap = maxBarsPerGroup === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
   const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : availablePerBar - barGap;
   const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth, availablePerBar - barGap));
   const displayedBars = [];
   const perspectiveBars = [];
-  parties.forEach((party, partyIndex) => {
-    const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
-    const totalBars = series.length * barWidth + (series.length - 1) * barGap;
+  groupedBars.forEach((group, groupIndex) => {
+    const center = margin.left + groupIndex * groupWidth + groupWidth / 2;
+    const totalBars = group.bars.length * barWidth + (group.bars.length - 1) * barGap;
     const startX = center - totalBars / 2;
-    series.forEach((item, seriesIndex) => {
+    group.bars.forEach(({ party, item }, barIndex) => {
+      const partyIndex = parties.indexOf(party);
       const key = `${party}|${item.region}|${item.average ? "average" : item.rank}`;
       const old = oldLayout.get(key);
       const value = Number(item.poll.values[party] || 0);
@@ -395,7 +400,7 @@ function render(animate = true) {
       const delta = value - baseline;
       const isNew = !election?.represented?.includes(party) && value >= 5 && party !== "Sonstige";
       const h = (value / yMax) * innerH;
-      const x = startX + seriesIndex * (barWidth + barGap);
+      const x = startX + barIndex * (barWidth + barGap);
       const y = margin.top + innerH - h;
       const fillOpacity = item.average ? .68 : [.68, .34, .16][item.rank];
       const strokeOpacity = item.average ? 1 : [1, .78, .56][item.rank];
@@ -459,64 +464,36 @@ function render(animate = true) {
       }
       els.chart.append(deltaLabel);
       old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, newLabelDelay);
-      displayedBars.push({ region: item.region, center: x + barWidth / 2 });
+      displayedBars.push({ region: item.region, party, center: x + barWidth / 2 });
       nextLayout.set(key, { x, center: x + barWidth / 2 });
     });
-
-    // A multi-parliament Union comparison shares CDU/CSU. With one parliament,
-    // the label is CDU, CSU for Bavaria, or CDU/CSU for the Bundestag.
-    const partyLabelY = height - margin.bottom + (compact ? 96 : 82);
-    const sharedUnionLabel = party === "CDU/CSU" && selectedRegions.length > 1;
-    let labelStart = 0;
-    while (labelStart < series.length) {
-      const displayLabel = sharedUnionLabel ? "CDU/CSU" : partyDisplayLabel(party, series[labelStart].region);
-      let labelEnd = labelStart + 1;
-      while (labelEnd < series.length && (sharedUnionLabel || partyDisplayLabel(party, series[labelEnd].region) === displayLabel)) labelEnd += 1;
-      const firstCenter = startX + labelStart * (barWidth + barGap) + barWidth / 2;
-      const lastCenter = startX + (labelEnd - 1) * (barWidth + barGap) + barWidth / 2;
-      const labelCenter = (firstCenter + lastCenter) / 2;
-      const rotatePartyLabel = compact && labelEnd - labelStart === 1;
-      const label = svgEl("text", {
-        x: labelCenter,
-        y: partyLabelY,
-        "text-anchor": "middle",
-        class: `poll-label${compact ? " mobile-party-label" : ""}`,
-        ...(rotatePartyLabel ? { transform: `rotate(-90 ${labelCenter} ${partyLabelY})` } : {})
-      });
-      label.textContent = displayLabel;
-      const partyLabelGroup = svgEl("g");
-      partyLabelGroup.append(label);
-      els.chart.append(partyLabelGroup);
-      fadeIn(partyLabelGroup, motionEnabled, newLabelDelay);
-      labelStart = labelEnd;
-    }
-    nextLayout.set(`party:${party}`, { center });
+    nextLayout.set(group.key, { center });
   });
 
-  // Parliament labels follow the complete visual bar sequence, not individual
-  // party groups. Any adjacent bars from one parliament therefore share one label.
-  let regionStart = 0;
-  while (regionStart < displayedBars.length) {
-    let regionEnd = regionStart + 1;
-    while (regionEnd < displayedBars.length && displayedBars[regionEnd].region === displayedBars[regionStart].region) regionEnd += 1;
-    const count = regionEnd - regionStart;
-    const regionLabelX = (displayedBars[regionStart].center + displayedBars[regionEnd - 1].center) / 2;
-    const regionLabelY = margin.top + innerH + 51;
-    const rotateRegionLabel = compact && count === 1;
-    const regionLabel = svgEl("text", {
-      x: regionLabelX,
-      y: regionLabelY,
-      "text-anchor": "middle",
-      class: `region-label${compact ? " mobile-region-label" : ""}`,
-      ...(rotateRegionLabel ? { transform: `rotate(-90 ${regionLabelX} ${regionLabelY})` } : {})
-    });
-    regionLabel.textContent = REGION_CODES[displayedBars[regionStart].region] || displayedBars[regionStart].region;
-    const regionLabelGroup = svgEl("g");
-    regionLabelGroup.append(regionLabel);
-    els.chart.append(regionLabelGroup);
-    fadeIn(regionLabelGroup, motionEnabled, newLabelDelay);
-    regionStart = regionEnd;
-  }
+  const appendGroupedLabels = (labelFor, y, className) => {
+    let start = 0;
+    while (start < displayedBars.length) {
+      const text = labelFor(displayedBars[start]);
+      let end = start + 1;
+      while (end < displayedBars.length && labelFor(displayedBars[end]) === text) end += 1;
+      const count = end - start;
+      const x = (displayedBars[start].center + displayedBars[end - 1].center) / 2;
+      const rotate = compact && count === 1;
+      const label = svgEl("text", {
+        x, y, "text-anchor": "middle",
+        class: `${className}${compact ? ` mobile-${className}` : ""}`,
+        ...(rotate ? { transform: `rotate(-90 ${x} ${y})` } : {})
+      });
+      label.textContent = text;
+      const labelGroup = svgEl("g");
+      labelGroup.append(label);
+      els.chart.append(labelGroup);
+      fadeIn(labelGroup, motionEnabled, newLabelDelay);
+      start = end;
+    }
+  };
+  appendGroupedLabels(bar => REGION_CODES[bar.region] || bar.region, margin.top + innerH + 51, "region-label");
+  appendGroupedLabels(bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region), height - margin.bottom + (compact ? 96 : 82), "party-label");
   const legendX = compact ? margin.left / 2 : margin.left - 10;
   [
     ["Veränderung", margin.top + innerH + 20],
@@ -560,9 +537,10 @@ function applyConfigurationCode(text) {
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 3) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 7) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
+  state.groupBy = mode & 4 ? "region" : "party";
   value %= legacySpace;
   const pollMask = Number(value % 7n) + 1;
   value /= 7n;
@@ -574,6 +552,7 @@ function applyConfigurationCode(text) {
   state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
   document.querySelector("#average-mode").checked = state.averageMode;
   els.mobileView.checked = state.mobileView;
+  document.querySelector(`#cluster-${state.groupBy}`).checked = true;
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
   els.parties.querySelectorAll("input").forEach(input => input.checked = state.parties.has(input.value));
   updatePollOptions(false);
@@ -753,6 +732,11 @@ fetch("data/polls.json", { cache: "no-store" })
       state.mobileView = event.currentTarget.checked;
       render(false);
     });
+    document.querySelectorAll('input[name="cluster-mode"]').forEach(input => input.addEventListener("change", event => {
+      if (!event.currentTarget.checked) return;
+      state.groupBy = event.currentTarget.value;
+      render();
+    }));
     document.querySelector("#export-jpeg").addEventListener("click", () => exportChartImage("jpeg").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
     document.querySelector("#export-png").addEventListener("click", () => exportChartImage("png").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
     window.addEventListener("resize", () => render(false));

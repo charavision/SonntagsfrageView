@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=chart-heading-controls-67">
+  <link rel="stylesheet" href="styles.css?v=cluster-mode-68">
 </head>
 <body>
   <main>
@@ -32,7 +32,7 @@
     <section class="controls" aria-label="Auswahl">
       <div class="control-group regions">
         <div class="control-heading">
-          <h2>Parlament</h2>
+          <div class="cluster-heading"><h2>Parlament</h2><span class="cluster-choice choice"><input id="cluster-region" type="radio" name="cluster-mode" value="region"><label for="cluster-region" aria-label="Nach Parlament gruppieren"></label></span></div>
           <button id="region-toggle" class="text-button" type="button">Alle auswählen</button>
         </div>
         <div id="region-options" class="option-grid"></div>
@@ -41,7 +41,7 @@
 
       <div class="control-group">
         <div class="control-heading">
-          <h2>Parteien</h2>
+          <div class="cluster-heading"><h2>Parteien</h2><span class="cluster-choice choice"><input id="cluster-party" type="radio" name="cluster-mode" value="party" checked><label for="cluster-party" aria-label="Nach Partei gruppieren"></label></span></div>
           <button id="party-toggle" class="text-button" type="button">Alle abwählen</button>
         </div>
         <div id="party-options" class="party-options"></div>
@@ -99,6 +99,6 @@
     </footer>
   </main>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
-  <script src="app.js?v=chart-heading-controls-67" defer></script>
+  <script src="app.js?v=cluster-mode-68" defer></script>
 </body>
 </html>
