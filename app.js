@@ -616,11 +616,16 @@ async function exportChartImage(format = "jpeg") {
     weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
   }).format(now);
   const headerX = 18;
-  const headerCenter = 240;
+  const headerMetaX = 565;
   addText("Sonntagsfragen", { x: headerX, y: 66, style: "font-family: Georgia, serif", "font-size": 64, "font-weight": 500, "letter-spacing": "-.06em" });
-  addText("visualizer by charavision", { x: headerX + 108, y: 84, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 6.5, "font-weight": 700, "letter-spacing": ".07em" });
-  addText(minuteStamp, { x: headerCenter, y: 108, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
-  addText(configurationCode(), { x: headerCenter, y: 124, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  const creator = addText("", { x: headerX + 108, y: 84, "text-anchor": "middle", fill: "#7f95b2", "font-size": 6.5, "font-weight": 400, "letter-spacing": ".04em", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' });
+  const creatorPrefix = svgEl("tspan");
+  creatorPrefix.textContent = "visualizer by ";
+  const creatorName = svgEl("tspan", { fill: "#b9dff1", "font-weight": 800 });
+  creatorName.textContent = "charavision";
+  creator.append(creatorPrefix, creatorName);
+  addText(minuteStamp, { x: headerMetaX, y: 54, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
+  addText(configurationCode(), { x: headerMetaX, y: 70, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
 
   clone.setAttribute("x", (documentWidth - viewBox.width) / 2);
   clone.setAttribute("y", headerHeight);
@@ -641,9 +646,9 @@ async function exportChartImage(format = "jpeg") {
       addText(item, { x: itemX + (swatches ? 7 : 0), y, fill: "#dce8f7", "font-size": 7 });
     });
   };
-  addLegendSection(650, 180, "PARTEIEN", selectedParties, partyColumns, true);
-  addLegendSection(850, 270, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), regionColumns);
-  addLegendSection(1140, documentWidth - 1158, "UMFRAGEDATEN", selectedPolls, pollColumns);
+  addLegendSection(700, 145, "PARTEIEN", selectedParties, partyColumns, true);
+  addLegendSection(865, 235, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), regionColumns);
+  addLegendSection(1120, 460, "UMFRAGEDATEN", selectedPolls, pollColumns);
 
   const footerCenter = documentWidth / 2;
   const footerY = headerHeight + viewBox.height + 20;
