@@ -463,9 +463,9 @@ function render(animate = true) {
     els.chart.append(legend);
   });
   state.chartLayout = nextLayout;
-  state.perspective = compact ? null : {
+  state.perspective = {
     floorLines: perspectiveFloorLines, floorRows: perspectiveFloorRows, bars: perspectiveBars,
-    floorLeft, floorRight, frontScale: 1.4
+    floorLeft, floorRight, frontScale: compact ? 1.52 : 1.4
   };
   updatePerspective();
 }
