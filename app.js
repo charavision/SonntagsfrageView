@@ -189,6 +189,7 @@ function render(animate = true) {
     : Math.max(availableWidth, margin.left + margin.right + visiblePlotWidth * (totalBarCount / visibleBarLimit));
   const height = compact ? 520 : 590;
   const innerH = height - margin.top - margin.bottom;
+  const baselineY = margin.top + innerH;
   const chartW = width - margin.left - margin.right;
   const groupWidth = chartW / parties.length;
   const maxValue = Math.max(50, ...series.flatMap(item => parties.map(party => item.poll.values[party] || 0)));
@@ -198,7 +199,13 @@ function render(animate = true) {
   els.chart.setAttribute("height", height);
 
   const defs = svgEl("defs");
-  defs.innerHTML = parties.map((party, index) => {
+  defs.innerHTML = `<linearGradient id="floor-line-fade" x1="0" y1="${baselineY}" x2="0" y2="${height}" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#65b6ff" stop-opacity=".08"/>
+      <stop offset=".22" stop-color="#65b6ff" stop-opacity=".34"/>
+      <stop offset=".68" stop-color="#65b6ff" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#65b6ff" stop-opacity=".04"/>
+    </linearGradient>
+    <filter id="floor-soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.25"/></filter>` + parties.map((party, index) => {
     const glow = PARTY_META[party].glow;
     const union = party === "CDU/CSU";
     return `<filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
@@ -212,6 +219,30 @@ function render(animate = true) {
     </filter>`;
   }).join("");
   els.chart.append(defs);
+
+  const floor = svgEl("g", { class: "perspective-floor", "aria-hidden": "true" });
+  const floorBottom = height - 2;
+  const vanishX = margin.left + chartW / 2;
+  const floorLeft = axisX;
+  const floorRight = width - margin.right;
+  for (let index = 0; index <= 18; index += 1) {
+    const x = floorLeft + ((floorRight - floorLeft) * index) / 18;
+    floor.append(svgEl("line", {
+      x1: vanishX, y1: baselineY, x2: x, y2: floorBottom,
+      stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1
+    }));
+  }
+  for (let index = 1; index <= 13; index += 1) {
+    const progress = index / 13;
+    const y = baselineY + (floorBottom - baselineY) * Math.pow(progress, 1.72);
+    const soft = index <= 2 || index >= 11;
+    floor.append(svgEl("line", {
+      x1: floorLeft, y1: y, x2: floorRight, y2: y,
+      stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1,
+      ...(soft ? { filter: "url(#floor-soft)" } : {})
+    }));
+  }
+  els.chart.append(floor);
 
   for (let tick = 0; tick <= yMax; tick += 10) {
     const y = margin.top + innerH - (tick / yMax) * innerH;
