@@ -210,7 +210,13 @@ function render(animate = true) {
     <filter id="star-wide" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="4.8"/></filter>` + parties.map((party, index) => {
     const glow = PARTY_META[party].glow;
     const union = party === "CDU/CSU";
-    return `<filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
+    return `<linearGradient id="bar-depth-${index}" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="${glow}" stop-opacity=".48"/>
+      <stop offset=".16" stop-color="${PARTY_META[party].color}"/>
+      <stop offset=".72" stop-color="${PARTY_META[party].color}"/>
+      <stop offset="1" stop-color="#020711" stop-opacity=".82"/>
+    </linearGradient>
+    <filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="${union ? 6 : 9}" result="wide-blur"/>
       <feFlood flood-color="${glow}" flood-opacity="${union ? ".34" : ".62"}" result="wide-color"/>
       <feComposite in="wide-color" in2="wide-blur" operator="in" result="wide-glow"/>
@@ -306,7 +312,7 @@ function render(animate = true) {
       });
       const bar = svgEl("rect", {
         x, y, width: barWidth, height: h,
-        fill: PARTY_META[party].color,
+        fill: compact ? PARTY_META[party].color : `url(#bar-depth-${partyIndex})`,
         stroke: PARTY_META[party].glow,
         "fill-opacity": fillOpacity,
         "stroke-opacity": strokeOpacity,
