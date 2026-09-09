@@ -88,5 +88,9 @@ footer a { color: inherit; }
   .hero, .chart-heading { align-items: flex-start; flex-direction: column; }
   .status, .chart-meta { text-align: left; }
   .poll-options { grid-template-columns: 1fr; }
+  .chart-section { padding-right: 8px; padding-left: 8px; }
+  .chart-scroll { border-radius: 18px; }
   #chart { min-height: 480px; }
+  .axis-label { font-size: 10px; }
+  .poll-label { font-size: 10px; }
 }
