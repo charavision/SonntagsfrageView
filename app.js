@@ -134,13 +134,16 @@ function render() {
   if (!series.length || !parties.length) return;
 
   const compact = window.innerWidth < 700;
-  const slotWidth = compact ? 48 : 60;
-  const groupWidth = Math.max(compact ? 76 : 96, series.length * slotWidth + 30);
   const margin = { top: 62, right: 34, bottom: 142, left: 64 };
-  const width = Math.max(els.scroll.clientWidth - 2, margin.left + margin.right + parties.length * groupWidth);
+  const totalBarCount = parties.length * series.length;
+  const availableWidth = Math.max(320, els.scroll.clientWidth - 2);
+  const width = totalBarCount <= 10
+    ? availableWidth
+    : Math.max(availableWidth, margin.left + margin.right + totalBarCount * (compact ? 46 : 58) + parties.length * 20);
   const height = compact ? 480 : 560;
   const innerH = height - margin.top - margin.bottom;
   const chartW = width - margin.left - margin.right;
+  const groupWidth = chartW / parties.length;
   const maxValue = Math.max(50, ...series.flatMap(item => parties.map(party => item.poll.values[party] || 0)));
   const yMax = Math.ceil(maxValue / 10) * 10;
   els.chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
@@ -159,8 +162,10 @@ function render() {
     els.chart.append(label);
   }
 
-  const barGap = compact ? 12 : 18;
-  const barWidth = compact ? 30 : 36;
+  const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12)) / series.length;
+  const barGap = series.length === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
+  const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : 58;
+  const barWidth = Math.max(10, Math.min(maxBarWidth, availablePerBar - barGap));
   parties.forEach((party, partyIndex) => {
     const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
     const totalBars = series.length * barWidth + (series.length - 1) * barGap;
