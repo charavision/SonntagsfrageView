@@ -49,6 +49,8 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .choice input:checked + label { border-color: #59d9ff; background: linear-gradient(135deg, rgba(37,105,154,.82), rgba(16,48,82,.96)); color: white; box-shadow: 0 0 18px rgba(89,217,255,.14); }
 .party-choice label::before { width: 10px; height: 10px; margin-right: 7px; background: var(--party-color); content: ""; }
 .party-choice input:checked + label { border-color: var(--party-color); background: color-mix(in srgb, var(--party-color) 28%, #101f38); color: var(--ink); box-shadow: 0 0 14px color-mix(in srgb, var(--party-color) 22%, transparent); }
+#party-cdu-csu + label { border-color: rgba(225,234,244,.56); box-shadow: 0 0 9px rgba(238,243,248,.18), inset 0 0 0 1px rgba(255,255,255,.04); }
+#party-cdu-csu:checked + label { border-color: #eef3f8; box-shadow: 0 0 16px rgba(238,243,248,.42), inset 0 0 0 1px rgba(255,255,255,.08); }
 .poll-picker { margin-top: 24px; }
 .poll-picker .control-heading span { color: var(--muted); font-size: 12px; }
 .poll-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
