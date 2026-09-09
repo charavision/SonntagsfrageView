@@ -168,7 +168,7 @@ function render(animate = true) {
     return;
   }
 
-  const compact = window.innerWidth < 700;
+  const compact = window.innerWidth < 900;
   // On phones the scale sits on the actual edge while the bars retain a small
   // inset, so the first bar never collides with the tick labels.
   const axisX = compact ? 1 : 160;
@@ -253,8 +253,10 @@ function render(animate = true) {
         ...(compact ? { transform: `rotate(-90 ${regionLabelX} ${regionLabelY})` } : {})
       });
       regionLabel.textContent = REGION_CODES[item.region] || item.region;
-      els.chart.append(regionLabel);
-      old ? animateX(regionLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabel, motionEnabled, newLabelDelay);
+      const regionLabelGroup = svgEl("g");
+      regionLabelGroup.append(regionLabel);
+      els.chart.append(regionLabelGroup);
+      old ? animateX(regionLabelGroup, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabelGroup, motionEnabled, newLabelDelay);
       nextLayout.set(key, { x, center: x + barWidth / 2 });
     });
     const partyLabelY = height - margin.bottom + 82;
@@ -267,8 +269,10 @@ function render(animate = true) {
     });
     label.textContent = party;
     const oldParty = oldLayout.get(`party:${party}`);
-    els.chart.append(label);
-    oldParty ? animateX(label, oldParty.center, center, motionEnabled) : fadeIn(label, motionEnabled, newLabelDelay);
+    const partyLabelGroup = svgEl("g");
+    partyLabelGroup.append(label);
+    els.chart.append(partyLabelGroup);
+    oldParty ? animateX(partyLabelGroup, oldParty.center, center, motionEnabled) : fadeIn(partyLabelGroup, motionEnabled, newLabelDelay);
     nextLayout.set(`party:${party}`, { center });
   });
   const legendX = margin.left - 10;

@@ -83,7 +83,7 @@ footer { padding-top: 20px; color: var(--muted); font-size: 12px; }
 footer a { color: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
-@media (max-width: 680px) {
+@media (max-width: 900px) {
   main { padding: 18px; }
   .hero, .chart-heading { align-items: flex-start; flex-direction: column; }
   .status, .chart-meta { text-align: left; }
