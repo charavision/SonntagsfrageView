@@ -120,6 +120,8 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .output-code output { display: block; }
 .outputs > small { color: var(--muted); font-size: 11px; }
 .export-controls { display: flex; align-items: center; gap: 8px; }
+.export-action { display: flex; align-items: stretch; flex-direction: column; gap: 4px; }
+.export-action small { color: var(--muted); font-size: 10px; line-height: 1.2; text-align: center; white-space: nowrap; }
 .export-controls > label { color: var(--muted); font-size: 12px; font-weight: 800; }
 .export-controls select { min-width: 112px; min-height: 38px; padding: 7px 28px 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #0d1d34; color: var(--ink); font: inherit; }
 .a4-choice label { min-height: 38px; padding: 8px 11px; }
@@ -141,7 +143,8 @@ footer a { color: inherit; }
   .outputs { align-items: stretch; flex-direction: column; gap: 8px; padding: 12px; }
   .export-controls { display: grid; grid-template-columns: auto minmax(112px, 1fr) auto; width: 100%; }
   .export-controls select { width: 100%; }
-  .export-controls .export-button { grid-column: 1 / -1; width: 100%; }
+  .export-controls .export-action { grid-column: 1 / -1; width: 100%; }
+  .export-controls .export-button { width: 100%; }
   .output-code { flex: none; width: 100%; }
   .title-lockup { padding-bottom: 5px; }
   .creator { left: 23%; font-size: 7px; }

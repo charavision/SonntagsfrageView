@@ -91,9 +91,12 @@
       </div>
       <div class="export-controls">
         <label for="export-format">Output-Format</label>
-        <select id="export-format"><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf">PDF</option></select>
-        <span class="a4-choice choice"><input id="a4-mode" type="checkbox"><label for="a4-mode">A4</label></span>
-        <button id="export-file" class="export-button" type="button">Ausgeben</button>
+        <select id="export-format"><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf" selected>PDF</option></select>
+        <span class="a4-choice choice"><input id="a4-mode" type="checkbox" checked><label for="a4-mode">A4</label></span>
+        <span class="export-action">
+          <small id="export-summary">– Items auf – Seiten</small>
+          <button id="export-file" class="export-button" type="button">Download</button>
+        </span>
       </div>
       <small id="export-message" aria-live="polite"></small>
     </section>
@@ -103,6 +106,6 @@
     </footer>
   </main>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
-  <script src="app.js?v=a4-grouped-labels-86" defer></script>
+  <script src="app.js?v=download-summary-90" defer></script>
 </body>
 </html>

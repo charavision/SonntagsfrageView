@@ -18,7 +18,7 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, groupBy: "party", a4Mode: false, chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, groupBy: "party", a4Mode: true, chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -28,7 +28,7 @@ const els = {
   chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
-  exportMessage: document.querySelector("#export-message")
+  exportMessage: document.querySelector("#export-message"), exportSummary: document.querySelector("#export-summary")
 };
 
 const CODE_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -519,6 +519,7 @@ function render(animate = true) {
   };
   updatePerspective();
   els.outputCode.textContent = configurationCode();
+  updateExportSummary();
 }
 
 function showTooltip(event, region, poll, party, value) {
@@ -734,7 +735,16 @@ function a4LayoutFor(clusters) {
   const largestCluster = Math.max(0, ...clusters.map(cluster => cluster.bars.length));
   if (largestCluster > 34) return { width: 1754, height: 1240, columns: 1, rows: 2, capacity: 2, landscape: true };
   if (largestCluster > 17) return { width: 1240, height: 1754, columns: 1, rows: 4, capacity: 4, landscape: false };
-  return { width: 1240, height: 1754, columns: 3, rows: 4, capacity: 12, landscape: false };
+  return { width: 1240, height: 1754, columns: 2, rows: 4, capacity: 8, landscape: false };
+}
+
+function updateExportSummary() {
+  if (!state.data || !els.exportSummary) return;
+  const clusters = a4ExportClusters();
+  const format = document.querySelector("#export-format")?.value || "pdf";
+  const usePages = state.a4Mode || format === "pdf";
+  const pages = usePages ? Math.max(1, Math.ceil(clusters.length / a4LayoutFor(clusters).capacity)) : 1;
+  els.exportSummary.textContent = `${clusters.length} ${clusters.length === 1 ? "Item" : "Items"} auf ${pages} ${pages === 1 ? "Seite" : "Seiten"}`;
 }
 
 function buildA4Page(clusters, pageNumber, pageCount, layout) {
@@ -769,10 +779,16 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: 315, y: metaY, fill: "#8fa6c1", "font-size": 8.5 });
   text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: metaY + 27, fill: "#59d9ff", "font-size": 11, "font-weight": 700 });
   const selectedRegions = [...state.regions], selectedParties = [...state.parties];
-  const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
-    const poll = (state.data.polls[region] || [])[rank];
-    return poll ? `${REGION_CODES[region]} · ${rank + 1}. · ${poll.institute} · ${formatDate(poll.date)}` : null;
-  }).filter(Boolean));
+  const selectedPollGroups = [...state.selectedPollRanks].sort().map(rank => ({
+    rank,
+    label: rank === 0 ? "Neueste Umfragen" : `${rank + 1}. jüngste Umfragen`,
+    fill: [.68, .34, .14][rank],
+    stroke: [1, .7, .4][rank],
+    items: selectedRegions.map(region => {
+      const poll = (state.data.polls[region] || [])[rank];
+      return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
+    }).filter(Boolean)
+  }));
   const headerLegend = (x, title, items, columns, columnWidth, colorItems = false) => {
     text(title, { x, y: 54, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".06em" });
     const rows = Math.ceil(items.length / columns);
@@ -785,19 +801,15 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const partyX = legendStart;
   const regionX = partyX + 105;
   const pollsX = regionX + (landscapeHeader ? 190 : 185);
-  const pollWidth = Math.max(105, (width - pollsX - 42) / (selectedPolls.length > 20 ? 3 : 2));
   headerLegend(partyX, "PARTEIEN", selectedParties, 1, 0, true);
   headerLegend(regionX, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 1, 0);
-  headerLegend(pollsX, "UMFRAGEDATEN", selectedPolls, selectedPolls.length > 20 ? 3 : 2, pollWidth);
-  text("TRANSPARENZ", { x: partyX, y: 232, fill: "#59d9ff", "font-size": 9, "font-weight": 800, "letter-spacing": ".06em" });
-  [
-    { label: "Neueste", fill: .68, stroke: 1 },
-    { label: "2. jüngste", fill: .34, stroke: .7 },
-    { label: "3. jüngste", fill: .14, stroke: .4 }
-  ].forEach((entry, index) => {
-    const itemX = partyX + index * 82;
-    page.append(svgEl("rect", { x: itemX, y: 241, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": entry.fill, stroke: "#dce8f7", "stroke-opacity": entry.stroke, "stroke-width": 1 }));
-    text(entry.label, { x: itemX + 24, y: 249, fill: "#dce8f7", "font-size": 7.5 });
+  text("UMFRAGEDATEN", { x: pollsX, y: 54, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".06em" });
+  const pollGroupWidth = (width - pollsX - 42) / Math.max(1, selectedPollGroups.length);
+  selectedPollGroups.forEach((group, groupIndex) => {
+    const groupX = pollsX + groupIndex * pollGroupWidth;
+    page.append(svgEl("rect", { x: groupX, y: 64, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
+    text(group.label, { x: groupX + 24, y: 72, fill: "#dce8f7", "font-size": 7.5, "font-weight": 700 });
+    group.items.forEach((item, itemIndex) => text(item, { x: groupX, y: 86 + itemIndex * 9, fill: "#dce8f7", "font-size": 6.5 }));
   });
   const gapX = 18, gapY = 18, left = 42, top = 280;
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
@@ -969,8 +981,11 @@ fetch("data/polls.json", { cache: "no-store" })
     const a4Mode = document.querySelector("#a4-mode");
     a4Mode.addEventListener("change", event => { state.a4Mode = event.currentTarget.checked; render(false); });
     exportFormat.addEventListener("change", event => {
-      if (event.currentTarget.value !== "pdf" || state.a4Mode) return;
-      state.a4Mode = true; a4Mode.checked = true; render(false);
+      if (event.currentTarget.value === "pdf" && !state.a4Mode) {
+        state.a4Mode = true; a4Mode.checked = true; render(false);
+        return;
+      }
+      updateExportSummary();
     });
     document.querySelector("#export-file").addEventListener("click", () => {
       const format = exportFormat.value;
