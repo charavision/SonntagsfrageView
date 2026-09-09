@@ -92,5 +92,6 @@ footer a { color: inherit; }
   .chart-scroll { border-radius: 18px; }
   #chart { min-height: 480px; }
   .axis-label { font-size: 10px; }
-  .poll-label { font-size: 10px; }
+  .mobile-region-label, .mobile-party-label { font-size: 8px; letter-spacing: .015em; }
+  .chart-legend { font-size: 6px; letter-spacing: 0; }
 }

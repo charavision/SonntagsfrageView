@@ -259,7 +259,7 @@ function render(animate = true) {
       old ? animateX(regionLabelGroup, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabelGroup, motionEnabled, newLabelDelay);
       nextLayout.set(key, { x, center: x + barWidth / 2 });
     });
-    const partyLabelY = height - margin.bottom + 82;
+    const partyLabelY = height - margin.bottom + (compact ? 96 : 82);
     const label = svgEl("text", {
       x: center,
       y: partyLabelY,
@@ -275,13 +275,13 @@ function render(animate = true) {
     oldParty ? animateX(partyLabelGroup, oldParty.center, center, motionEnabled) : fadeIn(partyLabelGroup, motionEnabled, newLabelDelay);
     nextLayout.set(`party:${party}`, { center });
   });
-  const legendX = margin.left - 10;
+  const legendX = compact ? margin.left / 2 : margin.left - 10;
   [
     ["Veränderung", margin.top + innerH + 20],
     ["Parlament", margin.top + innerH + 51],
-    ["Partei", height - margin.bottom + 82]
+    ["Partei", height - margin.bottom + (compact ? 96 : 82)]
   ].forEach(([text, y]) => {
-    const legend = svgEl("text", { x: legendX, y, "text-anchor": "end", class: "chart-legend" });
+    const legend = svgEl("text", { x: legendX, y, "text-anchor": compact ? "middle" : "end", class: "chart-legend" });
     legend.textContent = text;
     els.chart.append(legend);
   });
