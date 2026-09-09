@@ -109,8 +109,9 @@ function svgEl(name, attrs = {}) {
   return el;
 }
 
-function formatPercent(value, signed = false) {
-  const absolute = Math.abs(Number(value)).toFixed(1).replace(".", ",");
+function formatPercent(value, signed = false, omitZeroDecimal = false) {
+  const numeric = Math.abs(Number(value));
+  const absolute = (omitZeroDecimal && Number.isInteger(numeric) ? numeric.toFixed(0) : numeric.toFixed(1)).replace(".", ",");
   if (!signed) return `${absolute} %`;
   if (Math.abs(value) < .05) return "±0,0";
   return `${value > 0 ? "+" : "−"}${absolute}`;
@@ -270,7 +271,7 @@ function render(animate = true) {
         growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
       }
       const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
-      valueLabel.textContent = formatPercent(value);
+      valueLabel.textContent = formatPercent(value, false, compact);
       els.chart.append(valueLabel);
       old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
