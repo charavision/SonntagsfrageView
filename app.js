@@ -169,7 +169,7 @@ function render(animate = true) {
   }
 
   const compact = window.innerWidth < 700;
-  const margin = { top: 62, right: 34, bottom: 176, left: 64 };
+  const margin = { top: 62, right: 34, bottom: 176, left: compact ? 120 : 160 };
   const totalBarCount = parties.length * series.length;
   const availableWidth = Math.max(320, els.scroll.clientWidth - 2);
   const width = totalBarCount <= 20
@@ -201,7 +201,7 @@ function render(animate = true) {
   const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12)) / series.length;
   const barGap = series.length === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
   const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : 34;
-  const barWidth = Math.max(10, Math.min(maxBarWidth, availablePerBar - barGap));
+  const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth, availablePerBar - barGap));
   parties.forEach((party, partyIndex) => {
     const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
     const totalBars = series.length * barWidth + (series.length - 1) * barGap;
@@ -251,12 +251,11 @@ function render(animate = true) {
     oldParty ? animateX(label, oldParty.center, center, motionEnabled) : fadeIn(label, motionEnabled, newLabelDelay);
     nextLayout.set(`party:${party}`, { center });
   });
-  const legend = svgEl("text", { x: margin.left + 14, y: compact ? height - 34 : height - 22, class: "chart-legend" });
-  const legendLines = compact
-    ? ["OBEN: Umfragewert · ±: Veränderung zur letzten Wahl", "NEW: neuer Einzug · BUND/BW/…: Parlament"]
-    : ["OBEN: Umfragewert  ·  ±: Veränderung zur letzten Wahl  ·  NEW: neuer Einzug  ·  BUND/BW/…: Parlament"];
+  const legendX = margin.left - 10;
+  const legend = svgEl("text", { x: legendX, y: margin.top + innerH + 24, "text-anchor": "end", class: "chart-legend" });
+  const legendLines = ["OBEN = Umfragewert", "± = zur letzten Wahl", "NEW = neuer Einzug", "Kürzel = Parlament"];
   legendLines.forEach((text, index) => {
-    const line = svgEl("tspan", { x: margin.left + 14, dy: index ? 14 : 0 });
+    const line = svgEl("tspan", { x: legendX, dy: index ? 13 : 0 });
     line.textContent = text;
     legend.append(line);
   });
