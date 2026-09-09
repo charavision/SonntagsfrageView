@@ -603,7 +603,8 @@ async function exportChartImage(format = "jpeg") {
     Math.ceil(selectedRegions.length / regionColumns),
     Math.ceil(selectedPolls.length / pollColumns)
   );
-  const headerHeight = Math.max(150, 58 + legendRows * 10);
+  const headerOffsetY = 34;
+  const headerHeight = Math.max(150, 92 + legendRows * 10);
   const footerHeight = 66;
   const documentWidth = Math.max(1600, viewBox.width);
   const documentHeight = headerHeight + viewBox.height + footerHeight;
@@ -633,15 +634,15 @@ async function exportChartImage(format = "jpeg") {
   }).format(now);
   const headerX = 18;
   const headerMetaX = 565;
-  addText("Sonntagsfragen", { x: headerX, y: 66, style: "font-family: Georgia, serif", "font-size": 64, "font-weight": 500, "letter-spacing": "-.06em" });
-  const creator = addText("", { x: headerX + 108, y: 84, "text-anchor": "middle", fill: "#7f95b2", "font-size": 6.5, "font-weight": 400, "letter-spacing": ".04em", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' });
+  addText("Sonntagsfragen", { x: headerX, y: 66 + headerOffsetY, style: "font-family: Georgia, serif", "font-size": 64, "font-weight": 500, "letter-spacing": "-.06em" });
+  const creator = addText("", { x: headerX + 108, y: 84 + headerOffsetY, "text-anchor": "middle", fill: "#7f95b2", "font-size": 6.5, "font-weight": 400, "letter-spacing": ".04em", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' });
   const creatorPrefix = svgEl("tspan");
   creatorPrefix.textContent = "visualizer by ";
   const creatorName = svgEl("tspan", { fill: "#b9dff1", "font-weight": 800 });
   creatorName.textContent = "charavision";
   creator.append(creatorPrefix, creatorName);
-  addText(minuteStamp, { x: headerMetaX, y: 54, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
-  addText(configurationCode(), { x: headerMetaX, y: 70, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  addText(minuteStamp, { x: headerMetaX, y: 54 + headerOffsetY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
+  addText(configurationCode(), { x: headerMetaX, y: 70 + headerOffsetY, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
 
   clone.setAttribute("x", (documentWidth - viewBox.width) / 2);
   clone.setAttribute("y", headerHeight);
@@ -650,14 +651,14 @@ async function exportChartImage(format = "jpeg") {
   documentSvg.append(clone);
 
   const addLegendSection = (x, width, title, items, columns = 1, swatches = false) => {
-    addText(title, { x, y: 27, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".08em" });
+    addText(title, { x, y: 27 + headerOffsetY, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".08em" });
     const rows = Math.ceil(items.length / columns);
     const columnWidth = width / columns;
     items.forEach((item, index) => {
       const column = Math.floor(index / rows);
       const row = index % rows;
       const itemX = x + column * columnWidth;
-      const y = 43 + row * 10;
+      const y = 43 + headerOffsetY + row * 10;
       if (swatches) documentSvg.append(svgEl("rect", { x: itemX, y: y - 6, width: 3, height: 7, fill: PARTY_META[item].color }));
       addText(item, { x: itemX + (swatches ? 7 : 0), y, fill: "#dce8f7", "font-size": 7 });
     });
@@ -667,7 +668,7 @@ async function exportChartImage(format = "jpeg") {
   addLegendSection(1120, 460, "UMFRAGEDATEN", selectedPolls, pollColumns);
 
   const footerCenter = documentWidth / 2;
-  const footerY = headerHeight + viewBox.height + 20;
+  const footerY = headerHeight + viewBox.height + 8;
   addText(secondStamp, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
   addText("Quelle der Daten: Wahlrecht.de", { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
   addText("© charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
