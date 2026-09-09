@@ -470,7 +470,7 @@ function render(animate = true) {
       const label = svgEl("text", {
         x: labelCenter,
         y: partyLabelY,
-        "text-anchor": rotatePartyLabel ? "end" : "middle",
+        "text-anchor": "middle",
         class: `poll-label${compact ? " mobile-party-label" : ""}`,
         ...(rotatePartyLabel ? { transform: `rotate(-90 ${labelCenter} ${partyLabelY})` } : {})
       });
@@ -497,7 +497,7 @@ function render(animate = true) {
     const regionLabel = svgEl("text", {
       x: regionLabelX,
       y: regionLabelY,
-      "text-anchor": rotateRegionLabel ? "end" : "middle",
+      "text-anchor": "middle",
       class: `region-label${compact ? " mobile-region-label" : ""}`,
       ...(rotateRegionLabel ? { transform: `rotate(-90 ${regionLabelX} ${regionLabelY})` } : {})
     });
