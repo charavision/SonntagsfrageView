@@ -190,6 +190,8 @@ function render(animate = true) {
   const height = compact ? 520 : 590;
   const innerH = height - margin.top - margin.bottom;
   const baselineY = margin.top + innerH;
+  const floorBackY = baselineY - (compact ? 36 : 44);
+  const floorFrontY = Math.min(height - 2, baselineY + (compact ? 118 : 142));
   const chartW = width - margin.left - margin.right;
   const groupWidth = chartW / parties.length;
   const maxValue = Math.max(50, ...series.flatMap(item => parties.map(party => item.poll.values[party] || 0)));
@@ -199,7 +201,7 @@ function render(animate = true) {
   els.chart.setAttribute("height", height);
 
   const defs = svgEl("defs");
-  defs.innerHTML = `<linearGradient id="floor-line-fade" x1="0" y1="${baselineY}" x2="0" y2="${height}" gradientUnits="userSpaceOnUse">
+  defs.innerHTML = `<linearGradient id="floor-line-fade" x1="0" y1="${floorBackY}" x2="0" y2="${floorFrontY}" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#65b6ff" stop-opacity=".08"/>
       <stop offset=".22" stop-color="#65b6ff" stop-opacity=".34"/>
       <stop offset=".68" stop-color="#65b6ff" stop-opacity=".2"/>
@@ -240,29 +242,35 @@ function render(animate = true) {
   els.chart.append(stars);
 
   const floor = svgEl("g", { class: "perspective-floor", "aria-hidden": "true" });
-  const floorBottom = height - 2;
   const floorLeft = axisX;
   const floorRight = width - margin.right;
   const floorCenter = (floorLeft + floorRight) / 2;
-  const foregroundExpansion = compact ? 2.15 : 1.72;
   for (let index = 0; index <= 18; index += 1) {
-    const horizonX = floorLeft + ((floorRight - floorLeft) * index) / 18;
-    const foregroundX = floorCenter + (horizonX - floorCenter) * foregroundExpansion;
+    const axisPointX = floorLeft + ((floorRight - floorLeft) * index) / 18;
+    const backgroundX = floorCenter + (axisPointX - floorCenter) * .82;
+    const foregroundX = floorCenter + (axisPointX - floorCenter) * (compact ? 1.52 : 1.4);
     floor.append(svgEl("line", {
-      x1: horizonX, y1: baselineY, x2: foregroundX, y2: floorBottom,
+      x1: backgroundX, y1: floorBackY, x2: foregroundX, y2: floorFrontY,
       stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1
     }));
   }
-  for (let index = 1; index <= 13; index += 1) {
-    const progress = index / 13;
-    const y = baselineY + (floorBottom - baselineY) * Math.pow(progress, 1.9);
-    const soft = index <= 2 || index >= 11;
+  const floorRows = [
+    [floorBackY, .82],
+    [baselineY - (compact ? 24 : 29), .88],
+    [baselineY - (compact ? 12 : 14), .94],
+    [baselineY, 1],
+    [baselineY + (compact ? 42 : 50), compact ? 1.19 : 1.14],
+    [floorFrontY, compact ? 1.52 : 1.4]
+  ];
+  floorRows.forEach(([y, scale], index) => {
+    const rowLeft = floorCenter + (floorLeft - floorCenter) * scale;
+    const rowRight = floorCenter + (floorRight - floorCenter) * scale;
     floor.append(svgEl("line", {
-      x1: floorLeft, y1: y, x2: floorRight, y2: y,
+      x1: rowLeft, y1: y, x2: rowRight, y2: y,
       stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1,
-      ...(soft ? { filter: "url(#floor-soft)" } : {})
+      ...(index === 0 || index === floorRows.length - 1 ? { filter: "url(#floor-soft)" } : {})
     }));
-  }
+  });
   els.chart.append(floor);
 
   for (let tick = 0; tick <= yMax; tick += 10) {
