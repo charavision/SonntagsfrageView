@@ -59,7 +59,6 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .chart-heading h2 { font-family: Georgia, serif; font-size: clamp(28px, 4vw, 46px); font-weight: 500; }
 .chart-meta { margin: 0; color: var(--muted); font-size: 13px; text-align: right; }
 .chart-scroll { position: relative; overflow-x: auto; overscroll-behavior-inline: contain; padding-bottom: 12px; border: 0; border-radius: 24px; background: radial-gradient(circle at 50% 18%, rgba(42,103,164,.28), transparent 42%), linear-gradient(160deg, #172744 0%, #081326 70%, #050d1b 100%); box-shadow: 0 0 42px rgba(6,16,32,.72), 0 24px 70px rgba(8,19,38,.18); }
-.chart-scroll::before { position: absolute; z-index: 3; inset: 0; border-radius: inherit; background: linear-gradient(90deg, rgba(6,16,32,.5), transparent 28px, transparent calc(100% - 28px), rgba(6,16,32,.5)); content: ""; pointer-events: none; }
 .chart-scroll::after { position: absolute; z-index: 0; right: 0; bottom: 0; left: 0; height: 105px; background: linear-gradient(rgba(65,117,174,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(65,117,174,.1) 1px, transparent 1px); background-size: 38px 24px; content: ""; opacity: .7; pointer-events: none; transform: perspective(220px) rotateX(55deg); transform-origin: bottom; }
 #chart { position: relative; z-index: 1; display: block; min-height: 560px; }
 .grid-line { stroke: #9bb4d0; stroke-width: 1; opacity: .22; }
