@@ -754,19 +754,20 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const landscapeHeader = width > 1400;
   const brandSize = landscapeHeader ? 104 : 72;
   const brandY = landscapeHeader ? 116 : 92;
-  const legendStart = landscapeHeader ? 760 : 510;
+  const legendStart = landscapeHeader ? 880 : 520;
   text("Sonntagsfragen", { x: 42, y: brandY, style: "font-family: Georgia, serif", "font-size": brandSize, "font-weight": 500, "letter-spacing": "-.06em" });
   const creator = text("", { x: 42 + brandSize * 1.55, y: brandY + brandSize * .2, "text-anchor": "middle", fill: "#7f95b2", "font-size": brandSize * .096, "font-weight": 400, "letter-spacing": ".04em" });
   const creatorPrefix = svgEl("tspan"); creatorPrefix.textContent = "visualizer by ";
   const creatorName = svgEl("tspan", { fill: "#b9dff1", "font-weight": 800 }); creatorName.textContent = "charavision";
   creator.append(creatorPrefix, creatorName);
   const minuteStamp = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now);
-  const metaY = brandY + brandSize * .43;
+  const introY = brandY + brandSize * .48;
+  const metaY = introY + 27;
+  text("Die aktuellen Sonntagsfragen von Bund & Ländern im Vergleich.", { x: 42, y: introY, fill: "#8fa6c1", "font-size": landscapeHeader ? 20 : 15, "font-weight": 400 });
   text(minuteStamp, { x: 42, y: metaY, fill: "#8fa6c1", "font-size": 9 });
-  text(configurationCode(), { x: 248, y: metaY, fill: "#b9cee5", "font-size": 9, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
-  text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: 365, y: metaY, fill: "#8fa6c1", "font-size": 8.5 });
-  text("Die aktuellen Sonntagsfragen von Bund & Ländern im Vergleich.", { x: 42, y: metaY + 31, fill: "#8fa6c1", "font-size": landscapeHeader ? 20 : 15, "font-weight": 400 });
-  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: metaY + 60, fill: "#59d9ff", "font-size": 11, "font-weight": 700 });
+  text(configurationCode(), { x: 208, y: metaY, fill: "#b9cee5", "font-size": 9, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: 315, y: metaY, fill: "#8fa6c1", "font-size": 8.5 });
+  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: metaY + 27, fill: "#59d9ff", "font-size": 11, "font-weight": 700 });
   const selectedRegions = [...state.regions], selectedParties = [...state.parties];
   const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
     const poll = (state.data.polls[region] || [])[rank];
@@ -782,21 +783,21 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     });
   };
   const partyX = legendStart;
-  const regionX = partyX + (landscapeHeader ? 130 : 115);
-  const pollsX = regionX + (landscapeHeader ? 230 : 205);
+  const regionX = partyX + 105;
+  const pollsX = regionX + (landscapeHeader ? 190 : 185);
   const pollWidth = Math.max(105, (width - pollsX - 42) / (selectedPolls.length > 20 ? 3 : 2));
   headerLegend(partyX, "PARTEIEN", selectedParties, 1, 0, true);
   headerLegend(regionX, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 1, 0);
   headerLegend(pollsX, "UMFRAGEDATEN", selectedPolls, selectedPolls.length > 20 ? 3 : 2, pollWidth);
-  text("TRANSPARENZ", { x: partyX, y: 172, fill: "#59d9ff", "font-size": 9, "font-weight": 800, "letter-spacing": ".06em" });
+  text("TRANSPARENZ", { x: partyX, y: 232, fill: "#59d9ff", "font-size": 9, "font-weight": 800, "letter-spacing": ".06em" });
   [
     { label: "Neueste", fill: .68, stroke: 1 },
     { label: "2. jüngste", fill: .34, stroke: .7 },
     { label: "3. jüngste", fill: .14, stroke: .4 }
   ].forEach((entry, index) => {
-    const itemY = 188 + index * 13;
-    page.append(svgEl("rect", { x: partyX, y: itemY - 8, width: 18, height: 9, rx: 1, fill: "#59b8ff", "fill-opacity": entry.fill, stroke: "#9bdcff", "stroke-opacity": entry.stroke, "stroke-width": 1 }));
-    text(entry.label, { x: partyX + 25, y: itemY, fill: "#dce8f7", "font-size": 7.5 });
+    const itemX = partyX + index * 82;
+    page.append(svgEl("rect", { x: itemX, y: 241, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": entry.fill, stroke: "#dce8f7", "stroke-opacity": entry.stroke, "stroke-width": 1 }));
+    text(entry.label, { x: itemX + 24, y: 249, fill: "#dce8f7", "font-size": 7.5 });
   });
   const gapX = 18, gapY = 18, left = 42, top = 280;
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
@@ -808,7 +809,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     const column = index % columns, row = Math.floor(index / columns);
     const x = left + column * (tileWidth + gapX), y = top + row * (tileHeight + gapY);
     text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 15, "font-weight": 800 });
-    const plot = { left: x + 34, right: x + tileWidth - 12, top: y + 48, bottom: y + tileHeight - 54 };
+    const plot = { left: x + 34, right: x + tileWidth - 12, top: y + 48, bottom: y + tileHeight - (cluster.bars.length > 34 ? 96 : 72) };
     page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
     page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
     [0, .5, 1].forEach(fraction => {
@@ -828,12 +829,34 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const strokeOpacity = item.average ? 1 : [1, .7, .4][item.rank] ?? .4;
       page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": fillOpacity, stroke: PARTY_META[party].glow, "stroke-opacity": strokeOpacity, "stroke-width": 1.5 }));
       text(`${item.average ? "Ø " : ""}${formatPercent(value, false, true).replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
-      const label = state.groupBy === "region" ? `${partyDisplayLabel(party, item.region)}${item.average ? "" : ` ${item.rank + 1}`}` : `${REGION_CODES[item.region]}${item.average ? "" : ` ${item.rank + 1}`}`;
+      const label = `${partyDisplayLabel(party, item.region)}${item.average ? "" : ` ${item.rank + 1}`}`;
       const partyBarCount = cluster.bars.filter(bar => bar.party === party).length;
       if (state.groupBy === "region" && party === "CDU/CSU" && partyBarCount === 1 && new Set(cluster.bars.map(bar => bar.party)).size > 1) {
         text("CDU/", { x: barX + barWidth / 2, y: plot.bottom + 14, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 7 });
         text("CSU", { x: barX + barWidth / 2, y: plot.bottom + 24, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 7 });
-      } else text(label, { x: barX + barWidth / 2, y: plot.bottom + 12, "text-anchor": "end", transform: `rotate(-90 ${barX + barWidth / 2} ${plot.bottom + 12})`, fill: "#a8bfd9", "font-size": cluster.bars.length > 18 ? 6 : 8 });
+      } else if (state.groupBy === "region") text(label, { x: barX + barWidth / 2, y: plot.bottom + 12, "text-anchor": "end", transform: `rotate(-90 ${barX + barWidth / 2} ${plot.bottom + 12})`, fill: "#a8bfd9", "font-size": cluster.bars.length > 18 ? 6 : 8 });
+    });
+    if (state.groupBy === "party") {
+      let runStart = 0;
+      while (runStart < cluster.bars.length) {
+        let runEnd = runStart;
+        while (runEnd + 1 < cluster.bars.length && cluster.bars[runEnd + 1].item.region === cluster.bars[runStart].item.region) runEnd += 1;
+        const runCenter = plot.left + slot * ((runStart + runEnd + 1) / 2);
+        text(REGION_CODES[cluster.bars[runStart].item.region], { x: runCenter, y: plot.bottom + 15, "text-anchor": "middle", fill: "#a8bfd9", "font-size": cluster.bars.length > 34 ? 6 : 7.5, "font-weight": 700 });
+        runStart = runEnd + 1;
+      }
+    }
+    const pollNotes = [...new Map(cluster.bars.map(({ item }) => {
+      const key = `${item.region}|${item.average ? "average" : item.rank}`;
+      const label = item.average ? `${REGION_CODES[item.region]} · Durchschnitt` : `${REGION_CODES[item.region]} ${item.rank + 1} · ${item.poll.institute} · ${formatDate(item.poll.date)}`;
+      return [key, label];
+    })).values()];
+    const noteColumns = Math.max(1, Math.min(6, Math.ceil(pollNotes.length / 6)));
+    const noteRows = Math.ceil(pollNotes.length / noteColumns);
+    const noteColumnWidth = (plot.right - plot.left) / noteColumns;
+    pollNotes.forEach((note, noteIndex) => {
+      const noteColumn = Math.floor(noteIndex / noteRows), noteRow = noteIndex % noteRows;
+      text(note, { x: plot.left + noteColumn * noteColumnWidth, y: plot.bottom + 31 + noteRow * 6.5, fill: "#7f95b2", "font-size": 5.2 });
     });
   });
   text("Werte in %", { x: width / 2, y: height - 92, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 11 });
