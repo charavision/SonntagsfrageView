@@ -793,20 +793,6 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   text(configurationCode(), { x: 208, y: metaY, fill: "#b9cee5", "font-size": 9, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
   text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: 315, y: metaY, fill: "#8fa6c1", "font-size": 8.5 });
   const selectedRegions = [...state.regions], selectedParties = [...state.parties];
-  const rankedPollGroups = [...state.selectedPollRanks].sort().map(rank => ({
-    rank,
-    label: rank === 0 ? "Neueste Umfragen" : `${rank + 1}. jüngste Umfragen`,
-    fill: [.68, .34, .14][rank],
-    stroke: [1, .7, .4][rank],
-    items: selectedRegions.map(region => {
-      const poll = (state.data.polls[region] || [])[rank];
-      return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
-    }).filter(Boolean)
-  }));
-  const selectedPollGroups = state.averageMode ? [{
-    label: "Verwendete Umfragen", noSwatch: true,
-    items: rankedPollGroups.flatMap(group => group.items)
-  }] : rankedPollGroups;
   const headerLegend = (x, y, title, items, columns, columnWidth, colorItems = false) => {
     text(title, { x, y, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
     const rows = Math.ceil(items.length / columns);
@@ -816,33 +802,21 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       text(item, { x: itemX + (colorItems ? 8 : 0), y: itemY, fill: "#dce8f7", "font-size": 10.7 });
     });
   };
-  const leftLegendWidth = landscapeHeader ? 800 : 570;
-  const partyX = 42;
-  const partyY = metaY + 29;
+  const partyX = landscapeHeader ? 900 : 650;
+  const rightLegendWidth = width - partyX - 42;
+  const partyY = 54;
   text("PARTEIEN", { x: partyX, y: partyY, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
-  const partySlot = leftLegendWidth / Math.max(1, selectedParties.length);
+  const partySlot = rightLegendWidth / Math.max(1, selectedParties.length);
   selectedParties.forEach((party, index) => {
     const itemX = partyX + index * partySlot;
     page.append(svgEl("rect", { x: itemX, y: partyY + 11, width: 4, height: 9, fill: getComputedStyle(document.documentElement).getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow }));
     text(party, { x: itemX + 8, y: partyY + 20, fill: "#dce8f7", "font-size": 10.7 });
   });
   text("* = Veränderung zur aktuellen Sitzverteilung", { x: partyX, y: partyY + 43, fill: "#8fa6c1", "font-size": 8 });
-  const rightLegendX = landscapeHeader ? 900 : 650;
-  const rightLegendWidth = width - rightLegendX - 42;
-  const pollsY = 54;
-  text("UMFRAGEDATEN", { x: rightLegendX, y: pollsY, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
-  const pollGroupWidth = rightLegendWidth / Math.max(1, selectedPollGroups.length);
-  selectedPollGroups.forEach((group, groupIndex) => {
-    const groupX = rightLegendX + groupIndex * pollGroupWidth;
-    if (!group.noSwatch) page.append(svgEl("rect", { x: groupX, y: pollsY + 10, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
-    text(group.label, { x: groupX + (group.noSwatch ? 0 : 24), y: pollsY + 19, fill: "#dce8f7", "font-size": 10.7, "font-weight": 700 });
-    group.items.forEach((item, itemIndex) => text(item, { x: groupX, y: pollsY + 35 + itemIndex * 11, fill: "#dce8f7", "font-size": 9.33 }));
-  });
-  const pollLegendRows = Math.max(0, ...selectedPollGroups.map(group => group.items.length));
-  const regionsY = pollsY + 58 + pollLegendRows * 11;
-  headerLegend(rightLegendX, regionsY, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 3, rightLegendWidth / 3);
+  const regionsY = partyY + 70;
+  headerLegend(partyX, regionsY, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 3, rightLegendWidth / 3);
   const regionLegendRows = Math.ceil(selectedRegions.length / 3);
-  const gapX = 18, gapY = 18, left = 42, top = Math.max(landscapeHeader ? 315 : 340, regionsY + 45 + regionLegendRows * 12, partyY + 72);
+  const gapX = 18, gapY = 18, left = 42, top = Math.max(landscapeHeader ? 265 : 300, regionsY + 62 + regionLegendRows * 12);
   text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: top - 24, fill: "#59d9ff", "font-size": 18, "font-weight": 800 });
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
   const tileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
@@ -855,14 +829,47 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 18, "font-weight": 800 });
     text(minuteStamp, { x: x + 16, y: y + 43, fill: "#8fa6c1", "font-size": 10.7 });
     const plotWidth = tileWidth - 52;
-    const pollNotes = [...new Map(cluster.bars.map(({ item }) => {
-      const key = `${item.region}|${item.average ? "average" : item.rank}`;
-      const label = item.average ? `${REGION_CODES[item.region]} · Durchschnitt` : `${REGION_CODES[item.region]} ${item.rank + 1} · ${item.poll.institute} · ${formatDate(item.poll.date)}`;
-      return [key, label];
-    })).values()];
-    const noteColumns = Math.max(1, Math.min(6, pollNotes.length, Math.floor(plotWidth / 145)));
-    const noteRows = Math.ceil(pollNotes.length / noteColumns);
-    const lowerLegendSpace = Math.max(160, 103 + noteRows * 11);
+    const clusterRegions = [...new Set(cluster.bars.map(({ item }) => item.region))];
+    const pollLegendGroups = state.averageMode ? [{
+      label: "Verwendete Umfragen", noSwatch: true,
+      items: [...state.selectedPollRanks].sort().flatMap(rank => clusterRegions.map(region => {
+        const poll = (state.data.polls[region] || [])[rank];
+        return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
+      }).filter(Boolean))
+    }] : [...state.selectedPollRanks].sort().map(rank => ({
+      rank,
+      label: rank === 0 ? "Neueste Umfragen" : `${rank + 1}. jüngste Umfragen`,
+      fill: [.68, .34, .14][rank], stroke: [1, .7, .4][rank],
+      items: clusterRegions.map(region => {
+        const poll = (state.data.polls[region] || [])[rank];
+        return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
+      }).filter(Boolean)
+    })).filter(group => group.items.length);
+    const pollGroupWidth = plotWidth / Math.max(1, pollLegendGroups.length);
+    const pollGroupLayouts = pollLegendGroups.map(group => {
+      const columns = Math.max(1, Math.min(group.items.length, Math.floor(pollGroupWidth / 145)));
+      return { columns, rows: Math.ceil(group.items.length / columns) };
+    });
+    const noteRows = Math.max(0, ...pollGroupLayouts.map(layout => layout.rows));
+    const labelRuns = [];
+    let labelRunStart = 0;
+    while (labelRunStart < cluster.bars.length) {
+      const key = state.groupBy === "party" ? cluster.bars[labelRunStart].item.region : cluster.bars[labelRunStart].party;
+      let labelRunEnd = labelRunStart;
+      while (labelRunEnd + 1 < cluster.bars.length) {
+        const nextKey = state.groupBy === "party" ? cluster.bars[labelRunEnd + 1].item.region : cluster.bars[labelRunEnd + 1].party;
+        if (nextKey !== key) break;
+        labelRunEnd += 1;
+      }
+      labelRuns.push({ key, count: labelRunEnd - labelRunStart + 1 });
+      labelRunStart = labelRunEnd + 1;
+    }
+    const maxVerticalLabelLength = state.groupBy === "party" && state.fullRegionNames
+      ? Math.max(0, ...labelRuns.map(run => Math.max(...String(run.key).split(/(?<=-)/).map(part => part.length))))
+      : 0;
+    const regionLabelSpace = maxVerticalLabelLength ? maxVerticalLabelLength * 5.3 : 38;
+    const pollLegendOffset = 59 + regionLabelSpace;
+    const lowerLegendSpace = Math.max(160, pollLegendOffset + 38 + noteRows * 11);
     const plot = { left: x + 40, right: x + tileWidth - 12, top: y + 62, bottom: y + tileHeight - lowerLegendSpace };
     page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
     page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
@@ -902,16 +909,11 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const runCenter = plot.left + slot * ((runStart + runEnd + 1) / 2);
       const runCount = runEnd - runStart + 1;
       const runLabel = state.groupBy === "party" ? (state.fullRegionNames ? runKey : REGION_CODES[runKey]) : partyDisplayLabel(runKey, cluster.bars[runStart].item.region);
-      const runWidth = slot * runCount;
       const hyphenIndex = runLabel.indexOf("-");
-      const wrappedParts = hyphenIndex >= 0 ? [runLabel.slice(0, hyphenIndex + 1), runLabel.slice(hyphenIndex + 1)] : [runLabel];
-      const fullLabelWidth = runLabel.length * 6.25;
-      const wrappedLabelWidth = Math.max(...wrappedParts.map(part => part.length * 6.25));
-      const forcedMobileRotation = state.groupBy === "party" && state.fullRegionNames && state.mobileView && runCount < 3;
       const wrapRegion = state.groupBy === "party" && state.fullRegionNames && runCount < 4 && hyphenIndex >= 0;
-      const rotateRegion = state.groupBy === "party" && state.fullRegionNames && (forcedMobileRotation || fullLabelWidth > runWidth - 6 || (wrapRegion && wrappedLabelWidth > runWidth - 6));
-      const labelY = plot.bottom + 46;
-      const labelNode = text("", { x: runCenter, y: labelY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9.33, "font-weight": 700, ...(rotateRegion ? { transform: `rotate(-90 ${runCenter} ${labelY})` } : {}) });
+      const rotateRegion = state.groupBy === "party" && state.fullRegionNames;
+      const labelY = plot.bottom + 39;
+      const labelNode = text("", { x: runCenter, y: labelY, "text-anchor": rotateRegion ? "end" : "middle", fill: "#a8bfd9", "font-size": 9.33, "font-weight": 700, ...(rotateRegion ? { transform: `rotate(-90 ${runCenter} ${labelY})` } : {}) });
       if (wrapRegion) {
         const split = hyphenIndex + 1;
         const firstLine = svgEl("tspan", { x: runCenter }); firstLine.textContent = runLabel.slice(0, split);
@@ -920,11 +922,16 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       } else labelNode.textContent = runLabel;
       runStart = runEnd + 1;
     }
-    const noteColumnWidth = (plot.right - plot.left) / noteColumns;
-    text("Verwendete Umfragen", { x: plot.left, y: plot.bottom + 76, fill: "#8fa6c1", "font-size": 9.33, "font-weight": 700, "letter-spacing": ".03em" });
-    pollNotes.forEach((note, noteIndex) => {
-      const noteColumn = Math.floor(noteIndex / noteRows), noteRow = noteIndex % noteRows;
-      text(note, { x: plot.left + noteColumn * noteColumnWidth, y: plot.bottom + 91 + noteRow * 11, fill: "#9bb0c9", "font-size": 9.33 });
+    pollLegendGroups.forEach((group, groupIndex) => {
+      const groupX = plot.left + groupIndex * pollGroupWidth;
+      const layout = pollGroupLayouts[groupIndex];
+      if (!group.noSwatch) page.append(svgEl("rect", { x: groupX, y: plot.bottom + pollLegendOffset - 8, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
+      text(group.label, { x: groupX + (group.noSwatch ? 0 : 24), y: plot.bottom + pollLegendOffset, fill: "#8fa6c1", "font-size": 9.33, "font-weight": 700, "letter-spacing": ".03em" });
+      const itemColumnWidth = pollGroupWidth / layout.columns;
+      group.items.forEach((note, noteIndex) => {
+        const noteColumn = Math.floor(noteIndex / layout.rows), noteRow = noteIndex % layout.rows;
+        text(note, { x: groupX + noteColumn * itemColumnWidth, y: plot.bottom + pollLegendOffset + 15 + noteRow * 11, fill: "#9bb0c9", "font-size": 9.33 });
+      });
     });
   });
   const footerStamp = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(now);
