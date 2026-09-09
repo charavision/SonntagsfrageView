@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=cluster-mode-68">
+  <link rel="stylesheet" href="styles.css?v=adaptive-a4-output-73">
 </head>
 <body>
   <main>
@@ -89,10 +89,12 @@
         <output id="output-code" for="input-code"></output>
         <button id="copy-code" type="button">Kopieren</button>
       </div>
-      <button id="export-jpeg" class="export-button" type="button">Output JPEG</button>
-      <button id="export-png" class="export-button" type="button">Output PNG</button>
-      <button id="export-a4-png" class="export-button" type="button">Output A4 PNG</button>
-      <button id="export-pdf" class="export-button" type="button">Output PDF</button>
+      <div class="export-controls">
+        <label for="export-format">Output-Format</label>
+        <select id="export-format"><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf">PDF</option></select>
+        <span class="a4-choice choice"><input id="a4-mode" type="checkbox"><label for="a4-mode">A4</label></span>
+        <button id="export-file" class="export-button" type="button">Ausgeben</button>
+      </div>
       <small id="export-message" aria-live="polite"></small>
     </section>
 
@@ -101,6 +103,6 @@
     </footer>
   </main>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
-  <script src="app.js?v=responsive-union-label-72" defer></script>
+  <script src="app.js?v=adaptive-a4-output-73" defer></script>
 </body>
 </html>

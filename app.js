@@ -18,7 +18,7 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, groupBy: "party", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, groupBy: "party", a4Mode: false, chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -68,7 +68,7 @@ function configurationCode() {
   let value = rankOrdered([...state.regions], state.data.regions);
   value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n);
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n);
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
@@ -542,10 +542,11 @@ function applyConfigurationCode(text) {
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 7) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 15) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
+  state.a4Mode = Boolean(mode & 8);
   value %= legacySpace;
   const pollMask = Number(value % 7n) + 1;
   value /= 7n;
@@ -558,6 +559,7 @@ function applyConfigurationCode(text) {
   document.querySelector("#average-mode").checked = state.averageMode;
   els.mobileView.checked = state.mobileView;
   document.querySelector(`#cluster-${state.groupBy}`).checked = true;
+  document.querySelector("#a4-mode").checked = state.a4Mode;
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
   els.parties.querySelectorAll("input").forEach(input => input.checked = state.parties.has(input.value));
   updatePollOptions(false);
@@ -728,9 +730,23 @@ function a4ExportClusters() {
   }));
 }
 
-function buildA4Page(clusters, pageNumber, pageCount) {
-  const width = 1240, height = 1754;
+function a4LayoutFor(clusters) {
+  const largestCluster = Math.max(0, ...clusters.map(cluster => cluster.bars.length));
+  if (largestCluster > 30) return { width: 1754, height: 1240, columns: 4, rows: 1, capacity: 4, landscape: true };
+  if (largestCluster > 18) return { width: 1240, height: 1754, columns: 1, rows: 4, capacity: 4, landscape: false };
+  return { width: 1240, height: 1754, columns: 3, rows: 4, capacity: 12, landscape: false };
+}
+
+function buildA4Page(clusters, pageNumber, pageCount, layout) {
+  const { width, height, columns, rows } = layout;
   const page = svgEl("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${width} ${height}`, width, height });
+  const defs = svgEl("defs");
+  clusters.forEach((_, index) => {
+    const gradient = svgEl("radialGradient", { id: `cluster-glow-${index}`, cx: "50%", cy: "35%", r: "72%" });
+    gradient.append(svgEl("stop", { offset: "0", "stop-color": "#244f80", "stop-opacity": ".42" }), svgEl("stop", { offset: ".62", "stop-color": "#132d50", "stop-opacity": ".18" }), svgEl("stop", { offset: "1", "stop-color": "#081326", "stop-opacity": "0" }));
+    defs.append(gradient);
+  });
+  page.append(defs);
   page.append(svgEl("rect", { width, height, fill: "#081326" }));
   const text = (value, attrs = {}) => { const node = svgEl("text", { fill: "#f4f8ff", ...attrs }); node.textContent = value; page.append(node); return node; };
   const now = new Date();
@@ -738,7 +754,7 @@ function buildA4Page(clusters, pageNumber, pageCount) {
   text(new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now), { x: 1198, y: 48, "text-anchor": "end", fill: "#8fa6c1", "font-size": 14 });
   text(configurationCode(), { x: 1198, y: 72, "text-anchor": "end", fill: "#b9cee5", "font-size": 14, style: "font-family: ui-monospace, monospace" });
   text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: 112, fill: "#59d9ff", "font-size": 14, "font-weight": 700 });
-  const columns = 3, rows = 4, gapX = 18, gapY = 18, left = 42, top = 142;
+  const gapX = 18, gapY = 18, left = 42, top = 142;
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
   const tileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
   const allValues = clusters.flatMap(cluster => cluster.bars.map(({ party, item }) => Number(item.poll.values[party] || 0)));
@@ -747,7 +763,7 @@ function buildA4Page(clusters, pageNumber, pageCount) {
   clusters.forEach((cluster, index) => {
     const column = index % columns, row = Math.floor(index / columns);
     const x = left + column * (tileWidth + gapX), y = top + row * (tileHeight + gapY);
-    page.append(svgEl("rect", { x, y, width: tileWidth, height: tileHeight, rx: 14, fill: "#0d1d34", stroke: "#29496e", "stroke-width": 1.5 }));
+    page.append(svgEl("rect", { x, y, width: tileWidth, height: tileHeight, fill: `url(#cluster-glow-${index})` }));
     text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 15, "font-weight": 800 });
     const plot = { left: x + 34, right: x + tileWidth - 12, top: y + 48, bottom: y + tileHeight - 54 };
     page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
@@ -775,24 +791,24 @@ function buildA4Page(clusters, pageNumber, pageCount) {
       } else text(label, { x: barX + barWidth / 2, y: plot.bottom + 12, "text-anchor": "end", transform: `rotate(-90 ${barX + barWidth / 2} ${plot.bottom + 12})`, fill: "#a8bfd9", "font-size": cluster.bars.length > 18 ? 6 : 8 });
     });
   });
-  text("Werte in %", { x: width / 2, y: 1672, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 11 });
-  text(`Quelle der Daten: Wahlrecht.de · © charavision`, { x: 42, y: 1715, fill: "#8fa6c1", "font-size": 11 });
-  text(`Seite ${pageNumber} / ${pageCount}`, { x: 1198, y: 1715, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
+  text("Werte in %", { x: width / 2, y: height - 82, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 11 });
+  text(`Quelle der Daten: Wahlrecht.de · © charavision`, { x: 42, y: height - 39, fill: "#8fa6c1", "font-size": 11 });
+  text(`Seite ${pageNumber} / ${pageCount}`, { x: width - 42, y: height - 39, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
   return page;
 }
 
-async function rasterizeA4Page(svg, mimeType, quality) {
+async function rasterizeA4Page(svg, mimeType, quality, layout) {
   const source = new XMLSerializer().serializeToString(svg);
   const url = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
   try {
     const image = new Image(); image.src = url; await image.decode();
-    const canvas = document.createElement("canvas"); canvas.width = 2480; canvas.height = 3508;
+    const canvas = document.createElement("canvas"); canvas.width = layout.width * 2; canvas.height = layout.height * 2;
     const context = canvas.getContext("2d"); context.fillStyle = "#081326"; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height);
     return await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("A4-Seite konnte nicht erstellt werden.")), mimeType, quality));
   } finally { URL.revokeObjectURL(url); }
 }
 
-function pdfFromJpegs(images) {
+function pdfFromJpegs(images, layout) {
   const encoder = new TextEncoder(), chunks = [], offsets = [0]; let length = 0;
   const push = value => { const bytes = typeof value === "string" ? encoder.encode(value) : value; chunks.push(bytes); length += bytes.length; };
   push("%PDF-1.4\n");
@@ -803,10 +819,11 @@ function pdfFromJpegs(images) {
   object(2, `<< /Type /Pages /Count ${images.length} /Kids [${pageRefs}] >>`);
   images.forEach((image, index) => {
     const pageObject = 3 + index * 3, contentObject = pageObject + 1, imageObject = pageObject + 2;
-    object(pageObject, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 ${imageObject} 0 R >> >> /Contents ${contentObject} 0 R >>`);
-    const drawing = "q 595.28 0 0 841.89 0 0 cm /Im0 Do Q";
+    const pageWidth = layout.landscape ? 841.89 : 595.28, pageHeight = layout.landscape ? 595.28 : 841.89;
+    object(pageObject, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 ${imageObject} 0 R >> >> /Contents ${contentObject} 0 R >>`);
+    const drawing = `q ${pageWidth} 0 0 ${pageHeight} 0 0 cm /Im0 Do Q`;
     object(contentObject, `<< /Length ${drawing.length} >>\nstream\n${drawing}\nendstream`);
-    object(imageObject, `<< /Type /XObject /Subtype /Image /Width 2480 /Height 3508 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.length} >>`, image);
+    object(imageObject, `<< /Type /XObject /Subtype /Image /Width ${layout.width * 2} /Height ${layout.height * 2} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.length} >>`, image);
   });
   const xref = length; push(`xref\n0 ${objectCount + 1}\n0000000000 65535 f \n`);
   for (let index = 1; index <= objectCount; index += 1) push(`${String(offsets[index]).padStart(10, "0")} 00000 n \n`);
@@ -817,15 +834,19 @@ function pdfFromJpegs(images) {
 async function exportA4(format) {
   const clusters = a4ExportClusters();
   if (!clusters.length) throw new Error("Bitte mindestens eine Partei und ein Parlament auswählen.");
-  const pages = Array.from({ length: Math.ceil(clusters.length / 12) }, (_, index) => buildA4Page(clusters.slice(index * 12, index * 12 + 12), index + 1, Math.ceil(clusters.length / 12)));
+  const layout = a4LayoutFor(clusters);
+  const pageCount = Math.ceil(clusters.length / layout.capacity);
+  const pages = Array.from({ length: pageCount }, (_, index) => buildA4Page(clusters.slice(index * layout.capacity, index * layout.capacity + layout.capacity), index + 1, pageCount, layout));
   els.exportMessage.textContent = `${format === "pdf" ? "PDF" : "A4-PNG"} mit ${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"} wird erstellt …`;
   if (format === "pdf") {
     const jpegs = [];
-    for (const page of pages) jpegs.push(new Uint8Array(await (await rasterizeA4Page(page, "image/jpeg", .94)).arrayBuffer()));
-    downloadBlob(pdfFromJpegs(jpegs), `sonntagsfragen-${configurationCode()}.pdf`);
+    for (const page of pages) jpegs.push(new Uint8Array(await (await rasterizeA4Page(page, "image/jpeg", .94, layout)).arrayBuffer()));
+    downloadBlob(pdfFromJpegs(jpegs, layout), `sonntagsfragen-${configurationCode()}.pdf`);
   } else {
     for (let index = 0; index < pages.length; index += 1) {
-      downloadBlob(await rasterizeA4Page(pages[index], "image/png"), `sonntagsfragen-${configurationCode()}-seite-${index + 1}.png`);
+      const mime = format === "jpeg" ? "image/jpeg" : "image/png";
+      const extension = format === "jpeg" ? "jpg" : "png";
+      downloadBlob(await rasterizeA4Page(pages[index], mime, format === "jpeg" ? .94 : undefined, layout), `sonntagsfragen-${configurationCode()}-seite-${index + 1}.${extension}`);
       await new Promise(resolve => setTimeout(resolve, 180));
     }
   }
@@ -874,10 +895,19 @@ fetch("data/polls.json", { cache: "no-store" })
       state.groupBy = event.currentTarget.value;
       render();
     }));
-    document.querySelector("#export-jpeg").addEventListener("click", () => exportChartImage("jpeg").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
-    document.querySelector("#export-png").addEventListener("click", () => exportChartImage("png").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
-    document.querySelector("#export-a4-png").addEventListener("click", () => exportA4("png").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
-    document.querySelector("#export-pdf").addEventListener("click", () => exportA4("pdf").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
+    const exportFormat = document.querySelector("#export-format");
+    const a4Mode = document.querySelector("#a4-mode");
+    a4Mode.addEventListener("change", event => { state.a4Mode = event.currentTarget.checked; render(false); });
+    exportFormat.addEventListener("change", event => {
+      if (event.currentTarget.value !== "pdf" || state.a4Mode) return;
+      state.a4Mode = true; a4Mode.checked = true; render(false);
+    });
+    document.querySelector("#export-file").addEventListener("click", () => {
+      const format = exportFormat.value;
+      if (format === "pdf" && !state.a4Mode) { state.a4Mode = true; a4Mode.checked = true; render(false); }
+      const operation = state.a4Mode || format === "pdf" ? exportA4(format) : exportChartImage(format);
+      operation.catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; });
+    });
     window.addEventListener("resize", () => render(false));
     let perspectiveFrame = 0;
     els.scroll.addEventListener("scroll", () => {
