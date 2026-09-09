@@ -18,7 +18,7 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]) };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), chartLayout: new Map() };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -116,13 +116,26 @@ function formatPercent(value, signed = false) {
   return `${value > 0 ? "+" : "−"}${absolute}`;
 }
 
-function render() {
+function animateX(element, from, to, enabled) {
+  if (!enabled || from == null || Math.abs(from - to) < .5) return;
+  element.append(svgEl("animate", { attributeName: "x", from, to, dur: "560ms", fill: "freeze", calcMode: "spline", keyTimes: "0;1", keySplines: ".22 1 .36 1" }));
+}
+
+function fadeIn(element, enabled, delay = "160ms") {
+  if (!enabled) return;
+  element.append(svgEl("animate", { attributeName: "opacity", from: "0", to: "1", dur: "360ms", begin: delay, fill: "freeze" }));
+}
+
+function render(animate = true) {
   const selectedRegions = [...state.regions];
   const series = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
     const poll = (state.data.polls[region] || [])[rank];
     return poll ? { region, rank, poll } : null;
   }).filter(Boolean));
   const parties = [...state.parties];
+  const motionEnabled = animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const oldLayout = state.chartLayout;
+  const nextLayout = new Map();
   const oneRegion = selectedRegions.length === 1;
   els.title.textContent = oneRegion ? selectedRegions[0] : `${selectedRegions.length} Parlamente im Vergleich`;
   els.kicker.textContent = oneRegion ? (selectedRegions[0] === "Bundestag" ? "Bundestagswahl" : "Landtagswahl") : "Bund & Länder";
@@ -131,7 +144,10 @@ function render() {
   els.chart.replaceChildren();
   els.empty.hidden = Boolean(series.length && parties.length);
   els.scroll.hidden = !series.length || !parties.length;
-  if (!series.length || !parties.length) return;
+  if (!series.length || !parties.length) {
+    state.chartLayout = new Map();
+    return;
+  }
 
   const compact = window.innerWidth < 700;
   const margin = { top: 62, right: 34, bottom: 142, left: 64 };
@@ -171,6 +187,8 @@ function render() {
     const totalBars = series.length * barWidth + (series.length - 1) * barGap;
     const startX = center - totalBars / 2;
     series.forEach((item, seriesIndex) => {
+      const key = `${party}|${item.region}|${item.rank}`;
+      const old = oldLayout.get(key);
       const value = Number(item.poll.values[party] || 0);
       const election = state.data.elections?.[item.region];
       const baseline = Number(election?.values?.[party] || 0);
@@ -180,30 +198,46 @@ function render() {
       const x = startX + seriesIndex * (barWidth + barGap);
       const y = margin.top + innerH - h;
       const bar = svgEl("rect", { x, y, width: barWidth, height: h, fill: PARTY_META[party].color, opacity: [1, .72, .46][item.rank], class: "bar", rx: 3 });
+      if (old) {
+        animateX(bar, old.x, x, motionEnabled);
+      } else if (motionEnabled) {
+        bar.append(svgEl("animate", { attributeName: "y", from: margin.top + innerH, to: y, dur: "640ms", fill: "freeze", calcMode: "spline", keyTimes: "0;1", keySplines: ".22 1 .36 1" }));
+        bar.append(svgEl("animate", { attributeName: "height", from: "0", to: h, dur: "640ms", fill: "freeze", calcMode: "spline", keyTimes: "0;1", keySplines: ".22 1 .36 1" }));
+      }
       bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, party, value));
       bar.addEventListener("pointerleave", hideTooltip);
       els.chart.append(bar);
       const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
       valueLabel.textContent = formatPercent(value);
+      old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, "300ms");
       els.chart.append(valueLabel);
       const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
       const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
       deltaLine.textContent = formatPercent(delta, true);
+      if (old) animateX(deltaLine, old.center, x + barWidth / 2, motionEnabled);
       deltaLabel.append(deltaLine);
       if (isNew) {
         const newLine = svgEl("tspan", { x: x + barWidth / 2, dy: 13, class: "new-label" });
         newLine.textContent = "NEW";
+        if (old) animateX(newLine, old.center, x + barWidth / 2, motionEnabled);
         deltaLabel.append(newLine);
       }
+      if (!old) fadeIn(deltaLabel, motionEnabled, "220ms");
       els.chart.append(deltaLabel);
       const regionLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 51, "text-anchor": "middle", class: "region-label" });
       regionLabel.textContent = REGION_CODES[item.region] || item.region;
+      old ? animateX(regionLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabel, motionEnabled, "220ms");
       els.chart.append(regionLabel);
+      nextLayout.set(key, { x, center: x + barWidth / 2 });
     });
     const label = svgEl("text", { x: center, y: height - margin.bottom + 82, "text-anchor": "middle", class: "poll-label" });
     label.textContent = party;
+    const oldParty = oldLayout.get(`party:${party}`);
+    oldParty ? animateX(label, oldParty.center, center, motionEnabled) : fadeIn(label, motionEnabled, "220ms");
     els.chart.append(label);
+    nextLayout.set(`party:${party}`, { center });
   });
+  state.chartLayout = nextLayout;
 }
 
 function showTooltip(event, region, poll, party, value) {
@@ -231,6 +265,6 @@ fetch("data/polls.json", { cache: "no-store" })
     buildControls();
     updatePollOptions(true);
     render();
-    window.addEventListener("resize", render);
+    window.addEventListener("resize", () => render(false));
   })
   .catch(error => { els.updated.textContent = "nicht verfügbar"; els.empty.hidden = false; els.empty.textContent = error.message; els.scroll.hidden = true; });
