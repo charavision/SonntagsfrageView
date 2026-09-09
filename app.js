@@ -18,7 +18,7 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), chartLayout: new Map() };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -107,6 +107,29 @@ function svgEl(name, attrs = {}) {
   const el = document.createElementNS("http://www.w3.org/2000/svg", name);
   Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
   return el;
+}
+
+function updatePerspective() {
+  const scene = state.perspective;
+  if (!scene) return;
+  const center = els.scroll.scrollLeft + els.scroll.clientWidth / 2;
+  scene.floorLines.forEach(({ line, axisX }) => {
+    line.setAttribute("x1", center + (axisX - center) * .82);
+    line.setAttribute("x2", center + (axisX - center) * scene.frontScale);
+  });
+  scene.floorRows.forEach(({ line, scale }) => {
+    line.setAttribute("x1", center + (scene.floorLeft - center) * scale);
+    line.setAttribute("x2", center + (scene.floorRight - center) * scale);
+  });
+  scene.bars.forEach(({ top, side, x, y, width, baseline, maxDepth }) => {
+    const barCenter = x + width / 2;
+    const distance = Math.min(1, Math.abs(center - barCenter) / Math.max(1, els.scroll.clientWidth / 2));
+    const dx = Math.sign(center - barCenter || 1) * maxDepth * (.35 + distance * .65);
+    const dy = Math.min(6, Math.max(2.5, width * .11));
+    top.setAttribute("points", `${x},${y} ${x + dx},${y - dy} ${x + width + dx},${y - dy} ${x + width},${y}`);
+    const edgeX = dx >= 0 ? x + width : x;
+    side.setAttribute("points", `${edgeX},${y} ${edgeX + dx},${y - dy} ${edgeX + dx},${baseline - dy} ${edgeX},${baseline}`);
+  });
 }
 
 function formatPercent(value, signed = false, omitZeroDecimal = false) {
@@ -245,14 +268,18 @@ function render(animate = true) {
   const floorLeft = axisX;
   const floorRight = width - margin.right;
   const floorCenter = (floorLeft + floorRight) / 2;
+  const perspectiveFloorLines = [];
+  const perspectiveFloorRows = [];
   for (let index = 0; index <= 18; index += 1) {
     const axisPointX = floorLeft + ((floorRight - floorLeft) * index) / 18;
     const backgroundX = floorCenter + (axisPointX - floorCenter) * .82;
     const foregroundX = floorCenter + (axisPointX - floorCenter) * (compact ? 1.52 : 1.4);
-    floor.append(svgEl("line", {
+    const line = svgEl("line", {
       x1: backgroundX, y1: floorBackY, x2: foregroundX, y2: floorFrontY,
       stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1
-    }));
+    });
+    floor.append(line);
+    perspectiveFloorLines.push({ line, axisX: axisPointX });
   }
   const floorRows = [
     [floorBackY, .82],
@@ -265,11 +292,13 @@ function render(animate = true) {
   floorRows.forEach(([y, scale], index) => {
     const rowLeft = floorCenter + (floorLeft - floorCenter) * scale;
     const rowRight = floorCenter + (floorRight - floorCenter) * scale;
-    floor.append(svgEl("line", {
+    const line = svgEl("line", {
       x1: rowLeft, y1: y, x2: rowRight, y2: y,
       stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1,
       ...(index === 0 || index === floorRows.length - 1 ? { filter: "url(#floor-soft)" } : {})
-    }));
+    });
+    floor.append(line);
+    perspectiveFloorRows.push({ line, scale });
   });
   els.chart.append(floor);
 
@@ -287,6 +316,7 @@ function render(animate = true) {
   const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : availablePerBar - barGap;
   const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth, availablePerBar - barGap));
   const displayedBars = [];
+  const perspectiveBars = [];
   parties.forEach((party, partyIndex) => {
     const center = margin.left + partyIndex * groupWidth + groupWidth / 2;
     const totalBars = series.length * barWidth + (series.length - 1) * barGap;
@@ -312,7 +342,7 @@ function render(animate = true) {
         filter: `url(#bar-glow-${partyIndex})`,
         class: "bar-glow", rx: 3
       });
-      const depthX = Math.min(7, Math.max(3, barWidth * .14));
+      const depthX = Math.min(8, Math.max(4, barWidth * .16));
       const depthY = Math.min(6, Math.max(2.5, barWidth * .11));
       const faces = compact || h <= 0 ? [] : [
         svgEl("polygon", {
@@ -328,6 +358,7 @@ function render(animate = true) {
           "stroke-width": 1.1, class: "bar-top"
         })
       ];
+      if (faces.length) perspectiveBars.push({ top: faces[1], side: faces[0], x, y, width: barWidth, baseline: margin.top + innerH, maxDepth: depthX });
       const bar = svgEl("rect", {
         x, y, width: barWidth, height: h,
         fill: PARTY_META[party].color,
@@ -432,6 +463,11 @@ function render(animate = true) {
     els.chart.append(legend);
   });
   state.chartLayout = nextLayout;
+  state.perspective = compact ? null : {
+    floorLines: perspectiveFloorLines, floorRows: perspectiveFloorRows, bars: perspectiveBars,
+    floorLeft, floorRight, frontScale: 1.4
+  };
+  updatePerspective();
 }
 
 function showTooltip(event, region, poll, party, value) {
@@ -460,5 +496,10 @@ fetch("data/polls.json", { cache: "no-store" })
     updatePollOptions(true);
     render();
     window.addEventListener("resize", () => render(false));
+    let perspectiveFrame = 0;
+    els.scroll.addEventListener("scroll", () => {
+      cancelAnimationFrame(perspectiveFrame);
+      perspectiveFrame = requestAnimationFrame(updatePerspective);
+    }, { passive: true });
   })
   .catch(error => { els.updated.textContent = "nicht verfügbar"; els.empty.hidden = false; els.empty.textContent = error.message; els.scroll.hidden = true; });
