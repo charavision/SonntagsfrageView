@@ -348,7 +348,14 @@ function render(animate = true) {
     floor.append(line);
     perspectiveFloorRows.push({ line, scale });
   });
-  els.chart.append(floor);
+  if (compact) {
+    // On phones the floor is a single static background asset. Keeping these
+    // arrays empty also removes all grid work from the horizontal scroll path.
+    perspectiveFloorLines.length = 0;
+    perspectiveFloorRows.length = 0;
+  } else {
+    els.chart.append(floor);
+  }
 
   for (let tick = 0; tick <= yMax; tick += 10) {
     const y = margin.top + innerH - (tick / yMax) * innerH;
@@ -629,6 +636,7 @@ fetch("data/polls.json", { cache: "no-store" })
     window.addEventListener("resize", () => render(false));
     let perspectiveFrame = 0;
     els.scroll.addEventListener("scroll", () => {
+      if (!state.perspective?.floorLines.length && !state.perspective?.bars.length) return;
       cancelAnimationFrame(perspectiveFrame);
       perspectiveFrame = requestAnimationFrame(updatePerspective);
     }, { passive: true });
