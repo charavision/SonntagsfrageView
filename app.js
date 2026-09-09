@@ -210,13 +210,7 @@ function render(animate = true) {
     <filter id="star-wide" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="4.8"/></filter>` + parties.map((party, index) => {
     const glow = PARTY_META[party].glow;
     const union = party === "CDU/CSU";
-    return `<linearGradient id="bar-depth-${index}" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="${glow}" stop-opacity=".48"/>
-      <stop offset=".16" stop-color="${PARTY_META[party].color}"/>
-      <stop offset=".72" stop-color="${PARTY_META[party].color}"/>
-      <stop offset="1" stop-color="#020711" stop-opacity=".82"/>
-    </linearGradient>
-    <filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
+    return `<filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="${union ? 6 : 9}" result="wide-blur"/>
       <feFlood flood-color="${glow}" flood-opacity="${union ? ".34" : ".62"}" result="wide-color"/>
       <feComposite in="wide-color" in2="wide-blur" operator="in" result="wide-glow"/>
@@ -310,9 +304,25 @@ function render(animate = true) {
         filter: `url(#bar-glow-${partyIndex})`,
         class: "bar-glow", rx: 3
       });
+      const depthX = Math.min(7, Math.max(3, barWidth * .14));
+      const depthY = Math.min(6, Math.max(2.5, barWidth * .11));
+      const faces = compact || h <= 0 ? [] : [
+        svgEl("polygon", {
+          points: `${x + barWidth},${y} ${x + barWidth + depthX},${y - depthY} ${x + barWidth + depthX},${margin.top + innerH - depthY} ${x + barWidth},${margin.top + innerH}`,
+          fill: PARTY_META[party].color, stroke: PARTY_META[party].glow,
+          "fill-opacity": fillOpacity * .42, "stroke-opacity": strokeOpacity * .72,
+          "stroke-width": 1.1, class: "bar-side"
+        }),
+        svgEl("polygon", {
+          points: `${x},${y} ${x + depthX},${y - depthY} ${x + barWidth + depthX},${y - depthY} ${x + barWidth},${y}`,
+          fill: PARTY_META[party].glow, stroke: PARTY_META[party].glow,
+          "fill-opacity": fillOpacity * .62, "stroke-opacity": strokeOpacity * .86,
+          "stroke-width": 1.1, class: "bar-top"
+        })
+      ];
       const bar = svgEl("rect", {
         x, y, width: barWidth, height: h,
-        fill: compact ? PARTY_META[party].color : `url(#bar-depth-${partyIndex})`,
+        fill: PARTY_META[party].color,
         stroke: PARTY_META[party].glow,
         "fill-opacity": fillOpacity,
         "stroke-opacity": strokeOpacity,
@@ -320,12 +330,14 @@ function render(animate = true) {
       });
       bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, partyDisplayLabel(party, item.region), value));
       bar.addEventListener("pointerleave", hideTooltip);
-      els.chart.append(glowOutline, bar);
+      els.chart.append(glowOutline, ...faces, bar);
       if (old) {
         animateX(glowOutline, old.x, x, motionEnabled);
+        faces.forEach(face => animateX(face, old.x, x, motionEnabled));
         animateX(bar, old.x, x, motionEnabled);
       } else {
         growBar(glowOutline, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
+        faces.forEach(face => growBar(face, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay));
         growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
       }
       const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
