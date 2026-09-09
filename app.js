@@ -18,7 +18,7 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -62,10 +62,12 @@ function base62Encode(value) { let text = ""; do { text = CODE_ALPHABET[Number(v
 function base62Decode(text) { return [...text].reduce((value, char) => { const digit = CODE_ALPHABET.indexOf(char); if (digit < 0) throw new Error("Ungültiger Code"); return value * 62n + BigInt(digit); }, 0n); }
 function configurationCode() {
   const partyUniverse = Object.keys(PARTY_META);
+  const partyCount = orderedChoiceCount(partyUniverse.length);
   const pollMask = [...state.selectedPollRanks].reduce((mask, rank) => mask | (1 << rank), 0);
   let value = rankOrdered([...state.regions], state.data.regions);
-  value = value * orderedChoiceCount(partyUniverse.length) + rankOrdered([...state.parties], partyUniverse);
+  value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
+  if (state.averageMode) value += orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
 
@@ -220,10 +222,16 @@ function growBar(element, center, baseline, opacity, enabled, delay) {
 
 function render(animate = true) {
   const selectedRegions = [...state.regions];
-  const series = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+  const rawSeries = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
     const poll = (state.data.polls[region] || [])[rank];
     return poll ? { region, rank, poll } : null;
   }).filter(Boolean));
+  const series = state.averageMode ? selectedRegions.map(region => {
+    const items = rawSeries.filter(item => item.region === region);
+    if (!items.length) return null;
+    const values = Object.fromEntries(Object.keys(PARTY_META).map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
+    return { region, rank: 0, average: true, poll: { institute: `Ø ${items.length} Umfragen`, date: items[0].poll.date, client: "", values, sourcePolls: items.map(item => item.poll) } };
+  }).filter(Boolean) : rawSeries;
   const parties = [...state.parties];
   const motionEnabled = animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const oldLayout = state.chartLayout;
@@ -235,8 +243,8 @@ function render(animate = true) {
   els.title.textContent = oneRegion ? selectedRegions[0] : `${selectedRegions.length} Parlamente im Vergleich`;
   els.kicker.hidden = !oneRegion;
   els.kicker.textContent = oneRegion ? (selectedRegions[0] === "Bundestag" ? "Bundestagswahl" : "Landtagswahl") : "";
-  els.meta.textContent = series.length === 1 ? `${series[0].poll.institute} · ${formatDate(series[0].poll.date)}` : `${series.length} Umfragen aus ${selectedRegions.length} Parlamenten`;
-  els.description.textContent = `Nach Parteien gruppiertes Balkendiagramm mit ${series.length} Umfragen aus ${selectedRegions.length} Parlamenten.`;
+  els.meta.textContent = state.averageMode ? `Durchschnitt aus ${rawSeries.length} Umfragen` : series.length === 1 ? `${series[0].poll.institute} · ${formatDate(series[0].poll.date)}` : `${series.length} Umfragen aus ${selectedRegions.length} Parlamenten`;
+  els.description.textContent = state.averageMode ? `Nach Parteien gruppiertes Balkendiagramm mit Durchschnittswerten aus ${rawSeries.length} Umfragen.` : `Nach Parteien gruppiertes Balkendiagramm mit ${series.length} Umfragen aus ${selectedRegions.length} Parlamenten.`;
   els.chart.replaceChildren();
   els.empty.hidden = Boolean(series.length && parties.length);
   els.scroll.hidden = !series.length || !parties.length;
@@ -378,7 +386,7 @@ function render(animate = true) {
     const totalBars = series.length * barWidth + (series.length - 1) * barGap;
     const startX = center - totalBars / 2;
     series.forEach((item, seriesIndex) => {
-      const key = `${party}|${item.region}|${item.rank}`;
+      const key = `${party}|${item.region}|${item.average ? "average" : item.rank}`;
       const old = oldLayout.get(key);
       const value = Number(item.poll.values[party] || 0);
       const election = state.data.elections?.[item.region];
@@ -388,8 +396,8 @@ function render(animate = true) {
       const h = (value / yMax) * innerH;
       const x = startX + seriesIndex * (barWidth + barGap);
       const y = margin.top + innerH - h;
-      const fillOpacity = [.68, .34, .16][item.rank];
-      const strokeOpacity = [1, .78, .56][item.rank];
+      const fillOpacity = item.average ? .68 : [.68, .34, .16][item.rank];
+      const strokeOpacity = item.average ? 1 : [1, .78, .56][item.rank];
       const glowOutline = svgEl("rect", {
         x, y, width: barWidth, height: h,
         fill: "none",
@@ -436,7 +444,7 @@ function render(animate = true) {
         growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
       }
       const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
-      valueLabel.textContent = formatPercent(value, false, compact);
+      valueLabel.textContent = `${item.average ? "Ø " : ""}${formatPercent(value, false, compact)}`;
       els.chart.append(valueLabel);
       old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
@@ -528,7 +536,10 @@ function render(animate = true) {
 }
 
 function showTooltip(event, region, poll, party, value) {
-  els.tooltip.innerHTML = `<strong>${region}</strong><br>${party}: ${String(value).replace(".", ",")} %<br>${poll.institute} · ${formatDate(poll.date)}${poll.client ? `<br>${poll.client}` : ""}`;
+  const pollDetail = poll.sourcePolls
+    ? `Durchschnitt aus ${poll.sourcePolls.length} Umfragen<br>${poll.sourcePolls.map(item => `${item.institute} · ${formatDate(item.date)}`).join("<br>")}`
+    : `${poll.institute} · ${formatDate(poll.date)}${poll.client ? `<br>${poll.client}` : ""}`;
+  els.tooltip.innerHTML = `<strong>${region}</strong><br>${party}: ${String(Math.round(value * 10) / 10).replace(".", ",")} %<br>${pollDetail}`;
   els.tooltip.hidden = false;
   const left = Math.min(window.innerWidth - 280, event.clientX + 14);
   els.tooltip.style.left = `${Math.max(8, left)}px`;
@@ -543,6 +554,10 @@ function applyConfigurationCode(text) {
   const partyCount = orderedChoiceCount(partyUniverse.length);
   const regionCount = orderedChoiceCount(state.data.regions.length);
   let value = base62Decode(text);
+  const legacySpace = regionCount * partyCount * 7n;
+  state.averageMode = value >= legacySpace;
+  if (state.averageMode) value -= legacySpace;
+  if (value >= legacySpace) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   const pollMask = Number(value % 7n) + 1;
   value /= 7n;
   const partyRank = value % partyCount;
@@ -551,6 +566,7 @@ function applyConfigurationCode(text) {
   state.regions = new Set(unrankOrdered(regionRank, state.data.regions));
   state.parties = new Set(unrankOrdered(partyRank, partyUniverse));
   state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
+  document.querySelector("#average-mode").checked = state.averageMode;
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
   els.parties.querySelectorAll("input").forEach(input => input.checked = state.parties.has(input.value));
   updatePollOptions(false);
@@ -709,6 +725,10 @@ fetch("data/polls.json", { cache: "no-store" })
     document.querySelector("#copy-code").addEventListener("click", async () => {
       await navigator.clipboard.writeText(els.outputCode.textContent);
       els.codeMessage.textContent = "Code kopiert.";
+    });
+    document.querySelector("#average-mode").addEventListener("change", event => {
+      state.averageMode = event.currentTarget.checked;
+      render();
     });
     document.querySelector("#export-jpeg").addEventListener("click", () => exportChartImage("jpeg").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
     document.querySelector("#export-png").addEventListener("click", () => exportChartImage("png").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
