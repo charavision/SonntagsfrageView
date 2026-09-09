@@ -560,7 +560,6 @@ function applyConfigurationCode(text) {
 async function exportChartAsJpeg() {
   els.exportMessage.textContent = "JPEG wird erstellt …";
   const clone = els.chart.cloneNode(true);
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   const originalTexts = [...els.chart.querySelectorAll("text")];
   const clonedTexts = [...clone.querySelectorAll("text")];
   clonedTexts.forEach((text, index) => {
@@ -572,18 +571,82 @@ async function exportChartAsJpeg() {
     text.style.letterSpacing = computed.letterSpacing;
   });
   const viewBox = els.chart.viewBox.baseVal;
-  const exportHeight = 1080;
-  const exportWidth = Math.max(1080, Math.round(exportHeight * viewBox.width / viewBox.height));
-  clone.setAttribute("width", exportWidth);
-  clone.setAttribute("height", exportHeight);
-  const background = svgEl("rect", { x: 0, y: 0, width: viewBox.width, height: viewBox.height, fill: "#081326" });
-  clone.insertBefore(background, clone.firstChild);
+  const headerHeight = 92;
+  const footerHeight = 66;
+  const legendWidth = 520;
+  const documentWidth = viewBox.width + legendWidth;
+  const documentHeight = headerHeight + viewBox.height + footerHeight;
+  const exportHeight = 1350;
+  const exportWidth = Math.max(1080, Math.round(exportHeight * documentWidth / documentHeight));
+  const documentSvg = svgEl("svg", {
+    xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${documentWidth} ${documentHeight}`,
+    width: exportWidth, height: exportHeight
+  });
   const css = [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules].map(rule => rule.cssText); } catch { return []; } }).join("\n");
   const style = svgEl("style");
   style.textContent = `svg, text { font-family: ${getComputedStyle(document.body).fontFamily}; }\n${css}`;
-  clone.insertBefore(style, clone.firstChild);
+  documentSvg.append(style, svgEl("rect", { x: 0, y: 0, width: documentWidth, height: documentHeight, fill: "#081326" }));
+
+  const addText = (text, attrs = {}) => {
+    const node = svgEl("text", { fill: "#f4f8ff", ...attrs });
+    node.textContent = text;
+    documentSvg.append(node);
+    return node;
+  };
+  const now = new Date();
+  const minuteStamp = new Intl.DateTimeFormat("de-DE", {
+    weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+  }).format(now);
+  const secondStamp = new Intl.DateTimeFormat("de-DE", {
+    weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
+  }).format(now);
+  const headerX = documentWidth - 18;
+  addText("Sonntagsfragen", { x: headerX, y: 46, "text-anchor": "end", "font-family": "Georgia, serif", "font-size": 42, "font-weight": 500 });
+  addText("visualizer by charavision", { x: headerX, y: 61, "text-anchor": "end", fill: "#a8bfd9", "font-size": 9, "font-weight": 700, "letter-spacing": ".08em" });
+  addText(minuteStamp, { x: headerX, y: 78, "text-anchor": "end", fill: "#8fa6c1", "font-size": 9 });
+
+  clone.setAttribute("x", 0);
+  clone.setAttribute("y", headerHeight);
+  clone.setAttribute("width", viewBox.width);
+  clone.setAttribute("height", viewBox.height);
+  documentSvg.append(clone);
+  documentSvg.append(svgEl("line", { x1: viewBox.width + 1, y1: headerHeight + 18, x2: viewBox.width + 1, y2: headerHeight + viewBox.height - 18, stroke: "#2a4165", "stroke-width": 1 }));
+
+  const selectedRegions = [...state.regions];
+  const selectedParties = [...state.parties];
+  const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+    const poll = (state.data.polls[region] || [])[rank];
+    return poll ? `${REGION_CODES[region]} · ${rank === 0 ? "Neueste" : `${rank + 1}. jüngste`} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
+  }).filter(Boolean));
+  const legendLeft = viewBox.width + 18;
+  const legendColumnWidth = (legendWidth - 44) / 2;
+  let legendY = headerHeight + 32;
+  const addLegendSection = (title, items, columns = 1, swatches = false) => {
+    addText(title, { x: legendLeft, y: legendY, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".08em" });
+    legendY += 16;
+    const rows = Math.ceil(items.length / columns);
+    items.forEach((item, index) => {
+      const column = Math.floor(index / rows);
+      const row = index % rows;
+      const x = legendLeft + column * legendColumnWidth;
+      const y = legendY + row * 12;
+      if (swatches) documentSvg.append(svgEl("rect", { x, y: y - 7, width: 3, height: 8, fill: PARTY_META[item].color }));
+      addText(item, { x: x + (swatches ? 8 : 0), y, fill: "#dce8f7", "font-size": 8 });
+    });
+    legendY += rows * 12 + 12;
+  };
+  addLegendSection("PARTEIEN", selectedParties, selectedParties.length > 5 ? 2 : 1, true);
+  addLegendSection("PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), selectedRegions.length > 8 ? 2 : 1);
+  addLegendSection("UMFRAGEDATEN", selectedPolls, selectedPolls.length > 10 ? 2 : 1);
+
+  const footerCenter = documentWidth / 2;
+  const footerY = headerHeight + viewBox.height + 20;
+  addText(secondStamp, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
+  addText("Quelle der Daten: Wahlrecht.de", { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
+  addText("© charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
+
   const rootStyle = getComputedStyle(document.documentElement);
-  let source = new XMLSerializer().serializeToString(clone).replace(/var\((--[\w-]+)\)/g, (_, name) => rootStyle.getPropertyValue(name).trim());
+  let source = new XMLSerializer().serializeToString(documentSvg).replace(/var\((--[\w-]+)\)/g, (_, name) => rootStyle.getPropertyValue(name).trim());
   const blobUrl = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
   try {
     const image = new Image();
