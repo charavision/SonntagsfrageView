@@ -386,7 +386,11 @@ function render(animate = true) {
   els.chart.append(svgEl("line", { x1: axisX, x2: axisX, y1: margin.top, y2: height - 18, class: "axis-line" }));
 
   const maxBarsPerGroup = Math.max(...groupedBars.map(group => group.bars.length));
-  const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12)) / maxBarsPerGroup;
+  const secondaryBlockKey = ({ party, item }) => state.groupBy === "party" ? item.region : party;
+  const blockBreakCount = bars => bars.slice(1).reduce((count, bar, index) => count + (secondaryBlockKey(bar) !== secondaryBlockKey(bars[index]) ? 1 : 0), 0);
+  const maxBlockBreaks = Math.max(0, ...groupedBars.map(group => blockBreakCount(group.bars)));
+  const blockGap = maxBlockBreaks ? Math.max(6, Math.min(14, groupWidth * .022)) : 0;
+  const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12) - maxBlockBreaks * blockGap) / maxBarsPerGroup;
   const barGap = maxBarsPerGroup === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
   const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : availablePerBar - barGap;
   const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth, availablePerBar - barGap));
@@ -394,8 +398,10 @@ function render(animate = true) {
   const perspectiveBars = [];
   groupedBars.forEach((group, groupIndex) => {
     const center = margin.left + groupIndex * groupWidth + groupWidth / 2;
-    const totalBars = group.bars.length * barWidth + (group.bars.length - 1) * barGap;
+    const groupBlockBreaks = blockBreakCount(group.bars);
+    const totalBars = group.bars.length * barWidth + (group.bars.length - 1) * barGap + groupBlockBreaks * blockGap;
     const startX = center - totalBars / 2;
+    let passedBlockBreaks = 0;
     group.bars.forEach(({ party, item }, barIndex) => {
       const partyIndex = parties.indexOf(party);
       const key = `${party}|${item.region}|${item.average ? "average" : item.rank}`;
@@ -406,7 +412,8 @@ function render(animate = true) {
       const delta = value - baseline;
       const isNew = !election?.represented?.includes(party) && value >= 5 && party !== "Sonstige";
       const h = (value / yMax) * innerH;
-      const x = startX + barIndex * (barWidth + barGap);
+      if (barIndex > 0 && secondaryBlockKey(group.bars[barIndex]) !== secondaryBlockKey(group.bars[barIndex - 1])) passedBlockBreaks += 1;
+      const x = startX + barIndex * (barWidth + barGap) + passedBlockBreaks * blockGap;
       const y = margin.top + innerH - h;
       const fillOpacity = item.average ? .68 : [.68, .34, .16][item.rank];
       const strokeOpacity = item.average ? 1 : [1, .78, .56][item.rank];
@@ -880,12 +887,19 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     });
     const fiftyY = plot.bottom - Math.min(1, 50 / yMax) * (plot.bottom - plot.top) + 14;
     text("Werte in %", { x: (plot.left + plot.right) / 2, y: fiftyY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 10.7 });
-    const slot = (plot.right - plot.left) / Math.max(1, cluster.bars.length);
+    const exportBlockKey = ({ party, item }) => state.groupBy === "party" ? item.region : party;
+    const exportBreaks = cluster.bars.slice(1).reduce((count, bar, barIndex) => count + (exportBlockKey(bar) !== exportBlockKey(cluster.bars[barIndex]) ? 1 : 0), 0);
+    const exportBlockGap = exportBreaks ? Math.max(4, Math.min(10, (plot.right - plot.left) * .008)) : 0;
+    const slot = ((plot.right - plot.left) - exportBreaks * exportBlockGap) / Math.max(1, cluster.bars.length);
     const barWidth = Math.max(2, Math.min(34, slot * .68));
+    const exportBarCenters = [];
+    let passedExportBreaks = 0;
     cluster.bars.forEach(({ party, item }, barIndex) => {
       const value = Number(item.poll.values[party] || 0);
       const barHeight = value / yMax * (plot.bottom - plot.top);
-      const barX = plot.left + slot * barIndex + (slot - barWidth) / 2;
+      if (barIndex > 0 && exportBlockKey(cluster.bars[barIndex]) !== exportBlockKey(cluster.bars[barIndex - 1])) passedExportBreaks += 1;
+      const barX = plot.left + slot * barIndex + passedExportBreaks * exportBlockGap + (slot - barWidth) / 2;
+      exportBarCenters.push(barX + barWidth / 2);
       const barY = plot.bottom - barHeight;
       const color = rootStyle.getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow;
       const fillOpacity = item.average ? .72 : [.68, .34, .14][item.rank] ?? .14;
@@ -906,7 +920,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         if (nextKey !== runKey) break;
         runEnd += 1;
       }
-      const runCenter = plot.left + slot * ((runStart + runEnd + 1) / 2);
+      const runCenter = (exportBarCenters[runStart] + exportBarCenters[runEnd]) / 2;
       const runCount = runEnd - runStart + 1;
       const runLabel = state.groupBy === "party" ? (state.fullRegionNames ? runKey : REGION_CODES[runKey]) : partyDisplayLabel(runKey, cluster.bars[runStart].item.region);
       const hyphenIndex = runLabel.indexOf("-");
