@@ -25,8 +25,49 @@ const els = {
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   kicker: document.querySelector("#chart-kicker"), meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  tooltip: document.querySelector("#tooltip")
+  tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
+  outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
+  exportMessage: document.querySelector("#export-message")
 };
+
+const CODE_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+function permutations(n, k) { let result = 1n; for (let i = 0; i < k; i += 1) result *= BigInt(n - i); return result; }
+function orderedChoiceCount(n) { let total = 0n; for (let k = 1; k <= n; k += 1) total += permutations(n, k); return total; }
+function rankOrdered(items, universe) {
+  let rank = 0n;
+  for (let k = 1; k < items.length; k += 1) rank += permutations(universe.length, k);
+  const remaining = [...universe];
+  items.forEach((item, index) => {
+    const choice = remaining.indexOf(item);
+    rank += BigInt(choice) * permutations(remaining.length - 1, items.length - index - 1);
+    remaining.splice(choice, 1);
+  });
+  return rank;
+}
+function unrankOrdered(rank, universe) {
+  let length = 1;
+  while (length <= universe.length && rank >= permutations(universe.length, length)) rank -= permutations(universe.length, length++);
+  if (length > universe.length) throw new Error("Ungültiger Code");
+  const remaining = [...universe], result = [];
+  for (let index = 0; index < length; index += 1) {
+    const block = permutations(remaining.length - 1, length - index - 1);
+    const choice = Number(rank / block);
+    rank %= block;
+    if (choice >= remaining.length) throw new Error("Ungültiger Code");
+    result.push(remaining.splice(choice, 1)[0]);
+  }
+  return result;
+}
+function base62Encode(value) { let text = ""; do { text = CODE_ALPHABET[Number(value % 62n)] + text; value /= 62n; } while (value); return text.padStart(13, "0"); }
+function base62Decode(text) { return [...text].reduce((value, char) => { const digit = CODE_ALPHABET.indexOf(char); if (digit < 0) throw new Error("Ungültiger Code"); return value * 62n + BigInt(digit); }, 0n); }
+function configurationCode() {
+  const partyUniverse = Object.keys(PARTY_META);
+  const pollMask = [...state.selectedPollRanks].reduce((mask, rank) => mask | (1 << rank), 0);
+  let value = rankOrdered([...state.regions], state.data.regions);
+  value = value * orderedChoiceCount(partyUniverse.length) + rankOrdered([...state.parties], partyUniverse);
+  value = value * 7n + BigInt(pollMask - 1);
+  return base62Encode(value);
+}
 
 function makeChoice(container, group, value, checked, color, code, nextElection) {
   const wrap = document.createElement("div");
@@ -113,13 +154,18 @@ function updatePerspective() {
   const scene = state.perspective;
   if (!scene) return;
   const center = els.scroll.scrollLeft + els.scroll.clientWidth / 2;
-  scene.floorLines.forEach(({ line, axisX }) => {
+  const visibleLeft = els.scroll.scrollLeft + 1;
+  const visibleRight = els.scroll.scrollLeft + els.scroll.clientWidth - 12;
+  scene.floorLines.forEach(({ line, axisX, ratio }) => {
+    if (scene.staticFloor) axisX = visibleLeft + ratio * (visibleRight - visibleLeft);
     line.setAttribute("x1", center + (axisX - center) * .82);
     line.setAttribute("x2", center + (axisX - center) * scene.frontScale);
   });
   scene.floorRows.forEach(({ line, scale }) => {
-    line.setAttribute("x1", center + (scene.floorLeft - center) * scale);
-    line.setAttribute("x2", center + (scene.floorRight - center) * scale);
+    const left = scene.staticFloor ? visibleLeft : scene.floorLeft;
+    const right = scene.staticFloor ? visibleRight : scene.floorRight;
+    line.setAttribute("x1", center + (left - center) * scale);
+    line.setAttribute("x2", center + (right - center) * scale);
   });
   scene.bars.forEach(({ top, side, x, y, width, baseline, maxDepth }) => {
     const barCenter = x + width / 2;
@@ -279,7 +325,7 @@ function render(animate = true) {
       stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1
     });
     floor.append(line);
-    perspectiveFloorLines.push({ line, axisX: axisPointX });
+    perspectiveFloorLines.push({ line, axisX: axisPointX, ratio: index / 18 });
   }
   const floorRows = [
     [floorBackY, .82],
@@ -465,9 +511,10 @@ function render(animate = true) {
   state.chartLayout = nextLayout;
   state.perspective = {
     floorLines: perspectiveFloorLines, floorRows: perspectiveFloorRows, bars: perspectiveBars,
-    floorLeft, floorRight, frontScale: compact ? 1.52 : 1.4
+    floorLeft, floorRight, frontScale: compact ? 1.52 : 1.4, staticFloor: compact
   };
   updatePerspective();
+  els.outputCode.textContent = configurationCode();
 }
 
 function showTooltip(event, region, poll, party, value) {
@@ -479,6 +526,68 @@ function showTooltip(event, region, poll, party, value) {
 }
 function hideTooltip() { els.tooltip.hidden = true; }
 function formatDate(value) { return new Intl.DateTimeFormat("de-DE").format(new Date(`${value}T12:00:00`)); }
+
+function applyConfigurationCode(text) {
+  if (!/^[0-9A-Za-z]{13}$/.test(text)) throw new Error("Bitte einen gültigen 13-stelligen Code eingeben.");
+  const partyUniverse = Object.keys(PARTY_META);
+  const partyCount = orderedChoiceCount(partyUniverse.length);
+  const regionCount = orderedChoiceCount(state.data.regions.length);
+  let value = base62Decode(text);
+  const pollMask = Number(value % 7n) + 1;
+  value /= 7n;
+  const partyRank = value % partyCount;
+  const regionRank = value / partyCount;
+  if (regionRank >= regionCount) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  state.regions = new Set(unrankOrdered(regionRank, state.data.regions));
+  state.parties = new Set(unrankOrdered(partyRank, partyUniverse));
+  state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
+  els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
+  els.parties.querySelectorAll("input").forEach(input => input.checked = state.parties.has(input.value));
+  updatePollOptions(false);
+  render(false);
+}
+
+async function exportChartAsJpeg() {
+  els.exportMessage.textContent = "JPEG wird erstellt …";
+  const clone = els.chart.cloneNode(true);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const viewBox = els.chart.viewBox.baseVal;
+  const exportHeight = 1080;
+  const exportWidth = Math.max(1080, Math.round(exportHeight * viewBox.width / viewBox.height));
+  clone.setAttribute("width", exportWidth);
+  clone.setAttribute("height", exportHeight);
+  const background = svgEl("rect", { x: 0, y: 0, width: viewBox.width, height: viewBox.height, fill: "#081326" });
+  clone.insertBefore(background, clone.firstChild);
+  const css = [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules].map(rule => rule.cssText); } catch { return []; } }).join("\n");
+  const style = svgEl("style");
+  style.textContent = css;
+  clone.insertBefore(style, clone.firstChild);
+  const rootStyle = getComputedStyle(document.documentElement);
+  let source = new XMLSerializer().serializeToString(clone).replace(/var\((--[\w-]+)\)/g, (_, name) => rootStyle.getPropertyValue(name).trim());
+  const blobUrl = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
+  try {
+    const image = new Image();
+    image.src = blobUrl;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = exportWidth;
+    canvas.height = exportHeight;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#081326";
+    context.fillRect(0, 0, exportWidth, exportHeight);
+    context.drawImage(image, 0, 0, exportWidth, exportHeight);
+    const jpeg = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", .94));
+    const downloadUrl = URL.createObjectURL(jpeg);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `sonntagsfragen-${configurationCode()}.jpg`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    els.exportMessage.textContent = `${exportWidth} × ${exportHeight} Pixel`;
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
 
 fetch("data/polls.json", { cache: "no-store" })
   .then(response => { if (!response.ok) throw new Error("Daten konnten nicht geladen werden"); return response.json(); })
@@ -495,6 +604,16 @@ fetch("data/polls.json", { cache: "no-store" })
     buildControls();
     updatePollOptions(true);
     render();
+    document.querySelector("#code-input").addEventListener("submit", event => {
+      event.preventDefault();
+      try { applyConfigurationCode(els.inputCode.value.trim()); els.codeMessage.textContent = "Konfiguration übernommen."; }
+      catch (error) { els.codeMessage.textContent = error.message; }
+    });
+    document.querySelector("#copy-code").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(els.outputCode.textContent);
+      els.codeMessage.textContent = "Code kopiert.";
+    });
+    document.querySelector("#export-jpeg").addEventListener("click", () => exportChartAsJpeg().catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
     window.addEventListener("resize", () => render(false));
     let perspectiveFrame = 0;
     els.scroll.addEventListener("scroll", () => {

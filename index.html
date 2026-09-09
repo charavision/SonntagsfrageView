@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=mobile-dynamic-floor-42">
+  <link rel="stylesheet" href="styles.css?v=share-code-jpeg-43">
 </head>
 <body>
   <main>
@@ -22,6 +22,12 @@
         <span>Stand</span>
         <strong id="updated">wird geladen …</strong>
       </div>
+      <form id="code-input" class="code-box code-input" novalidate>
+        <label for="input-code">Input-Code</label>
+        <input id="input-code" maxlength="13" autocomplete="off" spellcheck="false" placeholder="13-stelliger Code">
+        <button type="submit">Anwenden</button>
+        <small id="code-message" aria-live="polite"></small>
+      </form>
     </header>
 
     <section class="controls" aria-label="Auswahl">
@@ -67,11 +73,21 @@
       <div id="empty-state" class="empty-state" hidden>Für diese Auswahl sind noch keine Daten verfügbar.</div>
     </section>
 
+    <section class="outputs" aria-label="Ausgabe">
+      <div class="code-box output-code">
+        <label for="output-code">Output-Code</label>
+        <output id="output-code" for="input-code"></output>
+        <button id="copy-code" type="button">Kopieren</button>
+      </div>
+      <button id="export-jpeg" class="export-button" type="button">Output JPEG</button>
+      <small id="export-message" aria-live="polite"></small>
+    </section>
+
     <footer>
       <p>Daten: <a href="https://www.wahlrecht.de/umfragen/" target="_blank" rel="noreferrer">Wahlrecht.de</a>. Die Werte werden automatisiert übernommen; maßgeblich ist die Originalquelle.</p>
     </footer>
   </main>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
-  <script src="app.js?v=mobile-dynamic-floor-42" defer></script>
+  <script src="app.js?v=share-code-jpeg-43" defer></script>
 </body>
 </html>
