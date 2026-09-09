@@ -35,15 +35,18 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .control-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
 .control-heading h2, .chart-heading h2 { margin: 0; font-size: 18px; }
 .text-button { padding: 2px; border: 0; color: var(--accent); background: transparent; cursor: pointer; font-size: 13px; font-weight: 700; }
-.option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 7px; }
+.option-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); grid-auto-rows: 1fr; gap: 7px; }
 .party-options { display: flex; flex-wrap: wrap; gap: 8px; }
 .choice { position: relative; }
 .choice input { position: absolute; opacity: 0; pointer-events: none; }
 .choice label { display: flex; align-items: center; gap: 7px; min-height: 42px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; background: rgba(16,31,56,.92); color: #dce8f7; cursor: pointer; font-size: 14px; transition: border-color .15s, background .15s, box-shadow .15s; }
-.region-choice label { align-items: flex-start; flex-direction: column; gap: 3px; }
-.region-name { display: flex; align-items: baseline; gap: 7px; }
+.region-choice, .region-choice label { height: 100%; }
+.region-choice label { align-items: flex-start; flex-direction: column; justify-content: space-between; gap: 6px; min-height: 78px; }
+.region-name { display: flex; align-items: flex-start; flex-direction: column; gap: 2px; min-width: 0; }
+.region-title { line-height: 1.2; }
 .region-code { flex: 0 0 auto; color: #fff; font-size: 14px; font-weight: 900; letter-spacing: .03em; }
 .next-election { color: var(--muted); font-size: 11px; line-height: 1.25; }
+.region-legend { margin: 8px 2px 0; color: var(--muted); font-size: 11px; }
 .region-choice input:checked + label .next-election { color: #c5d9ef; }
 .choice input:focus-visible + label { outline: 3px solid color-mix(in srgb, var(--accent) 25%, transparent); outline-offset: 2px; }
 .choice input:checked + label { border-color: #59d9ff; background: linear-gradient(135deg, rgba(37,105,154,.82), rgba(16,48,82,.96)); color: white; box-shadow: 0 0 18px rgba(89,217,255,.14); }
@@ -90,6 +93,11 @@ footer a { color: inherit; }
   main { padding: 18px; }
   .hero, .chart-heading { align-items: flex-start; flex-direction: column; }
   .status, .chart-meta { text-align: left; }
+  .option-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .region-choice label { min-height: 66px; padding: 6px; gap: 4px; font-size: 9px; }
+  .region-title { font-size: 9px; line-height: 1.15; }
+  .region-code { font-size: 10px; }
+  .next-election, .region-legend { font-size: 8px; }
   .party-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
   .party-choice label { justify-content: center; gap: 3px; min-height: 34px; padding: 5px 4px; font-size: 10px; white-space: nowrap; }
   .party-choice label::before { width: 7px; height: 7px; margin-right: 2px; }

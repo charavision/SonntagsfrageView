@@ -33,7 +33,7 @@ function makeChoice(container, group, value, checked, color, code, nextElection)
   wrap.className = `choice ${group === "party" ? "party-choice" : ""} ${group === "region" ? "region-choice" : ""}`;
   if (color) wrap.style.setProperty("--party-color", color);
   const id = `${group}-${value.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  const label = code ? `<span class="region-name"><strong class="region-code">${code}</strong><span>${value}</span></span><small class="next-election">Nächste Wahl: ${nextElection || "noch offen"}</small>` : value;
+  const label = code ? `<span class="region-name"><span class="region-title">${value}</span><strong class="region-code">${code}</strong></span><small class="next-election"><span aria-hidden="true">📅</span> ${nextElection || "noch offen"}</small>` : value;
   wrap.innerHTML = `<input id="${id}" type="checkbox" name="${group}" value="${value}" ${checked ? "checked" : ""}><label for="${id}">${label}</label>`;
   container.append(wrap);
   return wrap.querySelector("input");
