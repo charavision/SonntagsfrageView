@@ -732,7 +732,7 @@ function a4ExportClusters() {
 
 function a4LayoutFor(clusters) {
   const largestCluster = Math.max(0, ...clusters.map(cluster => cluster.bars.length));
-  if (largestCluster > 34) return { width: 1754, height: 1240, columns: 2, rows: 1, capacity: 2, landscape: true };
+  if (largestCluster > 34) return { width: 1754, height: 1240, columns: 1, rows: 2, capacity: 2, landscape: true };
   if (largestCluster > 17) return { width: 1240, height: 1754, columns: 1, rows: 4, capacity: 4, landscape: false };
   return { width: 1240, height: 1754, columns: 3, rows: 4, capacity: 12, landscape: false };
 }
