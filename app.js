@@ -252,14 +252,15 @@ function render(animate = true) {
     nextLayout.set(`party:${party}`, { center });
   });
   const legendX = margin.left - 10;
-  const legend = svgEl("text", { x: legendX, y: margin.top + innerH + 24, "text-anchor": "end", class: "chart-legend" });
-  const legendLines = ["OBEN = Umfragewert", "± = zur letzten Wahl", "NEW = neuer Einzug", "Kürzel = Parlament"];
-  legendLines.forEach((text, index) => {
-    const line = svgEl("tspan", { x: legendX, dy: index ? 13 : 0 });
-    line.textContent = text;
-    legend.append(line);
+  [
+    ["Veränderung", margin.top + innerH + 20],
+    ["Parlament", margin.top + innerH + 51],
+    ["Partei", height - margin.bottom + 82]
+  ].forEach(([text, y]) => {
+    const legend = svgEl("text", { x: legendX, y, "text-anchor": "end", class: "chart-legend" });
+    legend.textContent = text;
+    els.chart.append(legend);
   });
-  els.chart.append(legend);
   state.chartLayout = nextLayout;
 }
 
