@@ -466,7 +466,7 @@ function render(animate = true) {
       const firstCenter = startX + labelStart * (barWidth + barGap) + barWidth / 2;
       const lastCenter = startX + (labelEnd - 1) * (barWidth + barGap) + barWidth / 2;
       const labelCenter = (firstCenter + lastCenter) / 2;
-      const rotatePartyLabel = compact;
+      const rotatePartyLabel = compact && labelEnd - labelStart === 1;
       const label = svgEl("text", {
         x: labelCenter,
         y: partyLabelY,
