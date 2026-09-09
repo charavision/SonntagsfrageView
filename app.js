@@ -158,7 +158,7 @@ function updatePerspective() {
   const visibleRight = els.scroll.scrollLeft + els.scroll.clientWidth - 12;
   scene.floorLines.forEach(({ line, axisX, ratio }) => {
     if (scene.staticFloor) axisX = visibleLeft + ratio * (visibleRight - visibleLeft);
-    line.setAttribute("x1", center + (axisX - center) * .82);
+    line.setAttribute("x1", center + (axisX - center) * scene.backScale);
     line.setAttribute("x2", center + (axisX - center) * scene.frontScale);
   });
   scene.floorRows.forEach(({ line, scale }) => {
@@ -314,12 +314,14 @@ function render(animate = true) {
   const floorLeft = axisX;
   const floorRight = width - margin.right;
   const floorCenter = (floorLeft + floorRight) / 2;
+  const floorBackScale = compact ? .93 : .82;
+  const floorFrontScale = compact ? 1.22 : 1.4;
   const perspectiveFloorLines = [];
   const perspectiveFloorRows = [];
   for (let index = 0; index <= 18; index += 1) {
     const axisPointX = floorLeft + ((floorRight - floorLeft) * index) / 18;
-    const backgroundX = floorCenter + (axisPointX - floorCenter) * .82;
-    const foregroundX = floorCenter + (axisPointX - floorCenter) * (compact ? 1.52 : 1.4);
+    const backgroundX = floorCenter + (axisPointX - floorCenter) * floorBackScale;
+    const foregroundX = floorCenter + (axisPointX - floorCenter) * floorFrontScale;
     const line = svgEl("line", {
       x1: backgroundX, y1: floorBackY, x2: foregroundX, y2: floorFrontY,
       stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1
@@ -328,12 +330,12 @@ function render(animate = true) {
     perspectiveFloorLines.push({ line, axisX: axisPointX, ratio: index / 18 });
   }
   const floorRows = [
-    [floorBackY, .82],
-    [baselineY - (compact ? 24 : 29), .88],
-    [baselineY - (compact ? 12 : 14), .94],
+    [floorBackY, compact ? .93 : .82],
+    [baselineY - (compact ? 24 : 29), compact ? .955 : .88],
+    [baselineY - (compact ? 12 : 14), compact ? .98 : .94],
     [baselineY, 1],
-    [baselineY + (compact ? 42 : 50), compact ? 1.19 : 1.14],
-    [floorFrontY, compact ? 1.52 : 1.4]
+    [baselineY + (compact ? 42 : 50), compact ? 1.08 : 1.14],
+    [floorFrontY, floorFrontScale]
   ];
   floorRows.forEach(([y, scale], index) => {
     const rowLeft = floorCenter + (floorLeft - floorCenter) * scale;
@@ -511,7 +513,7 @@ function render(animate = true) {
   state.chartLayout = nextLayout;
   state.perspective = {
     floorLines: perspectiveFloorLines, floorRows: perspectiveFloorRows, bars: perspectiveBars,
-    floorLeft, floorRight, frontScale: compact ? 1.52 : 1.4, staticFloor: compact
+    floorLeft, floorRight, backScale: floorBackScale, frontScale: floorFrontScale, staticFloor: compact
   };
   updatePerspective();
   els.outputCode.textContent = configurationCode();
