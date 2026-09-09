@@ -585,7 +585,7 @@ async function exportChartAsJpeg() {
     Math.ceil(selectedRegions.length / regionColumns),
     Math.ceil(selectedPolls.length / pollColumns)
   );
-  const headerHeight = Math.max(135, 58 + legendRows * 10);
+  const headerHeight = Math.max(150, 58 + legendRows * 10);
   const footerHeight = 66;
   const documentWidth = Math.max(1600, viewBox.width);
   const documentHeight = headerHeight + viewBox.height + footerHeight;
@@ -614,9 +614,11 @@ async function exportChartAsJpeg() {
     weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
   }).format(now);
   const headerX = 18;
+  const headerCenter = 270;
   addText("Sonntagsfragen", { x: headerX, y: 66, style: "font-family: Georgia, serif", "font-size": 64, "font-weight": 500, "letter-spacing": "-.06em" });
   addText("visualizer by charavision", { x: headerX + 108, y: 84, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 6.5, "font-weight": 700, "letter-spacing": ".07em" });
-  addText(minuteStamp, { x: headerX, y: 106, fill: "#8fa6c1", "font-size": 8 });
+  addText(minuteStamp, { x: headerCenter, y: 108, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
+  addText(`Konfigurationscode: ${configurationCode()}`, { x: headerCenter, y: 124, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
 
   clone.setAttribute("x", (documentWidth - viewBox.width) / 2);
   clone.setAttribute("y", headerHeight);
