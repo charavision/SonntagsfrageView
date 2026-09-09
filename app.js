@@ -585,9 +585,9 @@ async function exportChartAsJpeg() {
     Math.ceil(selectedRegions.length / regionColumns),
     Math.ceil(selectedPolls.length / pollColumns)
   );
-  const headerHeight = Math.max(115, 58 + legendRows * 10);
+  const headerHeight = Math.max(135, 58 + legendRows * 10);
   const footerHeight = 66;
-  const documentWidth = Math.max(1200, viewBox.width);
+  const documentWidth = Math.max(1600, viewBox.width);
   const documentHeight = headerHeight + viewBox.height + footerHeight;
   const exportHeight = 1350;
   const exportWidth = Math.min(12000, Math.max(1080, Math.round(exportHeight * documentWidth / documentHeight)));
@@ -614,9 +614,9 @@ async function exportChartAsJpeg() {
     weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
   }).format(now);
   const headerX = 18;
-  addText("Sonntagsfragen", { x: headerX, y: 46, style: "font-family: Georgia, serif", "font-size": 42, "font-weight": 500, "letter-spacing": "-.06em" });
-  addText("visualizer by charavision", { x: headerX + 17, y: 61, fill: "#a8bfd9", "font-size": 9, "font-weight": 700, "letter-spacing": ".08em" });
-  addText(minuteStamp, { x: headerX, y: 80, fill: "#8fa6c1", "font-size": 9 });
+  addText("Sonntagsfragen", { x: headerX, y: 66, style: "font-family: Georgia, serif", "font-size": 64, "font-weight": 500, "letter-spacing": "-.06em" });
+  addText("visualizer by charavision", { x: headerX + 108, y: 84, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 6.5, "font-weight": 700, "letter-spacing": ".07em" });
+  addText(minuteStamp, { x: headerX, y: 106, fill: "#8fa6c1", "font-size": 8 });
 
   clone.setAttribute("x", (documentWidth - viewBox.width) / 2);
   clone.setAttribute("y", headerHeight);
@@ -637,9 +637,9 @@ async function exportChartAsJpeg() {
       addText(item, { x: itemX + (swatches ? 7 : 0), y, fill: "#dce8f7", "font-size": 7 });
     });
   };
-  addLegendSection(330, 150, "PARTEIEN", selectedParties, partyColumns, true);
-  addLegendSection(500, 220, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), regionColumns);
-  addLegendSection(740, documentWidth - 758, "UMFRAGEDATEN", selectedPolls, pollColumns);
+  addLegendSection(650, 180, "PARTEIEN", selectedParties, partyColumns, true);
+  addLegendSection(850, 270, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), regionColumns);
+  addLegendSection(1140, documentWidth - 1158, "UMFRAGEDATEN", selectedPolls, pollColumns);
 
   const footerCenter = documentWidth / 2;
   const footerY = headerHeight + viewBox.height + 20;
