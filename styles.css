@@ -69,8 +69,8 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .axis-line { stroke: #9bb4d0; stroke-width: 1; opacity: .35; }
 .chart-legend { fill: #8fa6c1; font-size: 9px; font-weight: 700; letter-spacing: .025em; }
 .poll-label { fill: #e8f0fa; font-size: 12px; font-weight: 700; }
-.bar { filter: url(#bar-glow); stroke: rgba(255,255,255,.7); stroke-width: 1.25; transition: opacity .12s, filter .12s; }
-.bar:hover { opacity: 1; filter: url(#bar-glow) brightness(1.2); }
+.bar { filter: url(#bar-glow); stroke-width: 1.8; transition: fill-opacity .15s, stroke-opacity .15s, filter .15s; }
+.bar:hover { fill-opacity: .84; stroke-opacity: 1; filter: url(#bar-glow) brightness(1.28); }
 .bar-value { fill: #fff; font-size: 10.5px; font-weight: 800; paint-order: stroke; stroke: #071225; stroke-width: 3px; stroke-linejoin: round; }
 .bar-delta { font-size: 10px; font-weight: 800; }
 .bar-delta.positive { fill: #63e6a6; }
