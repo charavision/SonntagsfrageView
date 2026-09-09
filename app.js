@@ -233,7 +233,8 @@ function render(animate = true) {
   const newLabelDelay = hasExistingBars ? 1220 : 430;
   const oneRegion = selectedRegions.length === 1;
   els.title.textContent = oneRegion ? selectedRegions[0] : `${selectedRegions.length} Parlamente im Vergleich`;
-  els.kicker.textContent = oneRegion ? (selectedRegions[0] === "Bundestag" ? "Bundestagswahl" : "Landtagswahl") : "Bund & Länder";
+  els.kicker.hidden = !oneRegion;
+  els.kicker.textContent = oneRegion ? (selectedRegions[0] === "Bundestag" ? "Bundestagswahl" : "Landtagswahl") : "";
   els.meta.textContent = series.length === 1 ? `${series[0].poll.institute} · ${formatDate(series[0].poll.date)}` : `${series.length} Umfragen aus ${selectedRegions.length} Parlamenten`;
   els.description.textContent = `Nach Parteien gruppiertes Balkendiagramm mit ${series.length} Umfragen aus ${selectedRegions.length} Parlamenten.`;
   els.chart.replaceChildren();
