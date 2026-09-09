@@ -116,6 +116,12 @@ function formatPercent(value, signed = false) {
   return `${value > 0 ? "+" : "−"}${absolute}`;
 }
 
+function partyDisplayLabel(party, region) {
+  if (party !== "CDU/CSU") return party;
+  if (region === "Bundestag") return "CDU/CSU";
+  return region === "Bayern" ? "CSU" : "CDU";
+}
+
 function animateX(element, from, to, enabled) {
   if (!enabled || from == null || Math.abs(from - to) < .5 || !element.animate) return;
   element.animate(
@@ -224,7 +230,7 @@ function render(animate = true) {
       const y = margin.top + innerH - h;
       const opacity = [1, .72, .46][item.rank];
       const bar = svgEl("rect", { x, y, width: barWidth, height: h, fill: PARTY_META[party].color, opacity, class: "bar", rx: 3 });
-      bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, party, value));
+      bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, partyDisplayLabel(party, item.region), value));
       bar.addEventListener("pointerleave", hideTooltip);
       els.chart.append(bar);
       old ? animateX(bar, old.x, x, motionEnabled) : growBar(bar, x + barWidth / 2, margin.top + innerH, opacity, motionEnabled, newBarDelay);
@@ -243,36 +249,62 @@ function render(animate = true) {
       }
       els.chart.append(deltaLabel);
       old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, newLabelDelay);
-      const regionLabelX = x + barWidth / 2;
+      nextLayout.set(key, { x, center: x + barWidth / 2 });
+    });
+
+    // One centered parliament label per consecutive poll group. A single bar
+    // remains vertical on phones; grouped labels have enough room horizontally.
+    let groupStart = 0;
+    while (groupStart < series.length) {
+      let groupEnd = groupStart + 1;
+      while (groupEnd < series.length && series[groupEnd].region === series[groupStart].region) groupEnd += 1;
+      const count = groupEnd - groupStart;
+      const firstCenter = startX + groupStart * (barWidth + barGap) + barWidth / 2;
+      const lastCenter = startX + (groupEnd - 1) * (barWidth + barGap) + barWidth / 2;
+      const regionLabelX = (firstCenter + lastCenter) / 2;
       const regionLabelY = margin.top + innerH + 51;
+      const rotateRegionLabel = compact && count === 1;
       const regionLabel = svgEl("text", {
         x: regionLabelX,
         y: regionLabelY,
-        "text-anchor": compact ? "end" : "middle",
+        "text-anchor": rotateRegionLabel ? "end" : "middle",
         class: `region-label${compact ? " mobile-region-label" : ""}`,
-        ...(compact ? { transform: `rotate(-90 ${regionLabelX} ${regionLabelY})` } : {})
+        ...(rotateRegionLabel ? { transform: `rotate(-90 ${regionLabelX} ${regionLabelY})` } : {})
       });
-      regionLabel.textContent = REGION_CODES[item.region] || item.region;
+      regionLabel.textContent = REGION_CODES[series[groupStart].region] || series[groupStart].region;
       const regionLabelGroup = svgEl("g");
       regionLabelGroup.append(regionLabel);
       els.chart.append(regionLabelGroup);
-      old ? animateX(regionLabelGroup, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabelGroup, motionEnabled, newLabelDelay);
-      nextLayout.set(key, { x, center: x + barWidth / 2 });
-    });
+      fadeIn(regionLabelGroup, motionEnabled, newLabelDelay);
+      groupStart = groupEnd;
+    }
+
+    // Most party groups get one shared label. The Union group is split only
+    // where the correct name changes between Bundestag, Bavaria and other states.
     const partyLabelY = height - margin.bottom + (compact ? 96 : 82);
-    const label = svgEl("text", {
-      x: center,
-      y: partyLabelY,
-      "text-anchor": compact ? "end" : "middle",
-      class: `poll-label${compact ? " mobile-party-label" : ""}`,
-      ...(compact ? { transform: `rotate(-90 ${center} ${partyLabelY})` } : {})
-    });
-    label.textContent = party;
-    const oldParty = oldLayout.get(`party:${party}`);
-    const partyLabelGroup = svgEl("g");
-    partyLabelGroup.append(label);
-    els.chart.append(partyLabelGroup);
-    oldParty ? animateX(partyLabelGroup, oldParty.center, center, motionEnabled) : fadeIn(partyLabelGroup, motionEnabled, newLabelDelay);
+    let labelStart = 0;
+    while (labelStart < series.length) {
+      const displayLabel = partyDisplayLabel(party, series[labelStart].region);
+      let labelEnd = labelStart + 1;
+      while (labelEnd < series.length && partyDisplayLabel(party, series[labelEnd].region) === displayLabel) labelEnd += 1;
+      const firstCenter = startX + labelStart * (barWidth + barGap) + barWidth / 2;
+      const lastCenter = startX + (labelEnd - 1) * (barWidth + barGap) + barWidth / 2;
+      const labelCenter = (firstCenter + lastCenter) / 2;
+      const rotatePartyLabel = compact;
+      const label = svgEl("text", {
+        x: labelCenter,
+        y: partyLabelY,
+        "text-anchor": rotatePartyLabel ? "end" : "middle",
+        class: `poll-label${compact ? " mobile-party-label" : ""}`,
+        ...(rotatePartyLabel ? { transform: `rotate(-90 ${labelCenter} ${partyLabelY})` } : {})
+      });
+      label.textContent = displayLabel;
+      const partyLabelGroup = svgEl("g");
+      partyLabelGroup.append(label);
+      els.chart.append(partyLabelGroup);
+      fadeIn(partyLabelGroup, motionEnabled, newLabelDelay);
+      labelStart = labelEnd;
+    }
     nextLayout.set(`party:${party}`, { center });
   });
   const legendX = compact ? margin.left / 2 : margin.left - 10;
