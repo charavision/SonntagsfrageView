@@ -222,7 +222,7 @@ function render(animate = true) {
 
   const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12)) / series.length;
   const barGap = series.length === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
-  const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : 34;
+  const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : availablePerBar - barGap;
   const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth, availablePerBar - barGap));
   const displayedBars = [];
   parties.forEach((party, partyIndex) => {
