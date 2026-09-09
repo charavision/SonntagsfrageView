@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=average-layout-64">
+  <link rel="stylesheet" href="styles.css?v=mobile-view-65">
 </head>
 <body>
   <main>
@@ -64,6 +64,10 @@
     </section>
 
     <section class="chart-section" aria-labelledby="chart-title">
+      <div class="mobile-view-choice choice">
+        <input id="mobile-view" type="checkbox">
+        <label for="mobile-view">Mobile Ansicht</label>
+      </div>
       <div class="chart-heading">
         <div>
           <p id="chart-kicker" class="eyebrow"></p>
@@ -94,6 +98,6 @@
     </footer>
   </main>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
-  <script src="app.js?v=average-layout-export-spacing-64" defer></script>
+  <script src="app.js?v=mobile-view-adaptive-header-65" defer></script>
 </body>
 </html>

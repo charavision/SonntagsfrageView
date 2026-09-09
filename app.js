@@ -18,13 +18,14 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   kicker: document.querySelector("#chart-kicker"), meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
   exportMessage: document.querySelector("#export-message")
@@ -67,7 +68,8 @@ function configurationCode() {
   let value = rankOrdered([...state.regions], state.data.regions);
   value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
-  if (state.averageMode) value += orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n);
+  value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
 
@@ -221,6 +223,7 @@ function growBar(element, center, baseline, opacity, enabled, delay) {
 }
 
 function render(animate = true) {
+  els.chartSection.classList.toggle("mobile-view", state.mobileView);
   const selectedRegions = [...state.regions];
   const rawSeries = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
     const poll = (state.data.polls[region] || [])[rank];
@@ -253,7 +256,7 @@ function render(animate = true) {
     return;
   }
 
-  const compact = window.innerWidth < 900;
+  const compact = state.mobileView || window.innerWidth < 900;
   // On phones the scale sits on the actual edge while the bars retain a small
   // inset, so the first bar never collides with the tick labels.
   const axisX = compact ? 1 : 160;
@@ -555,9 +558,11 @@ function applyConfigurationCode(text) {
   const regionCount = orderedChoiceCount(state.data.regions.length);
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
-  state.averageMode = value >= legacySpace;
-  if (state.averageMode) value -= legacySpace;
-  if (value >= legacySpace) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  const mode = Number(value / legacySpace);
+  if (mode > 3) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  state.averageMode = Boolean(mode & 1);
+  state.mobileView = Boolean(mode & 2);
+  value %= legacySpace;
   const pollMask = Number(value % 7n) + 1;
   value /= 7n;
   const partyRank = value % partyCount;
@@ -567,6 +572,7 @@ function applyConfigurationCode(text) {
   state.parties = new Set(unrankOrdered(partyRank, partyUniverse));
   state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
   document.querySelector("#average-mode").checked = state.averageMode;
+  els.mobileView.checked = state.mobileView;
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
   els.parties.querySelectorAll("input").forEach(input => input.checked = state.parties.has(input.value));
   updatePollOptions(false);
@@ -603,8 +609,10 @@ async function exportChartImage(format = "jpeg") {
     Math.ceil(selectedRegions.length / regionColumns),
     Math.ceil(selectedPolls.length / pollColumns)
   );
-  const headerOffsetY = 34;
-  const headerHeight = Math.max(150, 92 + legendRows * 10);
+  const exportBarCount = selectedParties.length * (state.averageMode ? selectedRegions.length : selectedPolls.length);
+  const headerScale = Math.min(2.2, Math.max(1, exportBarCount / 22));
+  const headerOffsetY = 50;
+  const headerHeight = Math.max(150, 100 + legendRows * 10) * headerScale;
   const footerHeight = 66;
   const documentWidth = Math.max(1600, viewBox.width);
   const documentHeight = headerHeight + viewBox.height + footerHeight;
@@ -625,6 +633,14 @@ async function exportChartImage(format = "jpeg") {
     documentSvg.append(node);
     return node;
   };
+  const headerGroup = svgEl("g", { transform: `scale(${headerScale})` });
+  documentSvg.append(headerGroup);
+  const addHeaderText = (text, attrs = {}) => {
+    const node = svgEl("text", { fill: "#f4f8ff", ...attrs });
+    node.textContent = text;
+    headerGroup.append(node);
+    return node;
+  };
   const now = new Date();
   const minuteStamp = new Intl.DateTimeFormat("de-DE", {
     weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
@@ -634,15 +650,15 @@ async function exportChartImage(format = "jpeg") {
   }).format(now);
   const headerX = 18;
   const headerMetaX = 565;
-  addText("Sonntagsfragen", { x: headerX, y: 66 + headerOffsetY, style: "font-family: Georgia, serif", "font-size": 64, "font-weight": 500, "letter-spacing": "-.06em" });
-  const creator = addText("", { x: headerX + 108, y: 84 + headerOffsetY, "text-anchor": "middle", fill: "#7f95b2", "font-size": 6.5, "font-weight": 400, "letter-spacing": ".04em", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' });
+  addHeaderText("Sonntagsfragen", { x: headerX, y: 66 + headerOffsetY, style: "font-family: Georgia, serif", "font-size": 64, "font-weight": 500, "letter-spacing": "-.06em" });
+  const creator = addHeaderText("", { x: headerX + 108, y: 84 + headerOffsetY, "text-anchor": "middle", fill: "#7f95b2", "font-size": 6.5, "font-weight": 400, "letter-spacing": ".04em", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' });
   const creatorPrefix = svgEl("tspan");
   creatorPrefix.textContent = "visualizer by ";
   const creatorName = svgEl("tspan", { fill: "#b9dff1", "font-weight": 800 });
   creatorName.textContent = "charavision";
   creator.append(creatorPrefix, creatorName);
-  addText(minuteStamp, { x: headerMetaX, y: 54 + headerOffsetY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
-  addText(configurationCode(), { x: headerMetaX, y: 70 + headerOffsetY, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  addHeaderText(minuteStamp, { x: headerMetaX, y: 54 + headerOffsetY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
+  addHeaderText(configurationCode(), { x: headerMetaX, y: 70 + headerOffsetY, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
 
   clone.setAttribute("x", (documentWidth - viewBox.width) / 2);
   clone.setAttribute("y", headerHeight);
@@ -651,7 +667,7 @@ async function exportChartImage(format = "jpeg") {
   documentSvg.append(clone);
 
   const addLegendSection = (x, width, title, items, columns = 1, swatches = false) => {
-    addText(title, { x, y: 27 + headerOffsetY, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".08em" });
+    addHeaderText(title, { x, y: 27 + headerOffsetY, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".08em" });
     const rows = Math.ceil(items.length / columns);
     const columnWidth = width / columns;
     items.forEach((item, index) => {
@@ -659,8 +675,8 @@ async function exportChartImage(format = "jpeg") {
       const row = index % rows;
       const itemX = x + column * columnWidth;
       const y = 43 + headerOffsetY + row * 10;
-      if (swatches) documentSvg.append(svgEl("rect", { x: itemX, y: y - 6, width: 3, height: 7, fill: PARTY_META[item].color }));
-      addText(item, { x: itemX + (swatches ? 7 : 0), y, fill: "#dce8f7", "font-size": 7 });
+      if (swatches) headerGroup.append(svgEl("rect", { x: itemX, y: y - 6, width: 3, height: 7, fill: PARTY_META[item].color }));
+      addHeaderText(item, { x: itemX + (swatches ? 7 : 0), y, fill: "#dce8f7", "font-size": 7 });
     });
   };
   addLegendSection(700, 145, "PARTEIEN", selectedParties, partyColumns, true);
@@ -730,6 +746,10 @@ fetch("data/polls.json", { cache: "no-store" })
     document.querySelector("#average-mode").addEventListener("change", event => {
       state.averageMode = event.currentTarget.checked;
       render();
+    });
+    els.mobileView.addEventListener("change", event => {
+      state.mobileView = event.currentTarget.checked;
+      render(false);
     });
     document.querySelector("#export-jpeg").addEventListener("click", () => exportChartImage("jpeg").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
     document.querySelector("#export-png").addEventListener("click", () => exportChartImage("png").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
