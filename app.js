@@ -205,7 +205,9 @@ function render(animate = true) {
       <stop offset=".68" stop-color="#65b6ff" stop-opacity=".2"/>
       <stop offset="1" stop-color="#65b6ff" stop-opacity=".04"/>
     </linearGradient>
-    <filter id="floor-soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.25"/></filter>` + parties.map((party, index) => {
+    <filter id="floor-soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.25"/></filter>
+    <filter id="star-soft" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="2.2"/></filter>
+    <filter id="star-wide" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="4.8"/></filter>` + parties.map((party, index) => {
     const glow = PARTY_META[party].glow;
     const union = party === "CDU/CSU";
     return `<filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
@@ -220,21 +222,40 @@ function render(animate = true) {
   }).join("");
   els.chart.append(defs);
 
+  const stars = svgEl("g", { class: "depth-stars", "aria-hidden": "true" });
+  const starPalette = ["#89cfff", "#d8efff", "#65b6ff"];
+  const starCount = compact ? 24 : 42;
+  for (let index = 0; index < starCount; index += 1) {
+    const x = axisX + ((index * 83 + 29) % 997) / 997 * (width - margin.right - axisX);
+    const y = 14 + ((index * 137 + 47) % 991) / 991 * Math.max(30, baselineY - 34);
+    const depth = (index * 41 % 100) / 100;
+    const radius = .45 + depth * 1.75;
+    stars.append(svgEl("circle", {
+      cx: x, cy: y, r: radius,
+      fill: starPalette[index % starPalette.length],
+      "fill-opacity": .08 + depth * .22,
+      ...(depth > .76 ? { filter: "url(#star-wide)" } : depth > .38 ? { filter: "url(#star-soft)" } : {})
+    }));
+  }
+  els.chart.append(stars);
+
   const floor = svgEl("g", { class: "perspective-floor", "aria-hidden": "true" });
   const floorBottom = height - 2;
-  const vanishX = margin.left + chartW / 2;
   const floorLeft = axisX;
   const floorRight = width - margin.right;
+  const floorCenter = (floorLeft + floorRight) / 2;
+  const foregroundExpansion = compact ? 2.15 : 1.72;
   for (let index = 0; index <= 18; index += 1) {
-    const x = floorLeft + ((floorRight - floorLeft) * index) / 18;
+    const horizonX = floorLeft + ((floorRight - floorLeft) * index) / 18;
+    const foregroundX = floorCenter + (horizonX - floorCenter) * foregroundExpansion;
     floor.append(svgEl("line", {
-      x1: vanishX, y1: baselineY, x2: x, y2: floorBottom,
+      x1: horizonX, y1: baselineY, x2: foregroundX, y2: floorBottom,
       stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1
     }));
   }
   for (let index = 1; index <= 13; index += 1) {
     const progress = index / 13;
-    const y = baselineY + (floorBottom - baselineY) * Math.pow(progress, 1.72);
+    const y = baselineY + (floorBottom - baselineY) * Math.pow(progress, 1.9);
     const soft = index <= 2 || index >= 11;
     floor.append(svgEl("line", {
       x1: floorLeft, y1: y, x2: floorRight, y2: y,
