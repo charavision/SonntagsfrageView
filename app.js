@@ -117,13 +117,29 @@ function formatPercent(value, signed = false) {
 }
 
 function animateX(element, from, to, enabled) {
-  if (!enabled || from == null || Math.abs(from - to) < .5) return;
-  element.append(svgEl("animate", { attributeName: "x", from, to, dur: "560ms", fill: "freeze", calcMode: "spline", keyTimes: "0;1", keySplines: ".22 1 .36 1" }));
+  if (!enabled || from == null || Math.abs(from - to) < .5 || !element.animate) return;
+  element.animate(
+    [{ transform: `translateX(${from - to}px)` }, { transform: "translateX(0)" }],
+    { duration: 780, easing: "cubic-bezier(.16, 1, .3, 1)", fill: "both" }
+  );
 }
 
-function fadeIn(element, enabled, delay = "160ms") {
-  if (!enabled) return;
-  element.append(svgEl("animate", { attributeName: "opacity", from: "0", to: "1", dur: "360ms", begin: delay, fill: "freeze" }));
+function fadeIn(element, enabled, delay = 180) {
+  if (!enabled || !element.animate) return;
+  element.animate(
+    [{ opacity: 0, transform: "translateY(7px)" }, { opacity: 1, transform: "translateY(0)" }],
+    { duration: 460, delay, easing: "cubic-bezier(.22, 1, .36, 1)", fill: "both" }
+  );
+}
+
+function growBar(element, center, baseline, opacity, enabled) {
+  if (!enabled || !element.animate) return;
+  element.style.transformBox = "view-box";
+  element.style.transformOrigin = `${center}px ${baseline}px`;
+  element.animate(
+    [{ transform: "scaleY(0)", opacity: 0 }, { transform: "scaleY(1)", opacity }],
+    { duration: 820, delay: 90, easing: "cubic-bezier(.16, 1, .3, 1)", fill: "both" }
+  );
 }
 
 function render(animate = true) {
@@ -197,44 +213,38 @@ function render(animate = true) {
       const h = (value / yMax) * innerH;
       const x = startX + seriesIndex * (barWidth + barGap);
       const y = margin.top + innerH - h;
-      const bar = svgEl("rect", { x, y, width: barWidth, height: h, fill: PARTY_META[party].color, opacity: [1, .72, .46][item.rank], class: "bar", rx: 3 });
-      if (old) {
-        animateX(bar, old.x, x, motionEnabled);
-      } else if (motionEnabled) {
-        bar.append(svgEl("animate", { attributeName: "y", from: margin.top + innerH, to: y, dur: "640ms", fill: "freeze", calcMode: "spline", keyTimes: "0;1", keySplines: ".22 1 .36 1" }));
-        bar.append(svgEl("animate", { attributeName: "height", from: "0", to: h, dur: "640ms", fill: "freeze", calcMode: "spline", keyTimes: "0;1", keySplines: ".22 1 .36 1" }));
-      }
+      const opacity = [1, .72, .46][item.rank];
+      const bar = svgEl("rect", { x, y, width: barWidth, height: h, fill: PARTY_META[party].color, opacity, class: "bar", rx: 3 });
       bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, party, value));
       bar.addEventListener("pointerleave", hideTooltip);
       els.chart.append(bar);
+      old ? animateX(bar, old.x, x, motionEnabled) : growBar(bar, x + barWidth / 2, margin.top + innerH, opacity, motionEnabled);
       const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
       valueLabel.textContent = formatPercent(value);
-      old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, "300ms");
       els.chart.append(valueLabel);
+      old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, 430);
       const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
       const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
       deltaLine.textContent = formatPercent(delta, true);
-      if (old) animateX(deltaLine, old.center, x + barWidth / 2, motionEnabled);
       deltaLabel.append(deltaLine);
       if (isNew) {
         const newLine = svgEl("tspan", { x: x + barWidth / 2, dy: 13, class: "new-label" });
         newLine.textContent = "NEW";
-        if (old) animateX(newLine, old.center, x + barWidth / 2, motionEnabled);
         deltaLabel.append(newLine);
       }
-      if (!old) fadeIn(deltaLabel, motionEnabled, "220ms");
       els.chart.append(deltaLabel);
+      old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, 320);
       const regionLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 51, "text-anchor": "middle", class: "region-label" });
       regionLabel.textContent = REGION_CODES[item.region] || item.region;
-      old ? animateX(regionLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabel, motionEnabled, "220ms");
       els.chart.append(regionLabel);
+      old ? animateX(regionLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(regionLabel, motionEnabled, 320);
       nextLayout.set(key, { x, center: x + barWidth / 2 });
     });
     const label = svgEl("text", { x: center, y: height - margin.bottom + 82, "text-anchor": "middle", class: "poll-label" });
     label.textContent = party;
     const oldParty = oldLayout.get(`party:${party}`);
-    oldParty ? animateX(label, oldParty.center, center, motionEnabled) : fadeIn(label, motionEnabled, "220ms");
     els.chart.append(label);
+    oldParty ? animateX(label, oldParty.center, center, motionEnabled) : fadeIn(label, motionEnabled, 320);
     nextLayout.set(`party:${party}`, { center });
   });
   state.chartLayout = nextLayout;
