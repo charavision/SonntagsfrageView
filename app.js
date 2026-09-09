@@ -478,13 +478,18 @@ function render(animate = true) {
       while (end < displayedBars.length && labelFor(displayedBars[end]) === text) end += 1;
       const count = end - start;
       const x = (displayedBars[start].center + displayedBars[end - 1].center) / 2;
-      const rotate = compact && count === 1;
+      const stackedUnion = !compact && text === "CDU/CSU" && count === 1 && parties.length > 1;
+      const rotate = compact && count === 1 && !stackedUnion;
       const label = svgEl("text", {
-        x, y, "text-anchor": "middle",
+        x, y: stackedUnion ? y - 5 : y, "text-anchor": "middle",
         class: `${className}${compact ? ` mobile-${className}` : ""}`,
         ...(rotate ? { transform: `rotate(-90 ${x} ${y})` } : {})
       });
-      label.textContent = text;
+      if (stackedUnion) {
+        const firstLine = svgEl("tspan", { x }); firstLine.textContent = "CDU/";
+        const secondLine = svgEl("tspan", { x, dy: 11 }); secondLine.textContent = "CSU";
+        label.append(firstLine, secondLine);
+      } else label.textContent = text;
       const labelGroup = svgEl("g");
       labelGroup.append(label);
       els.chart.append(labelGroup);
@@ -700,6 +705,138 @@ async function exportChartImage(format = "jpeg") {
   }
 }
 
+function a4ExportClusters() {
+  const regions = [...state.regions];
+  const parties = [...state.parties];
+  const raw = regions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+    const poll = (state.data.polls[region] || [])[rank];
+    return poll ? { region, rank, poll } : null;
+  }).filter(Boolean));
+  const series = state.averageMode ? regions.map(region => {
+    const items = raw.filter(item => item.region === region);
+    if (!items.length) return null;
+    const values = Object.fromEntries(Object.keys(PARTY_META).map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
+    return { region, rank: 0, average: true, poll: { values } };
+  }).filter(Boolean) : raw;
+  if (state.groupBy === "region") return regions.map(region => ({
+    title: `${region} (${REGION_CODES[region]})`,
+    bars: parties.flatMap(party => series.filter(item => item.region === region).map(item => ({ party, item })))
+  })).filter(cluster => cluster.bars.length);
+  return parties.map(party => ({
+    title: party === "CDU/CSU" && regions.length === 1 ? partyDisplayLabel(party, regions[0]) : party,
+    bars: series.map(item => ({ party, item }))
+  }));
+}
+
+function buildA4Page(clusters, pageNumber, pageCount) {
+  const width = 1240, height = 1754;
+  const page = svgEl("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${width} ${height}`, width, height });
+  page.append(svgEl("rect", { width, height, fill: "#081326" }));
+  const text = (value, attrs = {}) => { const node = svgEl("text", { fill: "#f4f8ff", ...attrs }); node.textContent = value; page.append(node); return node; };
+  const now = new Date();
+  text("Sonntagsfragen", { x: 42, y: 78, style: "font-family: Georgia, serif", "font-size": 58, "font-weight": 500, "letter-spacing": "-.06em" });
+  text(new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(now), { x: 1198, y: 48, "text-anchor": "end", fill: "#8fa6c1", "font-size": 14 });
+  text(configurationCode(), { x: 1198, y: 72, "text-anchor": "end", fill: "#b9cee5", "font-size": 14, style: "font-family: ui-monospace, monospace" });
+  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: 112, fill: "#59d9ff", "font-size": 14, "font-weight": 700 });
+  const columns = 3, rows = 4, gapX = 18, gapY = 18, left = 42, top = 142;
+  const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
+  const tileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
+  const allValues = clusters.flatMap(cluster => cluster.bars.map(({ party, item }) => Number(item.poll.values[party] || 0)));
+  const yMax = Math.max(50, Math.ceil(Math.max(0, ...allValues) / 10) * 10);
+  const rootStyle = getComputedStyle(document.documentElement);
+  clusters.forEach((cluster, index) => {
+    const column = index % columns, row = Math.floor(index / columns);
+    const x = left + column * (tileWidth + gapX), y = top + row * (tileHeight + gapY);
+    page.append(svgEl("rect", { x, y, width: tileWidth, height: tileHeight, rx: 14, fill: "#0d1d34", stroke: "#29496e", "stroke-width": 1.5 }));
+    text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 15, "font-weight": 800 });
+    const plot = { left: x + 34, right: x + tileWidth - 12, top: y + 48, bottom: y + tileHeight - 54 };
+    page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
+    page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
+    [0, .5, 1].forEach(fraction => {
+      const lineY = plot.bottom - fraction * (plot.bottom - plot.top);
+      page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: lineY, y2: lineY, stroke: "#9bb4d0", "stroke-opacity": .2 }));
+      text(`${Math.round(yMax * fraction)}`, { x: plot.left - 6, y: lineY + 4, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8 });
+    });
+    const slot = (plot.right - plot.left) / Math.max(1, cluster.bars.length);
+    const barWidth = Math.max(2, Math.min(34, slot * .68));
+    cluster.bars.forEach(({ party, item }, barIndex) => {
+      const value = Number(item.poll.values[party] || 0);
+      const barHeight = value / yMax * (plot.bottom - plot.top);
+      const barX = plot.left + slot * barIndex + (slot - barWidth) / 2;
+      const barY = plot.bottom - barHeight;
+      const color = rootStyle.getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow;
+      page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": .62, stroke: PARTY_META[party].glow, "stroke-width": 1.5 }));
+      text(`${item.average ? "Ø " : ""}${formatPercent(value, false, true).replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
+      const label = state.groupBy === "region" ? `${partyDisplayLabel(party, item.region)}${item.average ? "" : ` ${item.rank + 1}`}` : `${REGION_CODES[item.region]}${item.average ? "" : ` ${item.rank + 1}`}`;
+      const partyBarCount = cluster.bars.filter(bar => bar.party === party).length;
+      if (state.groupBy === "region" && party === "CDU/CSU" && partyBarCount === 1 && new Set(cluster.bars.map(bar => bar.party)).size > 1) {
+        text("CDU/", { x: barX + barWidth / 2, y: plot.bottom + 14, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 7 });
+        text("CSU", { x: barX + barWidth / 2, y: plot.bottom + 24, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 7 });
+      } else text(label, { x: barX + barWidth / 2, y: plot.bottom + 12, "text-anchor": "end", transform: `rotate(-90 ${barX + barWidth / 2} ${plot.bottom + 12})`, fill: "#a8bfd9", "font-size": cluster.bars.length > 18 ? 6 : 8 });
+    });
+  });
+  text("Werte in %", { x: width / 2, y: 1672, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 11 });
+  text(`Quelle der Daten: Wahlrecht.de · © charavision`, { x: 42, y: 1715, fill: "#8fa6c1", "font-size": 11 });
+  text(`Seite ${pageNumber} / ${pageCount}`, { x: 1198, y: 1715, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
+  return page;
+}
+
+async function rasterizeA4Page(svg, mimeType, quality) {
+  const source = new XMLSerializer().serializeToString(svg);
+  const url = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
+  try {
+    const image = new Image(); image.src = url; await image.decode();
+    const canvas = document.createElement("canvas"); canvas.width = 2480; canvas.height = 3508;
+    const context = canvas.getContext("2d"); context.fillStyle = "#081326"; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("A4-Seite konnte nicht erstellt werden.")), mimeType, quality));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+function pdfFromJpegs(images) {
+  const encoder = new TextEncoder(), chunks = [], offsets = [0]; let length = 0;
+  const push = value => { const bytes = typeof value === "string" ? encoder.encode(value) : value; chunks.push(bytes); length += bytes.length; };
+  push("%PDF-1.4\n");
+  const objectCount = 2 + images.length * 3;
+  const object = (number, body, binary) => { offsets[number] = length; push(`${number} 0 obj\n${body}`); if (binary) { push("\nstream\n"); push(binary); push("\nendstream"); } push("\nendobj\n"); };
+  object(1, "<< /Type /Catalog /Pages 2 0 R >>");
+  const pageRefs = images.map((_, index) => `${3 + index * 3} 0 R`).join(" ");
+  object(2, `<< /Type /Pages /Count ${images.length} /Kids [${pageRefs}] >>`);
+  images.forEach((image, index) => {
+    const pageObject = 3 + index * 3, contentObject = pageObject + 1, imageObject = pageObject + 2;
+    object(pageObject, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 ${imageObject} 0 R >> >> /Contents ${contentObject} 0 R >>`);
+    const drawing = "q 595.28 0 0 841.89 0 0 cm /Im0 Do Q";
+    object(contentObject, `<< /Length ${drawing.length} >>\nstream\n${drawing}\nendstream`);
+    object(imageObject, `<< /Type /XObject /Subtype /Image /Width 2480 /Height 3508 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.length} >>`, image);
+  });
+  const xref = length; push(`xref\n0 ${objectCount + 1}\n0000000000 65535 f \n`);
+  for (let index = 1; index <= objectCount; index += 1) push(`${String(offsets[index]).padStart(10, "0")} 00000 n \n`);
+  push(`trailer\n<< /Size ${objectCount + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(chunks, { type: "application/pdf" });
+}
+
+async function exportA4(format) {
+  const clusters = a4ExportClusters();
+  if (!clusters.length) throw new Error("Bitte mindestens eine Partei und ein Parlament auswählen.");
+  const pages = Array.from({ length: Math.ceil(clusters.length / 12) }, (_, index) => buildA4Page(clusters.slice(index * 12, index * 12 + 12), index + 1, Math.ceil(clusters.length / 12)));
+  els.exportMessage.textContent = `${format === "pdf" ? "PDF" : "A4-PNG"} mit ${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"} wird erstellt …`;
+  if (format === "pdf") {
+    const jpegs = [];
+    for (const page of pages) jpegs.push(new Uint8Array(await (await rasterizeA4Page(page, "image/jpeg", .94)).arrayBuffer()));
+    downloadBlob(pdfFromJpegs(jpegs), `sonntagsfragen-${configurationCode()}.pdf`);
+  } else {
+    for (let index = 0; index < pages.length; index += 1) {
+      downloadBlob(await rasterizeA4Page(pages[index], "image/png"), `sonntagsfragen-${configurationCode()}-seite-${index + 1}.png`);
+      await new Promise(resolve => setTimeout(resolve, 180));
+    }
+  }
+  els.exportMessage.textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"} erstellt`;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob), link = document.createElement("a");
+  link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1200);
+}
+
 fetch("data/polls.json", { cache: "no-store" })
   .then(response => { if (!response.ok) throw new Error("Daten konnten nicht geladen werden"); return response.json(); })
   .then(data => {
@@ -739,6 +876,8 @@ fetch("data/polls.json", { cache: "no-store" })
     }));
     document.querySelector("#export-jpeg").addEventListener("click", () => exportChartImage("jpeg").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
     document.querySelector("#export-png").addEventListener("click", () => exportChartImage("png").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
+    document.querySelector("#export-a4-png").addEventListener("click", () => exportA4("png").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
+    document.querySelector("#export-pdf").addEventListener("click", () => exportA4("pdf").catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; }));
     window.addEventListener("resize", () => render(false));
     let perspectiveFrame = 0;
     els.scroll.addEventListener("scroll", () => {
