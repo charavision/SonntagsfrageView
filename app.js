@@ -1332,6 +1332,15 @@ async function reportRequest(path, options = {}) {
   return payload;
 }
 
+async function loadIntroAdminSetting() {
+  const checkbox = document.querySelector("#report-intro-enabled");
+  const message = document.querySelector("#report-intro-message");
+  message.textContent = "Einstellung wird geladen …";
+  const setting = await reportRequest("/settings/intro");
+  checkbox.checked = setting.enabled !== false;
+  message.textContent = "";
+}
+
 async function loadReports() {
   const list = document.querySelector("#report-list");
   list.innerHTML = '<p class="report-empty">Einträge werden geladen …</p>';
@@ -1448,6 +1457,181 @@ function updateHeaderTimestamp(data) {
     hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short", timeZone: "Europe/Berlin"
   }).format(new Date(data.updatedAt));
 }
+
+async function startAppIntro() {
+  const intro = document.querySelector("#app-intro");
+  const canvas = document.querySelector("#intro-canvas");
+  const brand = document.querySelector("#intro-brand");
+  const target = document.querySelector(".title-lockup");
+  if (!intro || !canvas || !brand || !target) return;
+  try {
+    const response = await fetch(`${reportApiUrl}/settings/intro`, { cache: "no-store" });
+    const setting = await response.json();
+    if (response.ok && setting.enabled === false) {
+      intro.remove();
+      document.body.classList.remove("intro-running");
+      return;
+    }
+  } catch (error) {
+    // Falls die Einstellung kurzzeitig nicht erreichbar ist, bleibt das Intro aktiv.
+  }
+  const context = canvas.getContext("2d");
+  const startTime = performance.now();
+  let frameId = 0;
+  let viewportWidth = 0;
+  let viewportHeight = 0;
+  const clamp = value => Math.max(0, Math.min(1, value));
+  const smooth = value => {
+    const amount = clamp(value);
+    return amount * amount * (3 - 2 * amount);
+  };
+  const mix = (from, to, amount) => from + (to - from) * amount;
+  const bars = [
+    { x: -2.8, z: 8, width: 2.6, depth: 2.5, height: 7.2, start: .85, color: [54, 184, 255] },
+    { x: 2.5, z: 18, width: 2.7, depth: 2.6, height: 5.4, start: 1.55, color: [255, 224, 79] },
+    { x: -2.2, z: 29, width: 3, depth: 2.8, height: 9.6, start: 2.25, color: [66, 232, 120] },
+    { x: 1.2, z: 43, width: 3.4, depth: 3.2, height: 16.5, start: 3.05, color: [194, 82, 255] }
+  ];
+  const resizeCanvas = () => {
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    viewportWidth = window.innerWidth;
+    viewportHeight = window.innerHeight;
+    canvas.width = Math.round(viewportWidth * ratio);
+    canvas.height = Math.round(viewportHeight * ratio);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  };
+  const vector = (x, y, z) => ({ x, y, z });
+  const subtract = (left, right) => vector(left.x - right.x, left.y - right.y, left.z - right.z);
+  const dot = (left, right) => left.x * right.x + left.y * right.y + left.z * right.z;
+  const cross = (left, right) => vector(left.y * right.z - left.z * right.y, left.z * right.x - left.x * right.z, left.x * right.y - left.y * right.x);
+  const normalize = value => {
+    const length = Math.hypot(value.x, value.y, value.z) || 1;
+    return vector(value.x / length, value.y / length, value.z / length);
+  };
+  const cameraAt = seconds => {
+    const travel = smooth(seconds / 4.85);
+    const climb = smooth((seconds - 4.15) / 1.55);
+    return {
+      position: vector(mix(0, .8, climb), mix(2.25, 5.7, climb), mix(-8, 38.5, travel)),
+      target: vector(mix(0, 1.2, climb), mix(1.25, 13.8, climb), mix(15, 43.7, climb))
+    };
+  };
+  const projectorFor = camera => {
+    const forward = normalize(subtract(camera.target, camera.position));
+    const right = normalize(cross(forward, vector(0, 1, 0)));
+    const up = normalize(cross(right, forward));
+    const focal = Math.min(viewportWidth, viewportHeight) * .9;
+    return point => {
+      const relative = subtract(point, camera.position);
+      const depth = dot(relative, forward);
+      if (depth < .3) return null;
+      return {
+        x: viewportWidth * .5 + dot(relative, right) * focal / depth,
+        y: viewportHeight * .53 - dot(relative, up) * focal / depth,
+        depth
+      };
+    };
+  };
+  const strokeWorldLine = (project, from, to, alpha, width = 1) => {
+    const first = project(from);
+    const second = project(to);
+    if (!first || !second) return;
+    context.beginPath();
+    context.moveTo(first.x, first.y);
+    context.lineTo(second.x, second.y);
+    context.strokeStyle = `rgba(72, 169, 255, ${alpha})`;
+    context.lineWidth = width;
+    context.stroke();
+  };
+  const polygon = (points, fill, stroke, glow = 0) => {
+    if (points.some(point => !point)) return;
+    context.save();
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+    points.slice(1).forEach(point => context.lineTo(point.x, point.y));
+    context.closePath();
+    context.fillStyle = fill;
+    context.shadowColor = stroke;
+    context.shadowBlur = glow;
+    context.fill();
+    context.strokeStyle = stroke;
+    context.lineWidth = 1.5;
+    context.stroke();
+    context.restore();
+  };
+  const drawBar = (project, bar, seconds, sceneAlpha) => {
+    const growth = smooth((seconds - bar.start) / .48);
+    if (growth <= 0) return;
+    const height = Math.max(.03, bar.height * growth);
+    const x0 = bar.x - bar.width / 2;
+    const x1 = bar.x + bar.width / 2;
+    const z0 = bar.z - bar.depth / 2;
+    const z1 = bar.z + bar.depth / 2;
+    const vertices = [
+      vector(x0, 0, z0), vector(x1, 0, z0), vector(x1, 0, z1), vector(x0, 0, z1),
+      vector(x0, height, z0), vector(x1, height, z0), vector(x1, height, z1), vector(x0, height, z1)
+    ].map(project);
+    const [red, green, blue] = bar.color;
+    const edge = `rgba(${red}, ${green}, ${blue}, ${.94 * sceneAlpha})`;
+    polygon([vertices[0], vertices[1], vertices[5], vertices[4]], `rgba(${red}, ${green}, ${blue}, ${.39 * sceneAlpha})`, edge, 14);
+    polygon([vertices[1], vertices[2], vertices[6], vertices[5]], `rgba(${red}, ${green}, ${blue}, ${.25 * sceneAlpha})`, edge, 10);
+    polygon([vertices[4], vertices[5], vertices[6], vertices[7]], `rgba(${Math.min(255, red + 30)}, ${Math.min(255, green + 30)}, ${Math.min(255, blue + 30)}, ${.58 * sceneAlpha})`, edge, 17);
+  };
+  const drawScene = now => {
+    const seconds = (now - startTime) / 1000;
+    const sceneAlpha = smooth(seconds / .7) * (1 - smooth((seconds - 5.85) / 1.05));
+    context.clearRect(0, 0, viewportWidth, viewportHeight);
+    const camera = cameraAt(seconds);
+    const project = projectorFor(camera);
+    context.save();
+    context.globalAlpha = sceneAlpha;
+    const gridStart = Math.floor((camera.position.z + 1) / 2) * 2;
+    for (let x = -22; x <= 22; x += 2) strokeWorldLine(project, vector(x, 0, gridStart), vector(x, 0, camera.position.z + 72), .28, x === 0 ? 1.4 : 1);
+    for (let z = gridStart; z <= camera.position.z + 72; z += 2) {
+      const distance = z - camera.position.z;
+      strokeWorldLine(project, vector(-22, 0, z), vector(22, 0, z), .16 + .28 * (1 - clamp(distance / 72)));
+    }
+    bars.slice().sort((left, right) => right.z - left.z).forEach(bar => drawBar(project, bar, seconds, sceneAlpha));
+    context.restore();
+    if (seconds < 7.5 && intro.isConnected) frameId = requestAnimationFrame(drawScene);
+  };
+  const placeBrand = () => {
+    const box = target.getBoundingClientRect();
+    const titleStyle = getComputedStyle(target.querySelector("h1"));
+    brand.style.left = `${box.left}px`;
+    brand.style.top = `${box.top}px`;
+    brand.style.width = `${box.width}px`;
+    brand.style.height = `${box.height}px`;
+    brand.querySelector("strong").style.fontSize = titleStyle.fontSize;
+  };
+  resizeCanvas();
+  placeBrand();
+  frameId = requestAnimationFrame(drawScene);
+  window.addEventListener("resize", resizeCanvas, { passive: true });
+  window.addEventListener("resize", placeBrand, { passive: true });
+  let revealTimer;
+  let finishTimer;
+  const finish = () => {
+    clearTimeout(revealTimer);
+    clearTimeout(finishTimer);
+    cancelAnimationFrame(frameId);
+    window.removeEventListener("resize", resizeCanvas);
+    window.removeEventListener("resize", placeBrand);
+    document.body.classList.add("intro-reveal");
+    intro.remove();
+    document.body.classList.remove("intro-running", "intro-reveal");
+  };
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    finish();
+    return;
+  }
+  revealTimer = setTimeout(() => document.body.classList.add("intro-reveal"), 6350);
+  finishTimer = setTimeout(finish, 7450);
+  intro.addEventListener("click", finish, { once: true });
+  document.addEventListener("keydown", event => { if (event.key === "Escape" || event.key === "Enter" || event.key === " ") finish(); }, { once: true });
+}
+
+startAppIntro();
 
 fetchLatestData()
   .then(data => {
@@ -1634,8 +1818,25 @@ fetchLatestData()
     document.querySelector("#report-accounts-open").addEventListener("click", async () => {
       const panel = document.querySelector("#report-accounts");
       panel.hidden = false;
-      try { await loadReportAccounts(); }
+      try { await Promise.all([loadReportAccounts(), loadIntroAdminSetting()]); }
       catch (error) { const list = document.querySelector("#report-account-list"); list.replaceChildren(); const notice = document.createElement("p"); notice.className = "report-empty"; notice.textContent = error.message; list.append(notice); }
+    });
+    document.querySelector("#report-intro-enabled").addEventListener("change", async event => {
+      const checkbox = event.currentTarget;
+      const message = document.querySelector("#report-intro-message");
+      const requested = checkbox.checked;
+      checkbox.disabled = true;
+      message.textContent = "Einstellung wird gespeichert …";
+      try {
+        const setting = await reportRequest("/settings/intro", { method: "PATCH", body: JSON.stringify({ enabled: requested }) });
+        checkbox.checked = setting.enabled !== false;
+        message.textContent = checkbox.checked ? "Intro ist eingeschaltet." : "Intro ist ausgeschaltet.";
+      } catch (error) {
+        checkbox.checked = !requested;
+        message.textContent = error.message;
+      } finally {
+        checkbox.disabled = false;
+      }
     });
     document.querySelector("#report-accounts-close").addEventListener("click", () => { document.querySelector("#report-accounts").hidden = true; });
     document.querySelector("#report-account-form").addEventListener("submit", async event => {
