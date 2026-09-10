@@ -522,7 +522,7 @@ function render(animate = true) {
   appendGroupedLabels(bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region), margin.top + innerH + (needsVerticalRegionNames ? 174 : compact ? 96 : 82), "party-label");
   const legendX = compact ? margin.left / 2 : margin.left - 10;
   [
-    ["Veränderung*", margin.top + innerH + 20],
+    ["Seit Wahl*", margin.top + innerH + 20],
     ["Parlament", margin.top + innerH + (needsVerticalRegionNames ? 92 : 51)],
     ["Partei", margin.top + innerH + (needsVerticalRegionNames ? 174 : compact ? 96 : 82)]
   ].forEach(([text, y]) => {
@@ -819,7 +819,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     page.append(svgEl("rect", { x: itemX, y: partyY + 11, width: 4, height: 9, fill: getComputedStyle(document.documentElement).getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow }));
     text(party, { x: itemX + 8, y: partyY + 20, fill: "#dce8f7", "font-size": 10.7 });
   });
-  text("* = Veränderung zur aktuellen Sitzverteilung", { x: partyX, y: partyY + 43, fill: "#8fa6c1", "font-size": 8 });
+  text("* = Differenz seit der letzten Wahl", { x: partyX, y: partyY + 43, fill: "#8fa6c1", "font-size": 8 });
   const regionsY = partyY + 70;
   headerLegend(partyX, regionsY, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 3, rightLegendWidth / 3);
   const regionLegendRows = Math.ceil(selectedRegions.length / 3);
@@ -910,7 +910,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const delta = value - electionValue;
       text(formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
     });
-    text("Veränderung*", { x: plot.left - 5, y: plot.bottom + 19, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8, "font-weight": 700 });
+    text("Seit Wahl*", { x: plot.left - 5, y: plot.bottom + 19, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8, "font-weight": 700 });
     let runStart = 0;
     while (runStart < cluster.bars.length) {
       const runKey = state.groupBy === "party" ? cluster.bars[runStart].item.region : cluster.bars[runStart].party;
