@@ -732,7 +732,7 @@ async function exportChartImage(format = "jpeg") {
   const footerCenter = documentWidth / 2;
   const footerY = headerHeight + viewBox.height + 8;
   const footerDevice = state.mobileView || window.innerWidth < 900 ? "mobil" : "desktop";
-  addText(`Code: ${configurationCode()} · Gerät: ${footerDevice} · ${secondStamp}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
+  addText(`${configurationCode()} · ${footerDevice} · ${secondStamp}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
   addText(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
   addText("© 2026 charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
 
@@ -1070,7 +1070,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   }
   const footerStamp = formatTimestamp(now);
   const footerDevice = state.mobileView || window.innerWidth < 900 ? "mobil" : "desktop";
-  text(`Code: ${configurationCode()} · Gerät: ${footerDevice} · ${footerStamp}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
+  text(`${configurationCode()} · ${footerDevice} · ${footerStamp}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
   text(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
   text("© 2026 charavision", { x: width / 2, y: height - 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 9, "font-weight": 700 });
   text(`Seite ${pageNumber} / ${pageCount}`, { x: width - 42, y: height - 30, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
