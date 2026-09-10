@@ -1332,13 +1332,164 @@ async function reportRequest(path, options = {}) {
   return payload;
 }
 
-async function loadIntroAdminSetting() {
-  const checkbox = document.querySelector("#report-intro-enabled");
-  const message = document.querySelector("#report-intro-message");
-  message.textContent = "Einstellung wird geladen …";
-  const setting = await reportRequest("/settings/intro");
-  checkbox.checked = setting.enabled !== false;
-  message.textContent = "";
+const developerFeatures = [
+  ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["dataUpdate", "Datenupdate"],
+  ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"], ["brackets", "Klammern"],
+  ["labels", "Beschriftungen"], ["barColors", "Balkenfarbe"], ["percentValues", "Prozentwerte"],
+  ["lut", "LUT"], ["background", "Hintergrund"], ["preview", "Vorschau"],
+  ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
+];
+const defaultDeveloperSettings = () => ({
+  mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "mobile" : key !== "export3d" }])),
+  desktop: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "desktop" : key !== "export3d" }]))
+});
+let developerSettings = defaultDeveloperSettings();
+let publicDeveloperSettingsPromise;
+
+async function fetchDeveloperSettings() {
+  if (!publicDeveloperSettingsPromise) publicDeveloperSettingsPromise = fetch(`${reportApiUrl}/settings/developer`, { cache: "no-store" })
+    .then(async response => {
+      const payload = await response.json();
+      if (!response.ok || !payload.settings) throw new Error("Entwicklereinstellungen sind nicht erreichbar.");
+      return payload.settings;
+    })
+    .catch(() => defaultDeveloperSettings());
+  developerSettings = await publicDeveloperSettingsPromise;
+  return developerSettings;
+}
+
+function platformDeveloperSettings() {
+  return developerSettings[startsMobile ? "mobile" : "desktop"];
+}
+
+function applyDeveloperSettings() {
+  const settings = platformDeveloperSettings();
+  const setVisible = (selector, visible) => {
+    const node = document.querySelector(selector);
+    if (node) node.hidden = !visible;
+  };
+  state.mobileView = settings.deviceForce.value === "mobile";
+  state.electionDates = !state.mobileView;
+  state.fullRegionNames = !settings.abbreviations.value;
+  state.showSinceElection = Boolean(settings.sinceElection.value);
+  state.showBrackets = Boolean(settings.brackets.value);
+  state.showLabels = Boolean(settings.labels.value);
+  state.barColors = Boolean(settings.barColors.value);
+  state.showPercentValues = Boolean(settings.percentValues.value);
+  state.showLut = Boolean(settings.lut.value);
+  state.showBackground = Boolean(settings.background.value);
+  state.a4Mode = Boolean(settings.a4Output.value);
+  state.export3d = Boolean(settings.export3d.value);
+  setVisible("#chart-settings .view-switch", settings.deviceForce.visible);
+  setVisible("#update-data", settings.dataUpdate.visible);
+  setVisible(".full-region-names-choice", settings.abbreviations.visible);
+  setVisible(".since-election-choice", settings.sinceElection.visible);
+  setVisible(".brackets-choice", settings.brackets.visible);
+  setVisible(".labels-choice", settings.labels.visible);
+  setVisible(".bar-colors-choice", settings.barColors.visible);
+  setVisible(".percent-values-choice", settings.percentValues.visible);
+  setVisible(".lut-choice", settings.lut.visible);
+  setVisible(".background-choice", settings.background.visible);
+  setVisible("#preview-export", settings.preview.visible);
+  const a4Choice = document.querySelector('input[name="output-shape"][value="a4"]')?.closest("label");
+  if (a4Choice) a4Choice.hidden = !settings.a4Output.visible;
+  const export3dChoice = document.querySelector("#export-3d")?.closest("label");
+  if (export3dChoice) export3dChoice.hidden = !settings.export3d.visible;
+  els.updateData.disabled = !settings.dataUpdate.value;
+  applyViewMode();
+}
+
+function renderDeveloperSettings(readOnly) {
+  const list = document.querySelector("#report-developer-list");
+  list.replaceChildren();
+  const head = document.createElement("div");
+  head.className = "developer-head";
+  head.innerHTML = "<span>Funktion</span><span>Mobil &amp; App</span><span>Desktop</span>";
+  list.append(head);
+  developerFeatures.forEach(([key, label]) => {
+    const row = document.createElement("div");
+    row.className = "developer-row";
+    const title = document.createElement("strong");
+    title.textContent = label;
+    row.append(title);
+    ["mobile", "desktop"].forEach(platform => {
+      const cell = document.createElement("div");
+      cell.className = "developer-platform";
+      cell.dataset.label = platform === "mobile" ? "Mobil & App" : "Desktop";
+      const visibleLabel = document.createElement("label");
+      visibleLabel.className = "developer-onoff";
+      visibleLabel.title = "Funktion anzeigen";
+      const visible = document.createElement("input");
+      visible.type = "checkbox";
+      visible.checked = developerSettings[platform][key].visible;
+      visible.disabled = readOnly;
+      const track = document.createElement("span");
+      visibleLabel.append(visible, track);
+      let value;
+      if (key === "deviceForce") {
+        value = document.createElement("select");
+        value.innerHTML = '<option value="desktop">Desktop</option><option value="mobile">Mobil</option>';
+        value.value = developerSettings[platform][key].value;
+      } else {
+        const valueLabel = document.createElement("label");
+        value = document.createElement("input");
+        value.type = "checkbox";
+        value.checked = Boolean(developerSettings[platform][key].value);
+        valueLabel.append(value, " Aktiv");
+        cell.append(visibleLabel, valueLabel);
+      }
+      value.disabled = readOnly;
+      visible.addEventListener("change", () => { developerSettings[platform][key].visible = visible.checked; saveDeveloperSettings(); });
+      value.addEventListener("change", () => { developerSettings[platform][key].value = key === "deviceForce" ? value.value : value.checked; saveDeveloperSettings(); });
+      if (key === "deviceForce") cell.append(visibleLabel, value);
+      row.append(cell);
+    });
+    list.append(row);
+  });
+}
+
+let developerSaveTimer;
+function saveDeveloperSettings() {
+  clearTimeout(developerSaveTimer);
+  const message = document.querySelector("#report-developer-message");
+  message.textContent = "Änderungen werden gespeichert …";
+  developerSaveTimer = setTimeout(async () => {
+    try {
+      const payload = await reportRequest("/settings/developer", { method: "PATCH", body: JSON.stringify({ settings: developerSettings }) });
+      developerSettings = payload.settings;
+      publicDeveloperSettingsPromise = Promise.resolve(developerSettings);
+      message.textContent = "Einstellungen gespeichert.";
+    } catch (error) { message.textContent = error.message; }
+  }, 250);
+}
+
+function showEddaThanks() {
+  const overlay = document.querySelector("#edda-thanks");
+  const fireworks = document.querySelector("#edda-fireworks");
+  if (!overlay || !fireworks) return;
+  fireworks.replaceChildren();
+  const colors = ["#59d9ff", "#c252ff", "#ffe04f", "#42e878", "#ff7391"];
+  [[37, 42], [63, 39], [50, 62]].forEach(([originX, originY], burst) => {
+    for (let index = 0; index < 12; index += 1) {
+      const angle = Math.PI * 2 * index / 12 + burst * .18;
+      const distance = 55 + (index % 3) * 18;
+      const spark = document.createElement("span");
+      spark.style.setProperty("--x", `${originX}%`);
+      spark.style.setProperty("--y", `${originY}%`);
+      spark.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
+      spark.style.setProperty("--dy", `${Math.sin(angle) * distance}px`);
+      spark.style.setProperty("--delay", `${.18 + burst * .2 + index * .012}s`);
+      spark.style.setProperty("--color", colors[(index + burst) % colors.length]);
+      fireworks.append(spark);
+    }
+  });
+  if (overlay.open) overlay.close();
+  overlay.classList.remove("is-playing");
+  requestAnimationFrame(() => {
+    overlay.classList.add("is-playing");
+    overlay.showModal();
+    setTimeout(() => { if (overlay.open) overlay.close(); overlay.classList.remove("is-playing"); }, 3300);
+  });
 }
 
 async function loadReports() {
@@ -1465,9 +1616,9 @@ async function startAppIntro() {
   const target = document.querySelector(".title-lockup");
   if (!intro || !canvas || !brand || !target) return;
   try {
-    const response = await fetch(`${reportApiUrl}/settings/intro`, { cache: "no-store" });
-    const setting = await response.json();
-    if (response.ok && setting.enabled === false) {
+    const settings = await fetchDeveloperSettings();
+    const introSetting = settings[startsMobile ? "mobile" : "desktop"].intro;
+    if (!introSetting.visible || !introSetting.value) {
       intro.remove();
       document.body.classList.remove("intro-running");
       return;
@@ -1633,11 +1784,13 @@ async function startAppIntro() {
 
 startAppIntro();
 
-fetchLatestData()
-  .then(data => {
+Promise.all([fetchLatestData(), fetchDeveloperSettings()])
+  .then(([data]) => {
     state.data = data;
+    applyDeveloperSettings();
     els.mobileView.checked = state.mobileView;
     els.electionDates.checked = state.electionDates;
+    els.showSinceElection.checked = state.showSinceElection;
     els.showBrackets.checked = state.showBrackets;
     els.fullRegionNames.checked = !state.fullRegionNames;
     els.showLabels.checked = state.showLabels;
@@ -1645,6 +1798,10 @@ fetchLatestData()
     els.showPercentValues.checked = state.showPercentValues;
     els.showLut.checked = state.showLut;
     els.showBackground.checked = state.showBackground;
+    document.querySelector("#export-3d").checked = state.export3d;
+    document.querySelector("#a4-mode").checked = state.a4Mode;
+    document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
+    document.querySelector("#a4-orientation-settings").hidden = !state.a4Mode;
     if (startsMobile) document.querySelector("#chart-view-settings").hidden = true;
     updateHeaderTimestamp(data);
     buildControls();
@@ -1797,6 +1954,8 @@ fetchLatestData()
         document.querySelector("#report-login").hidden = true;
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
+        document.querySelector("#report-developer-open").textContent = currentReportRole === "Admin" ? "Entwicklereinstellungen" : "Entwicklereinstellungen ansehen";
+        document.querySelector("#report-logout").hidden = false;
         document.querySelector("#report-book").hidden = false;
         const identityHeader = document.querySelector(".report-session-user");
         identityHeader.classList.remove("is-revealed");
@@ -1810,7 +1969,9 @@ fetchLatestData()
       pinFields.forEach(field => { field.value = ""; });
       document.querySelector("#report-session").hidden = true;
       document.querySelector("#report-accounts").hidden = true;
+      document.querySelector("#report-developer").hidden = true;
       document.querySelector("#report-book").hidden = true;
+      document.querySelector("#report-logout").hidden = true;
       document.querySelector("#report-login").hidden = false;
       document.querySelector("#report-login-message").textContent = "";
       pinFields[0].focus();
@@ -1818,26 +1979,23 @@ fetchLatestData()
     document.querySelector("#report-accounts-open").addEventListener("click", async () => {
       const panel = document.querySelector("#report-accounts");
       panel.hidden = false;
-      try { await Promise.all([loadReportAccounts(), loadIntroAdminSetting()]); }
+      try { await loadReportAccounts(); }
       catch (error) { const list = document.querySelector("#report-account-list"); list.replaceChildren(); const notice = document.createElement("p"); notice.className = "report-empty"; notice.textContent = error.message; list.append(notice); }
     });
-    document.querySelector("#report-intro-enabled").addEventListener("change", async event => {
-      const checkbox = event.currentTarget;
-      const message = document.querySelector("#report-intro-message");
-      const requested = checkbox.checked;
-      checkbox.disabled = true;
-      message.textContent = "Einstellung wird gespeichert …";
+    document.querySelector("#report-developer-open").addEventListener("click", async () => {
+      const panel = document.querySelector("#report-developer");
+      panel.hidden = false;
+      document.querySelector("#report-developer-note").textContent = currentReportRole === "Admin"
+        ? "Sichtbarkeit und Aktivzustand getrennt für Mobil & App und Desktop festlegen."
+        : "Diese Einstellungen können nur von einem Admin verändert werden.";
+      document.querySelector("#report-developer-message").textContent = "";
       try {
-        const setting = await reportRequest("/settings/intro", { method: "PATCH", body: JSON.stringify({ enabled: requested }) });
-        checkbox.checked = setting.enabled !== false;
-        message.textContent = checkbox.checked ? "Intro ist eingeschaltet." : "Intro ist ausgeschaltet.";
-      } catch (error) {
-        checkbox.checked = !requested;
-        message.textContent = error.message;
-      } finally {
-        checkbox.disabled = false;
-      }
+        publicDeveloperSettingsPromise = null;
+        await fetchDeveloperSettings();
+        renderDeveloperSettings(currentReportRole !== "Admin");
+      } catch (error) { document.querySelector("#report-developer-message").textContent = error.message; }
     });
+    document.querySelector("#report-developer-close").addEventListener("click", () => { document.querySelector("#report-developer").hidden = true; });
     document.querySelector("#report-accounts-close").addEventListener("click", () => { document.querySelector("#report-accounts").hidden = true; });
     document.querySelector("#report-account-form").addEventListener("submit", async event => {
       event.preventDefault();
@@ -1876,6 +2034,7 @@ fetchLatestData()
         form.reset();
         document.querySelector("#report-include-config").checked = true;
         message.textContent = "Eintrag gespeichert.";
+        showEddaThanks();
         await loadReports();
       } catch (error) { message.textContent = error.message; }
     });

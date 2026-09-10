@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-180">
+  <link rel="stylesheet" href="styles.css?v=report-book-182">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro" aria-label="Sonntagsfragen wird gestartet">
@@ -163,7 +163,7 @@
     </footer>
   </main>
   <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-title">
-    <div class="preview-header"><strong id="report-title">Meldungsbuch</strong><button id="report-close" type="button" aria-label="Meldungsbuch schließen">×</button></div>
+    <div class="preview-header"><strong id="report-title">Meldungsbuch</strong><div class="report-header-actions"><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Meldungsbuch schließen">×</button></div></div>
     <div class="report-content">
       <form id="report-login" class="report-login">
         <p>Bitte PIN eingeben, um Meldungen zu lesen oder zu verfassen.</p>
@@ -187,16 +187,17 @@
         </div>
         <div class="report-session-actions">
           <button id="report-accounts-open" type="button" hidden>Accounts verwalten</button>
-          <button id="report-logout" type="button">Abmelden</button>
+          <button id="report-developer-open" type="button">Entwicklereinstellungen ansehen</button>
         </div>
       </section>
+      <section id="report-developer" class="report-developer" hidden aria-labelledby="report-developer-title">
+        <div class="report-list-heading"><h2 id="report-developer-title">Entwicklereinstellungen</h2><button id="report-developer-close" class="panel-close" type="button" aria-label="Entwicklereinstellungen schließen">×</button></div>
+        <p id="report-developer-note"></p>
+        <div id="report-developer-list" class="report-developer-list"></div>
+        <small id="report-developer-message" aria-live="polite"></small>
+      </section>
       <section id="report-accounts" class="report-accounts" hidden aria-labelledby="report-accounts-title">
-        <div class="report-list-heading"><h2 id="report-accounts-title">Accounts</h2><button id="report-accounts-close" type="button">Schließen</button></div>
-        <div class="report-admin-settings">
-          <h3>Admin-Seite</h3>
-          <label><input id="report-intro-enabled" type="checkbox" checked> Intro</label>
-          <small id="report-intro-message" aria-live="polite"></small>
-        </div>
+        <div class="report-list-heading"><h2 id="report-accounts-title">Accounts</h2><button id="report-accounts-close" class="panel-close" type="button" aria-label="Accounts schließen">×</button></div>
         <div id="report-account-list" class="report-account-list"></div>
         <form id="report-account-form" class="report-account-form">
           <h3>Neuer Account</h3>
@@ -224,6 +225,11 @@
       </div>
     </div>
   </dialog>
+  <dialog id="edda-thanks" class="edda-thanks" aria-live="polite">
+    <div id="edda-fireworks" class="edda-fireworks" aria-hidden="true"></div>
+    <img src="edda-thanks.png" alt="Edda">
+    <strong>Edda dankt dir für deine Hilfe!</strong>
+  </dialog>
   <dialog id="export-preview-dialog" class="preview-dialog" aria-labelledby="preview-title">
     <div class="preview-header">
       <div><strong id="preview-title">Vorschau</strong><small id="preview-page-status"></small></div>
@@ -239,6 +245,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-179" defer></script>
+  <script src="app.js?v=report-book-181" defer></script>
 </body>
 </html>
