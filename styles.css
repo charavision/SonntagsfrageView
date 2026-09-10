@@ -47,6 +47,11 @@ body.intro-running.intro-reveal main { opacity: 1; transition: opacity .9s ease;
 .developer-onoff input:checked + span::after { background: var(--accent); transform: translateX(19px); }
 .developer-platform select { min-height: 31px; padding: 4px 7px; border: 1px solid var(--line); border-radius: 7px; background: #071326; color: var(--ink); }
 .developer-platform :disabled { cursor: not-allowed; opacity: .62; }
+.developer-platform-readonly { grid-template-columns: repeat(2, minmax(78px, max-content)); }
+.developer-readonly-state { display: inline-flex; align-items: center; min-height: 25px; padding: 4px 8px; border: 1px solid #415878; border-radius: 999px; color: var(--muted); font-size: 10px; font-weight: 800; }
+.developer-readonly-state::before { width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #71839b; content: ""; }
+.developer-readonly-state.is-on { border-color: rgba(89,217,255,.55); color: #dce8f7; }
+.developer-readonly-state.is-on::before { background: var(--accent); box-shadow: 0 0 7px rgba(89,217,255,.7); }
 #report-developer-message { display: block; min-height: 1em; margin-top: 10px; color: var(--muted); }
 .report-list-heading { gap: 12px; }
 .report-list-heading h2 { min-width: 0; overflow-wrap: anywhere; }

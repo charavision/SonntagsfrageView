@@ -1547,6 +1547,20 @@ function renderDeveloperSettings(readOnly) {
       const cell = document.createElement("div");
       cell.className = "developer-platform";
       cell.dataset.label = platform === "mobile" ? "Mobil & App" : "Desktop";
+      if (readOnly) {
+        cell.classList.add("developer-platform-readonly");
+        const visibility = document.createElement("span");
+        visibility.className = `developer-readonly-state ${developerSettings[platform][key].visible ? "is-on" : "is-off"}`;
+        visibility.textContent = developerSettings[platform][key].visible ? "Sichtbar" : "Verborgen";
+        const value = document.createElement("span");
+        value.className = `developer-readonly-state ${key === "deviceForce" || developerSettings[platform][key].value ? "is-on" : "is-off"}`;
+        value.textContent = key === "deviceForce"
+          ? (developerSettings[platform][key].value === "mobile" ? "Mobil" : "Desktop")
+          : (developerSettings[platform][key].value ? "Aktiv" : "Inaktiv");
+        cell.append(visibility, value);
+        row.append(cell);
+        return;
+      }
       const visibleLabel = document.createElement("label");
       visibleLabel.className = "developer-onoff";
       visibleLabel.title = "Funktion anzeigen";
