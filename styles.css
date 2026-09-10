@@ -184,12 +184,50 @@ footer a { color: inherit; }
 .report-dialog::backdrop { background: rgba(1,7,15,.82); backdrop-filter: blur(5px); }
 .report-content { padding: 20px; overflow: auto; max-height: calc(92vh - 62px); }
 .report-login, .report-form { display: grid; gap: 12px; }
+.report-login[hidden], .report-session[hidden], .report-accounts[hidden], #report-book[hidden], #report-accounts-open[hidden] { display: none !important; }
+.report-form [hidden] { display: none; }
 .report-login { max-width: 440px; margin: 28px auto; }
 .report-login p { margin: 0 0 4px; color: var(--muted); }
 .report-login label, .report-form label { display: grid; gap: 6px; color: #dce8f7; font-size: 12px; font-weight: 750; }
 .report-login input, .report-form input, .report-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #061020; color: var(--ink); resize: vertical; }
+.report-pin-group { margin: 0; padding: 0; border: 0; }
+.report-pin-group legend { margin-bottom: 7px; color: #dce8f7; font-size: 12px; font-weight: 750; }
+.report-pin-fields { display: grid; grid-template-columns: repeat(5, minmax(42px, 1fr)); gap: 10px; }
+.report-pin-fields input { min-width: 0; aspect-ratio: 1; padding: 8px; text-align: center; font-size: 22px; font-weight: 850; text-transform: uppercase; }
+.report-pin-fields input:focus { border-color: var(--accent); outline: 2px solid rgba(71,205,255,.24); box-shadow: 0 0 18px rgba(71,205,255,.16); }
 .report-login button, .report-form button, .report-list-heading button { min-height: 38px; padding: 8px 12px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
 .report-login small, .report-form small { min-height: 1.2em; color: var(--muted); }
+.report-session { max-width: 520px; margin: 8px auto 26px; padding: 0; }
+.report-session-user { display: grid; gap: 2px; text-align: center; }
+.report-session-user strong { font-size: 20px; }
+.report-session-user span { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+.report-session-actions { display: flex; justify-content: center; gap: 9px; margin-top: 12px; }
+.report-session-actions button, .report-account-form button { min-height: 36px; padding: 7px 12px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
+.report-accounts { margin-bottom: 24px; padding: 16px; border: 1px solid var(--line); border-radius: 13px; background: rgba(10,27,49,.96); }
+.report-account-list { display: grid; gap: 8px; margin: 14px 0 20px; }
+.report-account-row { padding: 10px 11px; border: 1px solid rgba(75,109,150,.6); border-radius: 8px; }
+.report-account-main { display: flex; align-items: center; gap: 9px; }
+.report-account-main > strong { margin-right: auto; }
+.report-account-main > span { color: var(--muted); font-size: 12px; }
+.report-account-main button, .report-account-confirm button { min-height: 32px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 7px; background: #102744; color: var(--ink); cursor: pointer; font-weight: 750; }
+.report-account-main .report-account-trash { width: 34px; border-color: #a84b61; background: rgba(107,24,43,.38); color: #ff8ca4; font-size: 17px; }
+.report-account-reset, .report-account-confirm { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(75,109,150,.45); }
+.report-account-reset label { display: grid; gap: 5px; color: #dce8f7; font-size: 12px; font-weight: 750; }
+.report-account-reset input { max-width: 180px; min-height: 36px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: #061020; color: var(--ink); text-transform: uppercase; }
+.report-account-confirm p { margin: 0; color: #ffd6df; font-weight: 750; }
+.report-account-confirm-actions { display: flex; gap: 8px; }
+.report-account-confirm .danger { border-color: #ff5577; background: #8f1e39; color: #fff; }
+.report-account-form { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+.report-account-form h3, .report-account-form > p, .report-account-form > button, .report-account-form > small { grid-column: 1 / -1; }
+.report-account-form h3 { margin: 0 0 2px; }
+.report-account-form > p { margin: -4px 0 4px; color: var(--muted); font-size: 12px; }
+.report-account-form label { display: grid; gap: 5px; color: #dce8f7; font-size: 12px; font-weight: 750; }
+.report-account-form input, .report-account-form select { min-height: 38px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #061020; color: var(--ink); }
+.report-account-form small { min-height: 1.2em; color: var(--muted); }
+.report-pin-once { color: var(--accent); font-weight: 850; letter-spacing: .12em; }
+.report-session-user.is-revealed strong, .report-session-user.is-revealed span { animation: report-identity-reveal 1.45s cubic-bezier(.2,.8,.2,1) both; }
+.report-session-user.is-revealed span { animation-delay: .12s; }
+@keyframes report-identity-reveal { 0% { opacity: 0; transform: translateY(7px); text-shadow: 0 0 0 transparent; } 42% { opacity: 1; color: #fff; text-shadow: 0 0 10px rgba(105,220,255,.95), 0 0 28px rgba(45,166,255,.65); } 100% { opacity: 1; transform: translateY(0); text-shadow: 0 0 8px rgba(71,205,255,.28); } }
 .report-form .report-configuration { display: flex; align-items: center; gap: 8px; }
 .report-configuration input { width: auto; }
 .report-list-section { margin-top: 26px; }
@@ -197,13 +235,17 @@ footer a { color: inherit; }
 .report-list-heading h2 { margin: 0; }
 .report-list { display: grid; gap: 10px; margin-top: 12px; }
 .report-entry { padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: rgba(16,31,56,.75); }
-.report-entry h3 { margin: 0 0 5px; font-size: 15px; }
-.report-entry p { margin: 8px 0; color: #dce8f7; white-space: pre-wrap; }
-.report-entry small { color: var(--muted); }
-.report-entry code { color: var(--accent); }
+.report-entry-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; }
+.report-entry-head strong { color: var(--ink); font-size: 15px; }
+.report-entry-title { color: var(--ink); font-size: 15px; font-weight: 800; }
+.report-entry-head code { color: var(--accent); font-size: 12px; }
+.report-delete { margin-left: auto; padding: 4px 8px; border: 1px solid #a84b61; border-radius: 7px; background: rgba(107,24,43,.35); color: #ff9bb0; cursor: pointer; font-size: 11px; font-weight: 800; }
+.report-delete:hover, .report-delete:focus-visible { border-color: #ff6685; background: rgba(151,29,55,.52); color: #fff; }
+.report-entry p { margin: 10px 0 8px; color: #dce8f7; white-space: pre-wrap; }
+.report-entry time { color: var(--muted); font-size: 11px; font-style: italic; }
 .report-empty { color: var(--muted); text-align: center; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-@media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; } .report-session-user.is-revealed strong, .report-session-user.is-revealed span { animation: none; } }
 @media (max-width: 900px) {
   main { padding: 18px; }
   .hero, .chart-heading { align-items: flex-start; flex-direction: column; }
@@ -211,6 +253,7 @@ footer a { color: inherit; }
   .settings-popover { top: 46px; right: 10px; }
   .full-region-names-choice label, .since-election-choice label { font-size: 9px; }
   .hero { gap: 16px; }
+  .report-account-form { grid-template-columns: 1fr; }
   .status, .chart-meta { text-align: left; }
   .code-input { flex: none; width: 100%; grid-template-columns: minmax(0, 1fr) auto; }
   .code-box input, .code-box output { min-width: 0; font-size: 10px; }
@@ -218,9 +261,10 @@ footer a { color: inherit; }
   .export-actions { display: grid; grid-template-columns: auto auto minmax(105px, 1fr); }
   .export-actions .icon-action span:last-child { display: none; }
   .preview-dialog { width: calc(100vw - 12px); height: calc(100vh - 12px); }
-  .preview-header { gap: 7px; padding: 9px; }
-  .preview-header > div:first-child { display: block; }
-  .preview-header .preview-zoom { gap: 4px; }
+  .preview-dialog .preview-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 9px; }
+  .preview-dialog .preview-header > div:first-child { display: flex; min-width: 0; align-items: baseline; }
+  .preview-dialog .preview-header .preview-zoom { grid-column: 1 / -1; grid-row: 2; justify-self: center; gap: 6px; margin-left: 0; }
+  .preview-dialog #close-preview { grid-column: 2; grid-row: 1; display: block; flex: none; }
   .preview-zoom input { width: 82px; }
   .preview-zoom output { min-width: 40px; font-size: 9px; }
   .preview-pages { padding: 12px; gap: 16px; }

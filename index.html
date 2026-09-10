@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-151">
+  <link rel="stylesheet" href="styles.css?v=report-book-159">
 </head>
 <body>
   <main>
@@ -132,13 +132,46 @@
     <div class="report-content">
       <form id="report-login" class="report-login">
         <p>Bitte PIN eingeben, um Meldungen zu lesen oder zu verfassen.</p>
-        <label>PIN <input id="report-pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
-        <button type="submit">Öffnen</button>
+        <fieldset class="report-pin-group">
+          <legend>PIN</legend>
+          <div id="report-pin" class="report-pin-fields" aria-label="Fünfstellige PIN">
+            <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 1" required>
+            <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 2" required>
+            <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 3" required>
+            <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 4" required>
+            <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 5" required>
+          </div>
+        </fieldset>
+        <button type="submit">Login</button>
         <small id="report-login-message" aria-live="polite"></small>
       </form>
+      <section id="report-session" class="report-session" hidden aria-live="polite">
+        <div class="report-session-user">
+          <strong id="report-session-person"></strong>
+          <span id="report-session-work"></span>
+        </div>
+        <div class="report-session-actions">
+          <button id="report-accounts-open" type="button" hidden>Accounts verwalten</button>
+          <button id="report-logout" type="button">Abmelden</button>
+        </div>
+      </section>
+      <section id="report-accounts" class="report-accounts" hidden aria-labelledby="report-accounts-title">
+        <div class="report-list-heading"><h2 id="report-accounts-title">Accounts</h2><button id="report-accounts-close" type="button">Schließen</button></div>
+        <div id="report-account-list" class="report-account-list"></div>
+        <form id="report-account-form" class="report-account-form">
+          <h3>Neuer Account</h3>
+          <p>Hier kann ich einen neuen Account anlegen.</p>
+          <label>Name <input id="report-account-person" maxlength="60" required></label>
+          <label>Arbeitsname <input id="report-account-work" maxlength="40" required></label>
+          <label>Rechte <select id="report-account-role"><option value="Helper" selected>Helper</option><option value="Admin">Admin</option></select></label>
+          <label>Neuer PIN <input id="report-account-pin" minlength="5" maxlength="5" autocomplete="new-password" required></label>
+          <button type="submit">Account anlegen</button>
+          <small id="report-account-message" aria-live="polite"></small>
+        </form>
+      </section>
       <div id="report-book" hidden>
         <form id="report-form" class="report-form">
-          <label>Titel <input id="report-subject" maxlength="100" required></label>
+          <label id="report-subject-field" hidden>Titel <input id="report-subject" maxlength="100"></label>
           <label>Problem und gewünschte Änderung <textarea id="report-body" maxlength="3000" rows="6" required></textarea></label>
           <label class="report-configuration"><input id="report-include-config" type="checkbox" checked> Aktuelle Konfiguration mitsenden</label>
           <button type="submit">Eintrag verfassen</button>
@@ -153,7 +186,7 @@
   </dialog>
   <dialog id="export-preview-dialog" class="preview-dialog" aria-labelledby="preview-title">
     <div class="preview-header">
-      <div><strong id="preview-title">Ausgabevorschau</strong><small id="preview-page-status"></small></div>
+      <div><strong id="preview-title">Vorschau</strong><small id="preview-page-status"></small></div>
       <div class="preview-zoom" aria-label="Zoom der Vorschau">
         <button id="preview-zoom-out" type="button" aria-label="Verkleinern">−</button>
         <input id="preview-zoom" type="range" min="40" max="500" step="10" value="100" aria-label="Zoomstufe">
@@ -166,6 +199,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-151" defer></script>
+  <script src="app.js?v=report-book-158" defer></script>
 </body>
 </html>

@@ -1222,6 +1222,13 @@ function downloadBlob(blob, filename) {
 
 const reportApiUrl = String(window.REPORT_API_URL || "").replace(/\/$/, "");
 let reportPin = "";
+let currentReportRole = "";
+const reportIdentities = {
+  Admin: { person: "Sebastian", work: "Admin" },
+  Helper2: { person: "Theresa", work: "Helper2" },
+  Helper3: { person: "Felix", work: "Helper3" }
+};
+let currentReportIdentity = null;
 async function reportRequest(path, options = {}) {
   if (!reportApiUrl) throw new Error("Die Reportfunktion ist noch nicht mit dem Speicherdienst verbunden.");
   const response = await fetch(`${reportApiUrl}${path}`, {
@@ -1242,14 +1249,80 @@ async function loadReports() {
   reports.forEach(report => {
     const article = document.createElement("article");
     article.className = "report-entry";
-    const title = document.createElement("h3"); title.textContent = report.subject;
-    const meta = document.createElement("small");
-    const reportDate = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(report.created_at));
-    meta.textContent = `${report.reporter || "Reporter"} · ${reportDate}`;
+    const head = document.createElement("div"); head.className = "report-entry-head";
+    const workName = document.createElement("strong"); workName.textContent = report.reporter || "Reporter";
+    head.append(workName);
+    if (report.subject && report.subject !== "Meldung") { const title = document.createElement("span"); title.className = "report-entry-title"; title.textContent = report.subject; head.append(title); }
+    if (report.configuration) { const code = document.createElement("code"); code.textContent = report.configuration; head.append(code); }
+    if (currentReportRole === "Admin") {
+      const remove = document.createElement("button");
+      remove.className = "report-delete"; remove.type = "button"; remove.textContent = "Löschen";
+      remove.addEventListener("click", async () => {
+        if (!window.confirm("Diesen Eintrag wirklich löschen?")) return;
+        remove.disabled = true;
+        try { await reportRequest(`/reports/${encodeURIComponent(report.id)}`, { method: "DELETE" }); await loadReports(); }
+        catch (error) { remove.disabled = false; window.alert(error.message); }
+      });
+      head.append(remove);
+    }
     const body = document.createElement("p"); body.textContent = report.body;
-    article.append(title, meta, body);
-    if (report.configuration) { const code = document.createElement("code"); code.textContent = report.configuration; article.append(code); }
+    const meta = document.createElement("time");
+    meta.dateTime = report.created_at;
+    meta.textContent = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(report.created_at));
+    article.append(head, body, meta);
     list.append(article);
+  });
+}
+
+async function loadReportAccounts() {
+  const list = document.querySelector("#report-account-list");
+  list.innerHTML = '<p class="report-empty">Accounts werden geladen …</p>';
+  const { accounts } = await reportRequest("/accounts");
+  list.replaceChildren();
+  accounts.forEach(account => {
+    const row = document.createElement("div"); row.className = "report-account-row";
+    const main = document.createElement("div"); main.className = "report-account-main";
+    const name = document.createElement("strong"); name.textContent = `${account.personName} (${account.workName})`;
+    const role = document.createElement("span"); role.textContent = account.role;
+    const reset = document.createElement("button"); reset.type = "button"; reset.textContent = "Reset PIN";
+    const trash = document.createElement("button"); trash.type = "button"; trash.className = "report-account-trash"; trash.textContent = "🗑"; trash.setAttribute("aria-label", `Account ${account.personName} löschen`);
+    main.append(name, role, reset, trash); row.append(main);
+
+    reset.addEventListener("click", () => {
+      row.querySelector(".report-account-confirm")?.remove();
+      const panel = document.createElement("form"); panel.className = "report-account-reset";
+      const label = document.createElement("label"); label.textContent = "Wie lautet der neue PIN?";
+      const input = document.createElement("input"); input.maxLength = 5; input.minLength = 5; input.required = true; input.autocomplete = "new-password";
+      label.append(input);
+      const submit = document.createElement("button"); submit.type = "submit"; submit.textContent = "PIN speichern";
+      const cancel = document.createElement("button"); cancel.type = "button"; cancel.textContent = "Abbrechen";
+      const actions = document.createElement("div"); actions.className = "report-account-confirm-actions"; actions.append(submit, cancel);
+      panel.append(label, actions); row.append(panel); input.focus();
+      input.addEventListener("input", () => { input.value = input.value.slice(0, 5).toUpperCase(); });
+      cancel.addEventListener("click", () => panel.remove());
+      panel.addEventListener("submit", async event => {
+        event.preventDefault(); submit.disabled = true;
+        try { await reportRequest(`/accounts/${encodeURIComponent(account.id)}/pin`, { method: "PATCH", body: JSON.stringify({ pin: input.value.trim().toUpperCase() }) }); panel.remove(); window.alert("PIN wurde geändert."); }
+        catch (error) { submit.disabled = false; window.alert(error.message); }
+      });
+    });
+
+    trash.addEventListener("click", () => {
+      row.querySelector(".report-account-reset")?.remove();
+      const confirm = document.createElement("div"); confirm.className = "report-account-confirm";
+      const question = document.createElement("p"); question.textContent = "Account wirklich löschen?";
+      const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger"; remove.textContent = "Ja, löschen";
+      const cancel = document.createElement("button"); cancel.type = "button"; cancel.textContent = "Abbrechen";
+      const actions = document.createElement("div"); actions.className = "report-account-confirm-actions"; actions.append(remove, cancel);
+      confirm.append(question, actions); row.append(confirm);
+      cancel.addEventListener("click", () => confirm.remove());
+      remove.addEventListener("click", async () => {
+        remove.disabled = true;
+        try { await reportRequest(`/accounts/${encodeURIComponent(account.id)}`, { method: "DELETE" }); await loadReportAccounts(); }
+        catch (error) { remove.disabled = false; window.alert(error.message); }
+      });
+    });
+    list.append(row);
   });
 }
 
@@ -1267,13 +1340,21 @@ function normalizeData(data) {
 async function fetchLatestData() {
   const response = await fetch(`data/polls.json?update=${Date.now()}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Daten konnten nicht geladen werden");
-  return normalizeData(await response.json());
+  const data = normalizeData(await response.json());
+  const retrievedAt = new Date();
+  const dateParts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(retrievedAt).filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  data.updated = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+  data.updatedAt = retrievedAt.toISOString();
+  return data;
 }
 
 function updateHeaderTimestamp(data) {
   els.updated.textContent = formatDate(data.updated);
-  if (!data.updatedAt) { els.updatedTime.textContent = "Uhrzeit nicht verfügbar · MEZ"; return; }
-  els.updatedTime.textContent = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(new Date(data.updatedAt));
+  els.updatedTime.textContent = new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short", timeZone: "Europe/Berlin"
+  }).format(new Date(data.updatedAt));
 }
 
 fetchLatestData()
@@ -1365,20 +1446,85 @@ fetchLatestData()
     document.querySelector("#preview-zoom-out").addEventListener("click", () => changePreviewZoom(-1));
     document.querySelector("#preview-zoom-in").addEventListener("click", () => changePreviewZoom(1));
     const reportDialog = document.querySelector("#report-dialog");
+    const pinFields = [...document.querySelectorAll("#report-pin input")];
+    const readReportPin = () => pinFields.map(input => input.value).join("").toUpperCase();
+    pinFields.forEach((input, index) => {
+      input.addEventListener("input", event => {
+        event.currentTarget.value = event.currentTarget.value.slice(-1).toUpperCase();
+        if (event.currentTarget.value && pinFields[index + 1]) pinFields[index + 1].focus();
+      });
+      input.addEventListener("keydown", event => {
+        if (event.key === "Backspace" && !event.currentTarget.value && pinFields[index - 1]) pinFields[index - 1].focus();
+      });
+      input.addEventListener("paste", event => {
+        const pasted = event.clipboardData.getData("text").replace(/\s/g, "").slice(0, 5).toUpperCase();
+        if (pasted.length < 2) return;
+        event.preventDefault();
+        pinFields.forEach((field, fieldIndex) => { field.value = pasted[fieldIndex] || ""; });
+        pinFields[Math.min(pasted.length, 5) - 1].focus();
+      });
+    });
     document.querySelector("#report-open").addEventListener("click", () => reportDialog.showModal());
     document.querySelector("#report-close").addEventListener("click", () => reportDialog.close());
     document.querySelector("#report-login").addEventListener("submit", async event => {
       event.preventDefault();
       const message = document.querySelector("#report-login-message");
-      reportPin = document.querySelector("#report-pin").value;
+      reportPin = readReportPin();
       message.textContent = "PIN wird geprüft …";
       try {
-        await reportRequest("/session", { method: "POST", body: "{}" });
+        const session = await reportRequest("/session", { method: "POST", body: "{}" });
+        currentReportRole = session.role || (session.reporter === "Admin" ? "Admin" : "Helper");
+        const fallbackIdentity = reportIdentities[session.reporter] || { person: session.reporter || "Reporter", work: session.reporter || "Reporter" };
+        const identity = { person: session.personName || fallbackIdentity.person, work: session.workName || fallbackIdentity.work };
+        currentReportIdentity = identity;
+        document.querySelector("#report-session-person").textContent = identity.person;
+        document.querySelector("#report-session-work").textContent = `(${identity.work})`;
+        document.querySelector("#report-subject-field").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-login").hidden = true;
+        document.querySelector("#report-session").hidden = false;
+        document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-book").hidden = false;
+        const identityHeader = document.querySelector(".report-session-user");
+        identityHeader.classList.remove("is-revealed");
+        requestAnimationFrame(() => identityHeader.classList.add("is-revealed"));
         message.textContent = "";
         await loadReports();
-      } catch (error) { reportPin = ""; message.textContent = error.message; }
+      } catch (error) { reportPin = ""; currentReportRole = ""; currentReportIdentity = null; pinFields.forEach(field => { field.value = ""; }); pinFields[0].focus(); message.textContent = error.message; }
+    });
+    document.querySelector("#report-logout").addEventListener("click", () => {
+      reportPin = ""; currentReportRole = ""; currentReportIdentity = null;
+      pinFields.forEach(field => { field.value = ""; });
+      document.querySelector("#report-session").hidden = true;
+      document.querySelector("#report-accounts").hidden = true;
+      document.querySelector("#report-book").hidden = true;
+      document.querySelector("#report-login").hidden = false;
+      document.querySelector("#report-login-message").textContent = "";
+      pinFields[0].focus();
+    });
+    document.querySelector("#report-accounts-open").addEventListener("click", async () => {
+      const panel = document.querySelector("#report-accounts");
+      panel.hidden = false;
+      try { await loadReportAccounts(); }
+      catch (error) { const list = document.querySelector("#report-account-list"); list.replaceChildren(); const notice = document.createElement("p"); notice.className = "report-empty"; notice.textContent = error.message; list.append(notice); }
+    });
+    document.querySelector("#report-accounts-close").addEventListener("click", () => { document.querySelector("#report-accounts").hidden = true; });
+    document.querySelector("#report-account-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const message = document.querySelector("#report-account-message");
+      const newPin = document.querySelector("#report-account-pin").value.trim().toUpperCase();
+      message.textContent = "Account wird angelegt …";
+      try {
+        await reportRequest("/accounts", { method: "POST", body: JSON.stringify({
+          personName: document.querySelector("#report-account-person").value.trim(),
+          workName: document.querySelector("#report-account-work").value.trim(),
+          role: document.querySelector("#report-account-role").value,
+          pin: newPin
+        }) });
+        form.reset(); document.querySelector("#report-account-role").value = "Helper";
+        message.innerHTML = `Account angelegt. PIN einmalig notieren: <span class="report-pin-once">${newPin}</span>`;
+        await loadReportAccounts();
+      } catch (error) { message.textContent = error.message; }
     });
     document.querySelector("#report-refresh").addEventListener("click", () => loadReports().catch(error => {
       const list = document.querySelector("#report-list");
@@ -1387,15 +1533,16 @@ fetchLatestData()
     }));
     document.querySelector("#report-form").addEventListener("submit", async event => {
       event.preventDefault();
+      const form = event.currentTarget;
       const message = document.querySelector("#report-form-message");
       message.textContent = "Eintrag wird gespeichert …";
       try {
         await reportRequest("/reports", { method: "POST", body: JSON.stringify({
-          subject: document.querySelector("#report-subject").value.trim(),
+          subject: currentReportRole === "Admin" ? (document.querySelector("#report-subject").value.trim() || "Meldung") : "Meldung",
           body: document.querySelector("#report-body").value.trim(),
           configuration: document.querySelector("#report-include-config").checked ? configurationCode() : null
         }) });
-        event.currentTarget.reset();
+        form.reset();
         document.querySelector("#report-include-config").checked = true;
         message.textContent = "Eintrag gespeichert.";
         await loadReports();
