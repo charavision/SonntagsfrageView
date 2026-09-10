@@ -5,11 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=settings-export-layout-103">
+  <link rel="stylesheet" href="styles.css?v=header-settings-position-109">
 </head>
 <body>
   <main>
     <header class="hero">
+      <button id="settings-toggle" class="settings-toggle" type="button" title="Einstellungen" aria-label="Einstellungen" aria-expanded="false" aria-controls="chart-settings">⚙</button>
+      <div id="chart-settings" class="settings-popover" hidden>
+        <strong>Einstellungen</strong>
+        <label><input id="mobile-view" type="checkbox"> Mobile Ansicht</label>
+        <label><input id="election-dates" type="checkbox" checked> Wahltermine</label>
+      </div>
       <div>
         <div class="title-lockup">
           <h1>Sonntagsfragen</h1>
@@ -23,7 +29,7 @@
       </div>
       <form id="code-input" class="code-box code-input" novalidate>
         <label class="sr-only" for="input-code">Input-Code</label>
-        <input id="input-code" maxlength="13" autocomplete="off" spellcheck="false" placeholder="Input-Code">
+        <input id="input-code" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Input-Code">
         <button type="submit">Anwenden</button>
         <small id="code-message" aria-live="polite"></small>
       </form>
@@ -64,12 +70,6 @@
     </section>
 
     <section class="chart-section" aria-labelledby="chart-title">
-      <button id="settings-toggle" class="settings-toggle" type="button" title="Einstellungen" aria-label="Einstellungen" aria-expanded="false" aria-controls="chart-settings">⚙</button>
-      <div id="chart-settings" class="settings-popover" hidden>
-        <strong>Einstellungen</strong>
-        <label><input id="mobile-view" type="checkbox"> Mobile Ansicht</label>
-        <label><input id="election-dates" type="checkbox" checked> Wahltermine</label>
-      </div>
       <div class="chart-heading">
         <div>
           <h2 id="chart-title">Umfrageverlauf</h2>
@@ -112,6 +112,6 @@
     </footer>
   </main>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
-  <script src="app.js?v=compact-region-row-gap-108" defer></script>
+  <script src="app.js?v=landscape-five-plus-legend-116" defer></script>
 </body>
 </html>
