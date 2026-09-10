@@ -1,0 +1,115 @@
+package de.charavision.sonntagsfragen;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Build;
+import android.os.Environment;
+import android.graphics.Insets;
+import android.view.WindowInsets;
+import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+
+public class MainActivity extends Activity {
+    private WebView webView;
+
+    @SuppressLint("SetJavaScriptEnabled")
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        FrameLayout frame = new FrameLayout(this);
+        frame.setBackgroundColor(android.graphics.Color.rgb(6, 16, 32));
+        webView = new WebView(this);
+        FrameLayout.LayoutParams webLayout = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        );
+        frame.addView(webView, webLayout);
+        setContentView(frame);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            frame.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+                Insets systemBars = windowInsets.getInsets(WindowInsets.Type.systemBars());
+                webLayout.topMargin = systemBars.top;
+                webLayout.bottomMargin = systemBars.bottom;
+                webLayout.leftMargin = systemBars.left;
+                webLayout.rightMargin = systemBars.right;
+                webView.setLayoutParams(webLayout);
+                return windowInsets;
+            });
+        }
+        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return false;
+            }
+        });
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setUserAgentString(webView.getSettings().getUserAgentString() + " SonntagsfragenApp/1.0.13");
+        webView.addJavascriptInterface(new AppBridge(), "AndroidApp");
+        webView.getSettings().setDomStorageEnabled(true);
+        webView.getSettings().setAllowFileAccess(true);
+        webView.getSettings().setAllowContentAccess(true);
+        webView.getSettings().setBuiltInZoomControls(false);
+        webView.getSettings().setDisplayZoomControls(false);
+        webView.setBackgroundColor(android.graphics.Color.rgb(6, 16, 32));
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+        webView.loadUrl("https://charavision.github.io/SonntagsfrageView/");
+    }
+
+    public class AppBridge {
+        @JavascriptInterface
+        public void installUpdate(String url) {
+            if (url == null || !url.startsWith("https://github.com/charavision/SonntagsfrageView/")) return;
+            runOnUiThread(() -> downloadAndInstall(url));
+        }
+    }
+
+    private void downloadAndInstall(String url) {
+        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+        request.setTitle("Sonntagsfragen-Update");
+        request.setDescription("Die neue App-Version wird heruntergeladen.");
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        request.setMimeType("application/vnd.android.package-archive");
+        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "Sonntagsfragen-Update.apk");
+        final long downloadId = manager.enqueue(request);
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) != downloadId) return;
+                unregisterReceiver(this);
+                Uri apk = manager.getUriForDownloadedFile(downloadId);
+                if (apk == null) return;
+                Intent install = new Intent(Intent.ACTION_VIEW);
+                install.setDataAndType(apk, "application/vnd.android.package-archive");
+                install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(install);
+            }
+        };
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
+    }
+}

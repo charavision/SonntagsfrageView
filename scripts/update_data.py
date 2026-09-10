@@ -9,6 +9,7 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urljoin
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -33,6 +34,7 @@ STATE_NAMES = {
     "saarland": "Saarland", "sachsen": "Sachsen", "sachsen-anhalt": "Sachsen-Anhalt",
     "schleswig-holstein": "Schleswig-Holstein", "thueringen": "Thüringen"
 }
+REPRESENTED_EXCEPTIONS = {"Sachsen": {"LINKE"}}
 
 def fetch(url: str) -> BeautifulSoup:
     response = requests.get(url, headers=HEADERS, timeout=30)
@@ -59,6 +61,17 @@ def iso_date(text: str) -> str | None:
         return date(year, month, day).isoformat()
     except ValueError:
         return None
+
+def election_label_date(text: str) -> str | None:
+    numeric = iso_date(text)
+    if numeric:
+        return numeric
+    months = {"januar": 1, "februar": 2, "märz": 3, "april": 4, "mai": 5, "juni": 6,
+              "juli": 7, "august": 8, "september": 9, "oktober": 10, "november": 11, "dezember": 12}
+    match = re.search(r"(\d{1,2})\.\s*([A-Za-zÄÖÜäöüß]+)\s+(\d{4})", clean(text))
+    if not match or match.group(2).lower() not in months:
+        return None
+    return date(int(match.group(3)), months[match.group(2).lower()], int(match.group(1))).isoformat()
 
 def normalize_party(text: str) -> str | None:
     key = re.sub(r"\s*/\s*", "/", clean(text)).upper().replace("Ü", "UE")
@@ -118,6 +131,38 @@ def extract_row_table(url: str) -> list[dict]:
         results.append({"date": poll_date, "institute": institute, "client": client, "values": values, "source": url})
     return results
 
+def extract_election_result(url: str) -> dict:
+    """Read the latest election-result row embedded in a Wahlrecht polling table."""
+    soup = fetch(url)
+    table = soup.select_one("table.wilko")
+    if not table:
+        return {"date": None, "values": {party: 0.0 for party in PARTIES}}
+    headers = []
+    for header_row in table.select("thead tr"):
+        candidate = []
+        recognized = 0
+        for cell in header_row.find_all(["th", "td"], recursive=False):
+            party = normalize_party(cell.get_text(" ", strip=True))
+            recognized += party is not None
+            candidate.extend([party] * int(cell.get("colspan", 1)))
+        if recognized >= 5:
+            headers = candidate
+            break
+    for row in table.select("tr"):
+        text = clean(row.get_text(" ", strip=True))
+        if not re.search(r"(?:Bundestags|Landtags|Abgeordnetenhaus|Bürgerschafts)wahl", text, re.I):
+            continue
+        texts = []
+        for cell in row.find_all(["th", "td"], recursive=False):
+            value_text = clean(cell.get_text(" ", strip=True))
+            texts.extend([value_text] * int(cell.get("colspan", 1)))
+        values = {party: 0.0 for party in PARTIES}
+        for index, party in enumerate(headers):
+            if party and index < len(texts):
+                values[party] = number(texts[index])
+        return {"date": next((iso_date(t) for t in texts if iso_date(t)), None), "values": values}
+    return {"date": None, "values": {party: 0.0 for party in PARTIES}}
+
 def discover_state_urls() -> dict[str, str]:
     soup = fetch(LAND_INDEX)
     found = {}
@@ -129,6 +174,28 @@ def discover_state_urls() -> dict[str, str]:
     for slug, name in STATE_NAMES.items():
         found.setdefault(name, urljoin(LAND_INDEX, f"{slug}.htm"))
     return found
+
+def extract_next_elections() -> dict[str, str]:
+    soup = fetch(LAND_INDEX)
+    elections = {"Bundestag": "Termin noch offen (voraussichtlich 2029)"}
+    table = soup.select_one("table.wilko")
+    if not table:
+        return elections
+    for row in table.select("tbody tr"):
+        cells = row.find_all(["th", "td"], recursive=False)
+        if len(cells) < 2:
+            continue
+        link = cells[0].select_one("a[href]")
+        slug = Path(link.get("href", "")).stem if link else ""
+        region = STATE_NAMES.get(slug, clean(cells[0].get_text(" ", strip=True)))
+        if region not in STATE_NAMES.values():
+            continue
+        label = clean(cells[1].get_text(" ", strip=True))
+        election_date = election_label_date(label)
+        if election_date and election_date <= date.today().isoformat():
+            label = f"voraussichtlich {int(election_date[:4]) + 5}"
+        elections[region] = label
+    return elections
 
 def extract_bundestag() -> list[dict]:
     soup = fetch(BASE)
@@ -151,12 +218,18 @@ def extract_bundestag() -> list[dict]:
 
 def main() -> None:
     polls = {"Bundestag": extract_bundestag()}
-    for state_name, url in discover_state_urls().items():
+    state_urls = discover_state_urls()
+    elections = {}
+    # Every Bundestag institute page contains the same latest federal election row.
+    elections["Bundestag"] = extract_election_result(urljoin(BASE, "forsa.htm"))
+    for state_name, url in state_urls.items():
         try:
             polls[state_name] = extract_row_table(url)[:500]
+            elections[state_name] = extract_election_result(url)
         except Exception as exc:
             print(f"Warnung: {state_name}: {exc}", file=sys.stderr)
             polls[state_name] = []
+            elections[state_name] = {"date": None, "values": {party: 0.0 for party in PARTIES}}
     regions = ["Bundestag", *STATE_NAMES.values()]
     compact_polls = {
         region: [
@@ -165,7 +238,16 @@ def main() -> None:
         ]
         for region, rows in polls.items()
     }
-    payload = {"updated": date.today().isoformat(), "regions": regions, "parties": PARTIES, "polls": compact_polls}
+    compact_elections = {
+        region: [
+            elections[region]["date"],
+            [elections[region]["values"][party] for party in PARTIES],
+            [party for party in PARTIES if elections[region]["values"][party] >= 5 or party in REPRESENTED_EXCEPTIONS.get(region, set())]
+        ]
+        for region in regions
+    }
+    retrieved_at = datetime.now(ZoneInfo("Europe/Berlin"))
+    payload = {"updated": retrieved_at.date().isoformat(), "updatedAt": retrieved_at.isoformat(), "regions": regions, "parties": PARTIES, "polls": compact_polls, "elections": compact_elections, "nextElections": extract_next_elections()}
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     total = sum(len(v) for v in polls.values())
