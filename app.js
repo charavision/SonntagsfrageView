@@ -18,19 +18,33 @@ const REGION_CODES = {
   "Schleswig-Holstein": "SH", "Thüringen": "TH"
 };
 
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: false, electionDates: true, fullRegionNames: false, showSinceElection: true, groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const startsMobile = window.matchMedia("(max-width: 900px)").matches;
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
-  exportMessage: document.querySelector("#export-message"), exportSummary: document.querySelector("#export-summary")
+  exportMessage: document.querySelector("#export-message"), exportSummary: document.querySelector("#export-summary"), updatedTime: document.querySelector("#updated-time"), updateMessage: document.querySelector("#update-message"), updateData: document.querySelector("#update-data"), previewDialog: document.querySelector("#export-preview-dialog"), previewPages: document.querySelector("#preview-pages"), previewPageStatus: document.querySelector("#preview-page-status"), previewZoom: document.querySelector("#preview-zoom"), previewZoomValue: document.querySelector("#preview-zoom-value")
 };
+
+document.body.classList.toggle("physical-mobile", startsMobile);
+function applyViewMode() {
+  document.body.classList.toggle("mobile-mode", state.mobileView);
+  const viewport = document.querySelector('meta[name="viewport"]');
+  const content = state.mobileView ? "width=device-width, initial-scale=1" : "width=1200";
+  if (viewport.getAttribute("content") !== content) viewport.setAttribute("content", content);
+  if (state.mobileView) {
+    state.electionDates = false;
+    els.electionDates.checked = false;
+  }
+  els.electionDates.disabled = state.mobileView;
+}
 
 function updateComparisonButtons() {
   document.querySelectorAll(".cluster-mode-button").forEach(button => {
@@ -41,7 +55,7 @@ function updateComparisonButtons() {
 }
 
 function updateElectionVisibility() {
-  document.body.classList.toggle("hide-election-dates", !state.electionDates || state.mobileView || window.innerWidth < 900);
+  document.body.classList.toggle("hide-election-dates", !state.electionDates);
 }
 
 const CODE_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -82,7 +96,7 @@ function configurationCode() {
   value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
   const orientationBits = state.a4Orientation === "portrait" ? 64n : state.a4Orientation === "landscape" ? 128n : 0n;
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n);
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n);
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
@@ -237,6 +251,7 @@ function growBar(element, center, baseline, opacity, enabled, delay) {
 }
 
 function render(animate = true) {
+  applyViewMode();
   els.chartSection.classList.toggle("mobile-view", state.mobileView);
   updateComparisonButtons();
   updateElectionVisibility();
@@ -270,7 +285,7 @@ function render(animate = true) {
     return;
   }
 
-  const compact = state.mobileView || window.innerWidth < 900;
+  const compact = state.mobileView;
   const regionRunCounts = selectedRegions.map(region => series.filter(item => item.region === region).length);
   const needsVerticalRegionNames = state.fullRegionNames && selectedRegions.length > 1 && state.groupBy === "party" && regionRunCounts.some(count => compact ? count < 3 : count === 1);
   // On phones the scale sits on the actual edge while the bars retain a small
@@ -281,7 +296,8 @@ function render(animate = true) {
   const partySpace = compact ? 54 : 38;
   const margin = { top: 62, right: compact ? 12 : 34, bottom: 58 + regionSpace + partySpace, left: compact ? 48 : 160 };
   const totalBarCount = parties.length * series.length;
-  const availableWidth = Math.max(320, els.scroll.clientWidth - 2);
+  const desktopModeOnMobileDevice = startsMobile && !state.mobileView;
+  const availableWidth = Math.max(desktopModeOnMobileDevice ? 1500 : 320, els.scroll.clientWidth - 2);
   const visibleBarLimit = compact ? 9 : 20;
   const visiblePlotWidth = availableWidth - margin.left - margin.right;
   const width = totalBarCount <= visibleBarLimit
@@ -502,6 +518,19 @@ function render(animate = true) {
     nextLayout.set(group.key, { center });
   });
 
+  if (state.showBrackets) {
+    let start = 0;
+    while (start < displayedBars.length) {
+      let end = start + 1;
+      while (end < displayedBars.length && displayedBars[end].party === displayedBars[start].party && displayedBars[end].region === displayedBars[start].region) end += 1;
+      if (end - start > 1) {
+        const y = baselineY + (state.showSinceElection ? 32 : 12);
+        els.chart.append(svgEl("path", { d: `M ${displayedBars[start].center - barWidth * .62} ${y - 5} V ${y} H ${displayedBars[end - 1].center + barWidth * .62} V ${y - 5}`, fill: "none", stroke: "#7693b4", "stroke-opacity": .72, "stroke-width": 1.15, class: "bar-bracket" }));
+      }
+      start = end;
+    }
+  }
+
   const appendGroupedLabels = (labelFor, y, className, labelKind = "party") => {
     let start = 0;
     while (start < displayedBars.length) {
@@ -538,19 +567,23 @@ function render(animate = true) {
     }
   };
   const sinceElectionOffset = state.showSinceElection ? 0 : -20;
+  const bracketOffset = state.showBrackets ? 0 : -4;
   const regionLabelY = margin.top + innerH + (needsVerticalRegionNames
     ? (compact ? regionSpace * .55 + 10 : regionSpace + 10)
-    : 48) + sinceElectionOffset;
+    : 48) + sinceElectionOffset + bracketOffset;
   const partyLabelY = compact && needsVerticalRegionNames
-    ? margin.top + innerH + regionSpace + 28 + sinceElectionOffset
-    : margin.top + innerH + 48 + regionSpace + (compact ? 22 : 18) + sinceElectionOffset;
-  appendGroupedLabels(bar => state.fullRegionNames ? bar.region : REGION_CODES[bar.region] || bar.region, regionLabelY, "region-label", "region");
-  appendGroupedLabels(bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region), partyLabelY, "party-label");
+    ? margin.top + innerH + regionSpace + 28 + sinceElectionOffset + bracketOffset
+    : margin.top + innerH + 48 + regionSpace + (compact ? 22 : 18) + sinceElectionOffset + bracketOffset;
+  const regionLabel = bar => state.fullRegionNames ? bar.region : REGION_CODES[bar.region] || bar.region;
+  const partyLabel = bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region);
+  const regionFirst = state.groupBy === "party";
+  appendGroupedLabels(regionFirst ? regionLabel : partyLabel, regionLabelY, regionFirst ? "region-label" : "party-label", regionFirst ? "region" : "party");
+  appendGroupedLabels(regionFirst ? partyLabel : regionLabel, partyLabelY, regionFirst ? "party-label" : "region-label", regionFirst ? "party" : "region");
   const legendX = compact ? margin.left / 2 : margin.left - 10;
   [
     ...(state.showSinceElection ? [["Seit Wahl*", margin.top + innerH + 20]] : []),
-    ["Parlament", regionLabelY],
-    ["Partei", partyLabelY]
+    [regionFirst ? "Parlament" : "Partei", regionLabelY],
+    [regionFirst ? "Partei" : "Parlament", partyLabelY]
   ].forEach(([text, y]) => {
     const legend = svgEl("text", { x: legendX, y, "text-anchor": compact ? "middle" : "end", class: "chart-legend" });
     legend.textContent = text;
@@ -599,7 +632,7 @@ function applyConfigurationCode(text) {
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 511) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 1023) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
@@ -608,6 +641,8 @@ function applyConfigurationCode(text) {
   state.electionDates = !(mode & 32);
   state.a4Orientation = mode & 128 ? "landscape" : mode & 64 ? "portrait" : "auto";
   state.showSinceElection = !(mode & 256);
+  state.showBrackets = !(mode & 512);
+  if (state.mobileView) state.electionDates = false;
   value %= legacySpace;
   const pollMask = Number(value % 7n) + 1;
   value /= 7n;
@@ -621,6 +656,7 @@ function applyConfigurationCode(text) {
   els.mobileView.checked = state.mobileView;
   els.fullRegionNames.checked = state.fullRegionNames;
   els.showSinceElection.checked = state.showSinceElection;
+  els.showBrackets.checked = state.showBrackets;
   els.electionDates.checked = state.electionDates;
   document.querySelector("#a4-mode").checked = state.a4Mode;
   document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
@@ -731,7 +767,7 @@ async function exportChartImage(format = "jpeg") {
 
   const footerCenter = documentWidth / 2;
   const footerY = headerHeight + viewBox.height + 8;
-  const footerDevice = state.mobileView || window.innerWidth < 900 ? "mobil" : "desktop";
+  const footerDevice = state.mobileView ? "mobil" : "desktop";
   addText(`${configurationCode()} · ${footerDevice} · ${secondStamp}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
   addText(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
   addText("© 2026 charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
@@ -998,7 +1034,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       }
       const runCenter = (exportBarCenters[runStart] + exportBarCenters[runEnd]) / 2;
       const runCount = runEnd - runStart + 1;
-      if (runCount > 1) {
+      if (runCount > 1 && state.showBrackets) {
         const bracketLeft = exportBarCenters[runStart] - barWidth * .62;
         const bracketRight = exportBarCenters[runEnd] + barWidth * .62;
         const bracketY = plot.bottom + (state.showSinceElection ? 31 : 12);
@@ -1011,7 +1047,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const hyphenIndex = runLabel.indexOf("-");
       const wrapRegion = state.groupBy === "party" && state.fullRegionNames && runCount < 4 && hyphenIndex >= 0;
       const rotateRegion = state.groupBy === "party" && state.fullRegionNames && !horizontalLabelFits({ key: runKey, count: runCount });
-      const labelY = plot.bottom + (runCount > 1
+      const labelY = plot.bottom + (runCount > 1 && state.showBrackets
         ? (state.showSinceElection ? 47 : 28)
         : (state.showSinceElection ? 39 : 20));
       const labelNode = text("", { x: runCenter, y: labelY, "text-anchor": rotateRegion ? "end" : "middle", fill: "#a8bfd9", "font-size": 9.33, "font-weight": 700, ...(rotateRegion ? { transform: `rotate(-90 ${runCenter} ${labelY})` } : {}) });
@@ -1069,7 +1105,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     });
   }
   const footerStamp = formatTimestamp(now);
-  const footerDevice = state.mobileView || window.innerWidth < 900 ? "mobil" : "desktop";
+  const footerDevice = state.mobileView ? "mobil" : "desktop";
   text(`${configurationCode()} · ${footerDevice} · ${footerStamp}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
   text(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
   text("© 2026 charavision", { x: width / 2, y: height - 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 9, "font-weight": 700 });
@@ -1111,7 +1147,7 @@ function pdfFromJpegs(images, layout) {
   return new Blob(chunks, { type: "application/pdf" });
 }
 
-async function exportA4(format) {
+function createA4Pages() {
   const clusters = a4ExportClusters();
   if (!clusters.length) throw new Error("Bitte mindestens eine Partei und ein Parlament auswählen.");
   const layout = a4LayoutFor(clusters);
@@ -1124,8 +1160,45 @@ async function exportA4(format) {
       ];
     })
     : Array.from({ length: Math.ceil(clusters.length / layout.capacity) }, (_, index) => clusters.slice(index * layout.capacity, index * layout.capacity + layout.capacity));
-  const pageCount = pageGroups.length;
-  const pages = pageGroups.map((pageClusters, index) => buildA4Page(pageClusters, index + 1, pageCount, layout));
+  return { layout, pages: pageGroups.map((pageClusters, index) => buildA4Page(pageClusters, index + 1, pageGroups.length, layout)) };
+}
+
+function applyPreviewZoom() {
+  const percent = Number(els.previewZoom.value);
+  const baseWidth = Math.min(920, Math.max(280, els.previewPages.clientWidth - 56));
+  els.previewZoomValue.textContent = `${percent} %`;
+  els.previewPages.querySelectorAll(".preview-sheet").forEach(sheet => {
+    sheet.style.width = `${baseWidth * percent / 100}px`;
+    sheet.style.maxWidth = "none";
+  });
+}
+
+function showExportPreview() {
+  els.previewPages.replaceChildren();
+  if (state.a4Mode) {
+    const { layout, pages } = createA4Pages();
+    pages.forEach((page, index) => {
+      page.classList.add("preview-sheet");
+      page.style.aspectRatio = `${layout.width} / ${layout.height}`;
+      page.setAttribute("aria-label", `Vorschauseite ${index + 1}`);
+      els.previewPages.append(page);
+    });
+    els.previewPageStatus.textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"}`;
+  } else {
+    const chart = els.chart.cloneNode(true);
+    chart.classList.add("preview-sheet");
+    chart.removeAttribute("width");
+    chart.removeAttribute("height");
+    chart.setAttribute("aria-label", "Vorschau der Schlauchausgabe");
+    els.previewPages.append(chart);
+    els.previewPageStatus.textContent = "Schlauchausgabe";
+  }
+  els.previewDialog.showModal();
+  requestAnimationFrame(applyPreviewZoom);
+}
+
+async function exportA4(format) {
+  const { layout, pages } = createA4Pages();
   els.exportMessage.textContent = `${format === "pdf" ? "PDF" : "A4-PNG"} mit ${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"} wird erstellt …`;
   if (format === "pdf") {
     const jpegs = [];
@@ -1147,9 +1220,40 @@ function downloadBlob(blob, filename) {
   link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1200);
 }
 
-fetch("data/polls.json", { cache: "no-store" })
-  .then(response => { if (!response.ok) throw new Error("Daten konnten nicht geladen werden"); return response.json(); })
-  .then(data => {
+const reportApiUrl = String(window.REPORT_API_URL || "").replace(/\/$/, "");
+let reportPin = "";
+async function reportRequest(path, options = {}) {
+  if (!reportApiUrl) throw new Error("Die Reportfunktion ist noch nicht mit dem Speicherdienst verbunden.");
+  const response = await fetch(`${reportApiUrl}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", "X-Report-Pin": reportPin, ...(options.headers || {}) }
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || "Die Reportfunktion ist momentan nicht erreichbar.");
+  return payload;
+}
+
+async function loadReports() {
+  const list = document.querySelector("#report-list");
+  list.innerHTML = '<p class="report-empty">Einträge werden geladen …</p>';
+  const { reports } = await reportRequest("/reports");
+  list.replaceChildren();
+  if (!reports.length) { list.innerHTML = '<p class="report-empty">Noch keine Einträge vorhanden.</p>'; return; }
+  reports.forEach(report => {
+    const article = document.createElement("article");
+    article.className = "report-entry";
+    const title = document.createElement("h3"); title.textContent = report.subject;
+    const meta = document.createElement("small");
+    const reportDate = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(report.created_at));
+    meta.textContent = `${report.reporter || "Reporter"} · ${reportDate}`;
+    const body = document.createElement("p"); body.textContent = report.body;
+    article.append(title, meta, body);
+    if (report.configuration) { const code = document.createElement("code"); code.textContent = report.configuration; article.append(code); }
+    list.append(article);
+  });
+}
+
+function normalizeData(data) {
     data.polls = Object.fromEntries(Object.entries(data.polls).map(([region, rows]) => [region, rows.map(row => ({
       date: row[0], institute: row[1], client: row[2],
       values: Object.fromEntries(data.parties.map((party, index) => [party, row[3][index] || 0]))
@@ -1157,8 +1261,28 @@ fetch("data/polls.json", { cache: "no-store" })
     data.elections = Object.fromEntries(Object.entries(data.elections || {}).map(([region, row]) => [region, {
       date: row[0], values: Object.fromEntries(data.parties.map((party, index) => [party, row[1][index] || 0])), represented: row[2] || []
     }]));
+    return data;
+}
+
+async function fetchLatestData() {
+  const response = await fetch(`data/polls.json?update=${Date.now()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Daten konnten nicht geladen werden");
+  return normalizeData(await response.json());
+}
+
+function updateHeaderTimestamp(data) {
+  els.updated.textContent = formatDate(data.updated);
+  if (!data.updatedAt) { els.updatedTime.textContent = "Uhrzeit nicht verfügbar · MEZ"; return; }
+  els.updatedTime.textContent = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(new Date(data.updatedAt));
+}
+
+fetchLatestData()
+  .then(data => {
     state.data = data;
-    els.updated.textContent = formatDate(data.updated);
+    els.mobileView.checked = state.mobileView;
+    els.electionDates.checked = state.electionDates;
+    els.showBrackets.checked = state.showBrackets;
+    updateHeaderTimestamp(data);
     buildControls();
     updateComparisonButtons();
     updateElectionVisibility();
@@ -1175,8 +1299,24 @@ fetch("data/polls.json", { cache: "no-store" })
       els.exportMessage.textContent = "Code kopiert.";
     };
     document.querySelector("#copy-code").addEventListener("click", copyOutputCode);
-    els.outputCode.addEventListener("click", copyOutputCode);
-    els.outputCode.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); copyOutputCode(); } });
+    els.updateData.addEventListener("click", async () => {
+      els.updateData.disabled = true;
+      els.updateMessage.textContent = "";
+      els.updateMessage.className = "";
+      try {
+        const freshData = await fetchLatestData();
+        state.data = freshData;
+        updateHeaderTimestamp(freshData);
+        updatePollOptions(false);
+        render(false);
+        els.updateMessage.textContent = "Update successfull";
+        els.updateMessage.className = "success";
+        setTimeout(() => { if (els.updateMessage.classList.contains("success")) { els.updateMessage.textContent = ""; els.updateMessage.className = ""; } }, 2600);
+      } catch (error) {
+        els.updateMessage.textContent = "Update failed";
+        els.updateMessage.className = "error";
+      } finally { els.updateData.disabled = false; }
+    });
     document.querySelector("#average-mode").addEventListener("change", event => {
       state.averageMode = event.currentTarget.checked;
       render();
@@ -1197,6 +1337,10 @@ fetch("data/polls.json", { cache: "no-store" })
       state.showSinceElection = event.currentTarget.checked;
       render(false);
     });
+    els.showBrackets.addEventListener("change", event => {
+      state.showBrackets = event.currentTarget.checked;
+      render(false);
+    });
     document.querySelectorAll(".cluster-mode-button").forEach(button => button.addEventListener("click", event => {
       state.groupBy = event.currentTarget.dataset.group;
       render();
@@ -1207,6 +1351,56 @@ fetch("data/polls.json", { cache: "no-store" })
     });
     togglePanel(document.querySelector("#settings-toggle"), document.querySelector("#chart-settings"));
     togglePanel(document.querySelector("#export-settings-toggle"), document.querySelector("#export-settings"));
+    document.querySelector("#preview-export").addEventListener("click", () => {
+      try { showExportPreview(); }
+      catch (error) { els.exportMessage.textContent = `Vorschau fehlgeschlagen: ${error.message}`; }
+    });
+    document.querySelector("#close-preview").addEventListener("click", () => els.previewDialog.close());
+    els.previewDialog.addEventListener("click", event => { if (event.target === els.previewDialog) els.previewDialog.close(); });
+    els.previewZoom.addEventListener("input", applyPreviewZoom);
+    const changePreviewZoom = direction => {
+      els.previewZoom.value = String(Math.max(Number(els.previewZoom.min), Math.min(Number(els.previewZoom.max), Number(els.previewZoom.value) + direction * Number(els.previewZoom.step))));
+      applyPreviewZoom();
+    };
+    document.querySelector("#preview-zoom-out").addEventListener("click", () => changePreviewZoom(-1));
+    document.querySelector("#preview-zoom-in").addEventListener("click", () => changePreviewZoom(1));
+    const reportDialog = document.querySelector("#report-dialog");
+    document.querySelector("#report-open").addEventListener("click", () => reportDialog.showModal());
+    document.querySelector("#report-close").addEventListener("click", () => reportDialog.close());
+    document.querySelector("#report-login").addEventListener("submit", async event => {
+      event.preventDefault();
+      const message = document.querySelector("#report-login-message");
+      reportPin = document.querySelector("#report-pin").value;
+      message.textContent = "PIN wird geprüft …";
+      try {
+        await reportRequest("/session", { method: "POST", body: "{}" });
+        document.querySelector("#report-login").hidden = true;
+        document.querySelector("#report-book").hidden = false;
+        message.textContent = "";
+        await loadReports();
+      } catch (error) { reportPin = ""; message.textContent = error.message; }
+    });
+    document.querySelector("#report-refresh").addEventListener("click", () => loadReports().catch(error => {
+      const list = document.querySelector("#report-list");
+      list.replaceChildren();
+      const message = document.createElement("p"); message.className = "report-empty"; message.textContent = error.message; list.append(message);
+    }));
+    document.querySelector("#report-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const message = document.querySelector("#report-form-message");
+      message.textContent = "Eintrag wird gespeichert …";
+      try {
+        await reportRequest("/reports", { method: "POST", body: JSON.stringify({
+          subject: document.querySelector("#report-subject").value.trim(),
+          body: document.querySelector("#report-body").value.trim(),
+          configuration: document.querySelector("#report-include-config").checked ? configurationCode() : null
+        }) });
+        event.currentTarget.reset();
+        document.querySelector("#report-include-config").checked = true;
+        message.textContent = "Eintrag gespeichert.";
+        await loadReports();
+      } catch (error) { message.textContent = error.message; }
+    });
     const exportFormat = document.querySelector("#export-format");
     const a4Mode = document.querySelector("#a4-mode");
     a4Mode.addEventListener("change", event => { state.a4Mode = event.currentTarget.checked; render(false); });

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=header-settings-position-109">
+  <link rel="stylesheet" href="styles.css?v=report-book-151">
 </head>
 <body>
   <main>
@@ -13,7 +13,7 @@
       <button id="settings-toggle" class="settings-toggle" type="button" title="Einstellungen" aria-label="Einstellungen" aria-expanded="false" aria-controls="chart-settings">⚙</button>
       <div id="chart-settings" class="settings-popover" hidden>
         <strong>Einstellungen</strong>
-        <label><input id="mobile-view" type="checkbox"> Mobile Ansicht</label>
+        <div class="view-switch"><span>Desktop</span><label class="switch"><input id="mobile-view" type="checkbox" aria-label="Ansicht zwischen Desktop und Mobil wechseln"><span></span></label><span>Mobil</span></div>
         <label><input id="election-dates" type="checkbox" checked> Wahltermine</label>
       </div>
       <div>
@@ -23,22 +23,21 @@
         </div>
           <p class="intro">Die aktuellen Sonntagsfragen von Bund &amp; Ländern im Vergleich.</p>
       </div>
-      <div class="status" aria-live="polite">
-        <span>Stand</span>
-        <strong id="updated">wird geladen …</strong>
+      <div class="status-block">
+        <div class="status" aria-live="polite">
+          <span>Stand</span>
+          <strong id="updated">wird geladen …</strong>
+          <small id="updated-time"></small>
+          <small id="update-message"></small>
+        </div>
+        <button id="update-data" class="update-button" type="button">Update</button>
       </div>
-      <form id="code-input" class="code-box code-input" novalidate>
-        <label class="sr-only" for="input-code">Input-Code</label>
-        <input id="input-code" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Input-Code">
-        <button type="submit">Anwenden</button>
-        <small id="code-message" aria-live="polite"></small>
-      </form>
     </header>
 
     <section class="controls" aria-label="Auswahl">
       <div class="control-group regions">
         <div class="control-heading">
-          <div class="cluster-heading"><button class="cluster-mode-button" type="button" data-group="party">Parlament</button><span class="comparison-state">wird verglichen</span></div>
+          <div class="cluster-heading"><button class="cluster-mode-button" type="button" data-group="party">Parlament</button><span class="comparison-state">werden gruppiert</span></div>
           <button id="region-toggle" class="text-button" type="button">Alle auswählen</button>
         </div>
         <div id="region-options" class="option-grid"></div>
@@ -47,7 +46,7 @@
 
       <div class="control-group">
         <div class="control-heading">
-          <div class="cluster-heading"><button class="cluster-mode-button" type="button" data-group="region">Parteien</button><span class="comparison-state">werden verglichen</span></div>
+          <div class="cluster-heading"><button class="cluster-mode-button" type="button" data-group="region">Parteien</button><span class="comparison-state">werden gruppiert</span></div>
           <button id="party-toggle" class="text-button" type="button">Alle abwählen</button>
         </div>
         <div id="party-options" class="party-options"></div>
@@ -84,6 +83,10 @@
             <input id="show-since-election" type="checkbox" checked>
             <label for="show-since-election">Seit Wahl</label>
           </div>
+          <div class="brackets-choice choice">
+            <input id="show-brackets" type="checkbox" checked>
+            <label for="show-brackets">Klammern</label>
+          </div>
         </div>
       </div>
       <div id="chart-scroll" class="chart-scroll">
@@ -94,28 +97,75 @@
     </section>
 
     <section class="outputs" aria-label="Ausgabe">
-      <button id="export-settings-toggle" class="export-settings-toggle" type="button" aria-expanded="false" aria-controls="export-settings">Ausgabeeinstellungen</button>
+      <form id="code-input" class="code-box code-input output-input" novalidate>
+        <label class="sr-only" for="input-code">Input Configuration</label>
+        <input id="input-code" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
+        <button type="submit">Anwenden</button>
+        <small id="code-message" aria-live="polite"></small>
+      </form>
       <div id="export-settings" class="export-settings-panel" hidden>
         <label>Dateiformat <select id="export-format"><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf" selected>PDF</option></select></label>
         <fieldset><legend>Ausgabeform</legend><label><input type="radio" name="output-shape" value="a4" checked> A4</label><label><input type="radio" name="output-shape" value="tube"> Schlauch</label></fieldset>
         <fieldset id="a4-orientation-settings"><legend>A4-Ausrichtung</legend><label><input type="radio" name="a4-orientation" value="auto" checked> Automatisch</label><label><input type="radio" name="a4-orientation" value="portrait"> Hochkant</label><label><input type="radio" name="a4-orientation" value="landscape"> Horizontal</label></fieldset>
         <input id="a4-mode" type="checkbox" checked hidden>
       </div>
+      <div class="export-actions">
+        <button id="export-settings-toggle" class="export-settings-toggle icon-action" type="button" aria-expanded="false" aria-controls="export-settings"><span class="relief-icon" aria-hidden="true">⚙</span><span>Ausgabeeinstellungen</span></button>
+        <button id="preview-export" class="preview-button icon-action" type="button"><span class="relief-icon eye-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></span><span>Vorschau</span></button>
+        <button id="export-file" class="export-button" type="button">Download</button>
+      </div>
       <small id="export-summary">– Diagramme auf – Seiten</small>
-      <button id="export-file" class="export-button" type="button">Download</button>
-      <div class="code-box output-code">
-        <label for="output-code">Output-Code</label>
-        <output id="output-code" for="input-code" tabindex="0" title="Code kopieren"></output>
-        <button id="copy-code" type="button">Kopieren</button>
+      <div class="output-code">
+        <button id="copy-code" type="button">Copy Configuration</button>
+        <output id="output-code" for="input-code"></output>
       </div>
       <small id="export-message" aria-live="polite"></small>
     </section>
 
     <footer>
-      <p>Daten: <a href="https://www.wahlrecht.de/umfragen/" target="_blank" rel="noreferrer">Wahlrecht.de</a>. Die Werte werden automatisiert übernommen; maßgeblich ist die Originalquelle.</p>
+      <p>Daten: <a href="https://www.wahlrecht.de/umfragen/" target="_blank" rel="noreferrer">Wahlrecht.de</a>. Die Werte werden automatisiert übernommen; maßgeblich ist die Originalquelle. Für die Richtigkeit der Daten ist die Quelle verantwortlich; eine Gewähr wird nicht übernommen.</p>
+      <button id="report-open" class="report-open" type="button">📖 Problem melden / Meldungsbuch</button>
     </footer>
   </main>
+  <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-title">
+    <div class="preview-header"><strong id="report-title">Meldungsbuch</strong><button id="report-close" type="button" aria-label="Meldungsbuch schließen">×</button></div>
+    <div class="report-content">
+      <form id="report-login" class="report-login">
+        <p>Bitte PIN eingeben, um Meldungen zu lesen oder zu verfassen.</p>
+        <label>PIN <input id="report-pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+        <button type="submit">Öffnen</button>
+        <small id="report-login-message" aria-live="polite"></small>
+      </form>
+      <div id="report-book" hidden>
+        <form id="report-form" class="report-form">
+          <label>Titel <input id="report-subject" maxlength="100" required></label>
+          <label>Problem und gewünschte Änderung <textarea id="report-body" maxlength="3000" rows="6" required></textarea></label>
+          <label class="report-configuration"><input id="report-include-config" type="checkbox" checked> Aktuelle Konfiguration mitsenden</label>
+          <button type="submit">Eintrag verfassen</button>
+          <small id="report-form-message" aria-live="polite"></small>
+        </form>
+        <section class="report-list-section" aria-labelledby="report-list-title">
+          <div class="report-list-heading"><h2 id="report-list-title">Einträge</h2><button id="report-refresh" type="button">Aktualisieren</button></div>
+          <div id="report-list" class="report-list"></div>
+        </section>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="export-preview-dialog" class="preview-dialog" aria-labelledby="preview-title">
+    <div class="preview-header">
+      <div><strong id="preview-title">Ausgabevorschau</strong><small id="preview-page-status"></small></div>
+      <div class="preview-zoom" aria-label="Zoom der Vorschau">
+        <button id="preview-zoom-out" type="button" aria-label="Verkleinern">−</button>
+        <input id="preview-zoom" type="range" min="40" max="500" step="10" value="100" aria-label="Zoomstufe">
+        <output id="preview-zoom-value" for="preview-zoom">100 %</output>
+        <button id="preview-zoom-in" type="button" aria-label="Vergrößern">+</button>
+      </div>
+      <button id="close-preview" type="button" aria-label="Vorschau schließen">×</button>
+    </div>
+    <div id="preview-pages" class="preview-pages"></div>
+  </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
-  <script src="app.js?v=compact-export-footer-142" defer></script>
+  <script src="report-config.js"></script>
+  <script src="app.js?v=report-book-151" defer></script>
 </body>
 </html>
