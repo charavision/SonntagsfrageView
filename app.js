@@ -292,6 +292,8 @@ function render(animate = true) {
   const baselineY = margin.top + innerH;
   const floorBackY = baselineY - (compact ? 18 : 44);
   const floorFrontY = Math.min(height - 2, baselineY + (compact ? 72 : 142));
+  if (compact) els.scroll.style.setProperty("--mobile-floor-y", `${baselineY - 55}px`);
+  else els.scroll.style.removeProperty("--mobile-floor-y");
   const chartW = width - margin.left - margin.right;
   const groupedBars = state.groupBy === "region"
     ? selectedRegions.map(region => ({ key: `region:${region}`, bars: parties.flatMap(party => series.filter(item => item.region === region).map(item => ({ party, item }))) })).filter(group => group.bars.length)
@@ -533,8 +535,12 @@ function render(animate = true) {
       start = end;
     }
   };
-  const regionLabelY = margin.top + innerH + (needsVerticalRegionNames ? regionSpace + 10 : 48);
-  const partyLabelY = margin.top + innerH + 48 + regionSpace + (compact ? 22 : 18);
+  const regionLabelY = margin.top + innerH + (needsVerticalRegionNames
+    ? (compact ? regionSpace * .55 + 10 : regionSpace + 10)
+    : 48);
+  const partyLabelY = compact && needsVerticalRegionNames
+    ? margin.top + innerH + regionSpace + 28
+    : margin.top + innerH + 48 + regionSpace + (compact ? 22 : 18);
   appendGroupedLabels(bar => state.fullRegionNames ? bar.region : REGION_CODES[bar.region] || bar.region, regionLabelY, "region-label", "region");
   appendGroupedLabels(bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region), partyLabelY, "party-label");
   const legendX = compact ? margin.left / 2 : margin.left - 10;
@@ -1083,7 +1089,8 @@ fetch("data/polls.json", { cache: "no-store" })
     });
     const copyOutputCode = async () => {
       await navigator.clipboard.writeText(els.outputCode.textContent);
-      els.codeMessage.textContent = "Code kopiert.";
+      els.codeMessage.textContent = "";
+      els.exportMessage.textContent = "Code kopiert.";
     };
     document.querySelector("#copy-code").addEventListener("click", copyOutputCode);
     els.outputCode.addEventListener("click", copyOutputCode);
