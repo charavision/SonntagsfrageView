@@ -19,14 +19,14 @@ const REGION_CODES = {
 };
 
 const startsMobile = window.matchMedia("(max-width: 900px)").matches;
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
@@ -96,7 +96,7 @@ function configurationCode() {
   value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
   const orientationBits = state.a4Orientation === "portrait" ? 64n : state.a4Orientation === "landscape" ? 128n : 0n;
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n);
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n);
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
@@ -253,6 +253,7 @@ function growBar(element, center, baseline, opacity, enabled, delay) {
 function render(animate = true) {
   applyViewMode();
   els.chartSection.classList.toggle("mobile-view", state.mobileView);
+  els.chartSection.classList.toggle("hide-chart-background", !state.showBackground);
   updateComparisonButtons();
   updateElectionVisibility();
   const selectedRegions = [...state.regions];
@@ -331,7 +332,7 @@ function render(animate = true) {
     <filter id="floor-soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.25"/></filter>
     <filter id="star-soft" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="2.2"/></filter>
     <filter id="star-wide" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="4.8"/></filter>` + parties.map((party, index) => {
-    const glow = PARTY_META[party].glow;
+    const glow = state.barColors ? PARTY_META[party].glow : "#aeb8c4";
     const union = party === "CDU/CSU";
     return `<filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="${union ? 6 : 9}" result="wide-blur"/>
@@ -360,7 +361,7 @@ function render(animate = true) {
       ...(depth > .76 ? { filter: "url(#star-wide)" } : depth > .38 ? { filter: "url(#star-soft)" } : {})
     }));
   }
-  els.chart.append(stars);
+  if (state.showBackground) els.chart.append(stars);
 
   const floor = svgEl("g", { class: "perspective-floor", "aria-hidden": "true" });
   const floorLeft = axisX;
@@ -400,7 +401,7 @@ function render(animate = true) {
     floor.append(line);
     perspectiveFloorRows.push({ line, scale });
   });
-  if (compact) {
+  if (compact || !state.showBackground) {
     // On phones the floor is a single static background asset. Keeping these
     // arrays empty also removes all grid work from the horizontal scroll path.
     perspectiveFloorLines.length = 0;
@@ -409,14 +410,16 @@ function render(animate = true) {
     els.chart.append(floor);
   }
 
-  for (let tick = 0; tick <= yMax; tick += 10) {
-    const y = margin.top + innerH - (tick / yMax) * innerH;
-    els.chart.append(svgEl("line", { x1: axisX, x2: width - margin.right, y1: y, y2: y, class: "grid-line" }));
-    const label = svgEl("text", { x: compact ? axisX + 7 : axisX - 10, y: y + 4, "text-anchor": compact ? "start" : "end", class: "axis-label" });
-    label.textContent = `${tick} %`;
-    els.chart.append(label);
+  if (state.showLut) {
+    for (let tick = 0; tick <= yMax; tick += 10) {
+      const y = margin.top + innerH - (tick / yMax) * innerH;
+      els.chart.append(svgEl("line", { x1: axisX, x2: width - margin.right, y1: y, y2: y, class: "grid-line" }));
+      const label = svgEl("text", { x: compact ? axisX + 7 : axisX - 10, y: y + 4, "text-anchor": compact ? "start" : "end", class: "axis-label" });
+      label.textContent = `${tick} %`;
+      els.chart.append(label);
+    }
+    els.chart.append(svgEl("line", { x1: axisX, x2: axisX, y1: margin.top, y2: height - 18, class: "axis-line" }));
   }
-  els.chart.append(svgEl("line", { x1: axisX, x2: axisX, y1: margin.top, y2: height - 18, class: "axis-line" }));
 
   const maxBarsPerGroup = Math.max(...groupedBars.map(group => group.bars.length));
   const secondaryBlockKey = ({ party, item }) => state.groupBy === "party" ? item.region : party;
@@ -463,13 +466,13 @@ function render(animate = true) {
       const faces = compact || h <= 0 ? [] : [
         svgEl("polygon", {
           points: `${x + barWidth},${y} ${x + barWidth + depthX},${y - depthY} ${x + barWidth + depthX},${margin.top + innerH - depthY} ${x + barWidth},${margin.top + innerH}`,
-          fill: PARTY_META[party].color, stroke: PARTY_META[party].glow,
+          fill: state.barColors ? PARTY_META[party].color : "#7d8794", stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4",
           "fill-opacity": fillOpacity * .42, "stroke-opacity": strokeOpacity * .72,
           "stroke-width": 1.1, class: "bar-side"
         }),
         svgEl("polygon", {
           points: `${x},${y} ${x + depthX},${y - depthY} ${x + barWidth + depthX},${y - depthY} ${x + barWidth},${y}`,
-          fill: PARTY_META[party].glow, stroke: PARTY_META[party].glow,
+          fill: state.barColors ? PARTY_META[party].glow : "#9aa5b2", stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4",
           "fill-opacity": fillOpacity * .62, "stroke-opacity": strokeOpacity * .86,
           "stroke-width": 1.1, class: "bar-top"
         })
@@ -477,8 +480,8 @@ function render(animate = true) {
       if (faces.length) perspectiveBars.push({ top: faces[1], side: faces[0], x, y, width: barWidth, baseline: margin.top + innerH, maxDepth: depthX });
       const bar = svgEl("rect", {
         x, y, width: barWidth, height: h,
-        fill: PARTY_META[party].color,
-        stroke: PARTY_META[party].glow,
+        fill: state.barColors ? PARTY_META[party].color : "#7d8794",
+        stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4",
         "fill-opacity": fillOpacity,
         "stroke-opacity": strokeOpacity,
         class: "bar", rx: 3
@@ -495,10 +498,12 @@ function render(animate = true) {
         faces.forEach(face => growBar(face, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay));
         growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
       }
-      const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
-      valueLabel.textContent = `${item.average ? "Ø " : ""}${formatPercent(value, false, compact).replace(" %", "")}`;
-      els.chart.append(valueLabel);
-      old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
+      if (state.showPercentValues) {
+        const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
+        valueLabel.textContent = `${item.average ? "Ø " : ""}${formatPercent(value, false, compact).replace(" %", "")}`;
+        els.chart.append(valueLabel);
+        old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
+      }
       if (state.showSinceElection) {
         const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
         const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
@@ -577,21 +582,24 @@ function render(animate = true) {
   const regionLabel = bar => state.fullRegionNames ? bar.region : REGION_CODES[bar.region] || bar.region;
   const partyLabel = bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region);
   const regionFirst = state.groupBy === "party";
-  appendGroupedLabels(regionFirst ? regionLabel : partyLabel, regionLabelY, regionFirst ? "region-label" : "party-label", regionFirst ? "region" : "party");
-  appendGroupedLabels(regionFirst ? partyLabel : regionLabel, partyLabelY, regionFirst ? "party-label" : "region-label", regionFirst ? "party" : "region");
+  if (state.showLabels) {
+    appendGroupedLabels(regionFirst ? regionLabel : partyLabel, regionLabelY, regionFirst ? "region-label" : "party-label", regionFirst ? "region" : "party");
+    appendGroupedLabels(regionFirst ? partyLabel : regionLabel, partyLabelY, regionFirst ? "party-label" : "region-label", regionFirst ? "party" : "region");
+  }
   const legendX = compact ? margin.left / 2 : margin.left - 10;
   [
     ...(state.showSinceElection ? [["Seit Wahl*", margin.top + innerH + 20]] : []),
-    [regionFirst ? "Parlament" : "Partei", regionLabelY],
-    [regionFirst ? "Partei" : "Parlament", partyLabelY]
+    ...(state.showLabels ? [[regionFirst ? "Parlament" : "Partei", regionLabelY], [regionFirst ? "Partei" : "Parlament", partyLabelY]] : [])
   ].forEach(([text, y]) => {
     const legend = svgEl("text", { x: legendX, y, "text-anchor": compact ? "middle" : "end", class: "chart-legend" });
     legend.textContent = text;
     els.chart.append(legend);
   });
-  const unitLabel = svgEl("text", { x: (axisX + width - margin.right) / 2, y: height - 6, "text-anchor": "middle", class: "chart-unit-label" });
-  unitLabel.textContent = "Werte in %";
-  els.chart.append(unitLabel);
+  if (state.showLut) {
+    const unitLabel = svgEl("text", { x: (axisX + width - margin.right) / 2, y: height - 6, "text-anchor": "middle", class: "chart-unit-label" });
+    unitLabel.textContent = "Werte in %";
+    els.chart.append(unitLabel);
+  }
   state.chartLayout = nextLayout;
   state.perspective = {
     floorLines: perspectiveFloorLines, floorRows: perspectiveFloorRows, bars: perspectiveBars,
@@ -632,7 +640,7 @@ function applyConfigurationCode(text) {
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 1023) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 32767) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
@@ -642,7 +650,13 @@ function applyConfigurationCode(text) {
   state.a4Orientation = mode & 128 ? "landscape" : mode & 64 ? "portrait" : "auto";
   state.showSinceElection = !(mode & 256);
   state.showBrackets = !(mode & 512);
+  state.showLabels = !(mode & 1024);
+  state.barColors = !(mode & 2048);
+  state.showPercentValues = !(mode & 4096);
+  state.showLut = !(mode & 8192);
+  state.showBackground = !(mode & 16384);
   if (state.mobileView) state.electionDates = false;
+  document.querySelector("#chart-view-settings").hidden = state.mobileView;
   value %= legacySpace;
   const pollMask = Number(value % 7n) + 1;
   value /= 7n;
@@ -654,9 +668,14 @@ function applyConfigurationCode(text) {
   state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
   document.querySelector("#average-mode").checked = state.averageMode;
   els.mobileView.checked = state.mobileView;
-  els.fullRegionNames.checked = state.fullRegionNames;
+  els.fullRegionNames.checked = !state.fullRegionNames;
   els.showSinceElection.checked = state.showSinceElection;
   els.showBrackets.checked = state.showBrackets;
+  els.showLabels.checked = state.showLabels;
+  els.showBarColors.checked = state.barColors;
+  els.showPercentValues.checked = state.showPercentValues;
+  els.showLut.checked = state.showLut;
+  els.showBackground.checked = state.showBackground;
   els.electionDates.checked = state.electionDates;
   document.querySelector("#a4-mode").checked = state.a4Mode;
   document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
@@ -757,12 +776,14 @@ async function exportChartImage(format = "jpeg") {
       const row = index % rows;
       const itemX = x + column * columnWidth;
       const y = 43 + headerOffsetY + row * 10;
-      if (swatches) headerGroup.append(svgEl("rect", { x: itemX, y: y - 6, width: 3, height: 7, fill: PARTY_META[item].color }));
+      if (swatches) headerGroup.append(svgEl("rect", { x: itemX, y: y - 6, width: 3, height: 7, fill: state.barColors ? PARTY_META[item].color : "#7d8794" }));
       addHeaderText(item, { x: itemX + (swatches ? 7 : 0), y, fill: "#dce8f7", "font-size": 7 });
     });
   };
-  addLegendSection(700, 145, "PARTEIEN", selectedParties, partyColumns, true);
-  addLegendSection(865, 235, "PARLAMENTE", selectedRegions.map(region => state.fullRegionNames ? region : REGION_CODES[region]), regionColumns);
+  if (state.showLabels) {
+    addLegendSection(700, 145, "PARTEIEN", selectedParties, partyColumns, true);
+    addLegendSection(865, 235, "PARLAMENTE", selectedRegions.map(region => state.fullRegionNames ? region : REGION_CODES[region]), regionColumns);
+  }
   addLegendSection(1120, 460, "UMFRAGEDATEN", selectedPolls, pollColumns);
 
   const footerCenter = documentWidth / 2;
@@ -985,15 +1006,17 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         : Math.max(160, pollLegendOffset + 38 + noteRows * 11);
     const splitRowFraction = showSideLegend ? Math.max(1, cluster.bars.length) / 30 : 1;
     const plot = { left: x + 40, right: splitClusterRow ? x + 40 + fullRowPlotWidth * splitRowFraction : x + tileWidth - 12, top: y + 62, bottom: y + tileHeight - lowerLegendSpace };
-    page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
-    page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
-    [0, .5, 1].forEach(fraction => {
-      const lineY = plot.bottom - fraction * (plot.bottom - plot.top);
-      page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: lineY, y2: lineY, stroke: "#9bb4d0", "stroke-opacity": .2 }));
-      text(`${Math.round(yMax * fraction)}`, { x: plot.left - 6, y: lineY + 4, "text-anchor": "end", fill: "#8fa6c1", "font-size": 10.7 });
-    });
-    const fiftyY = plot.bottom - Math.min(1, 50 / yMax) * (plot.bottom - plot.top) + 14;
-    text("Werte in %", { x: (plot.left + plot.right) / 2, y: fiftyY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 10.7 });
+    if (state.showLut) {
+      page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
+      page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
+      [0, .5, 1].forEach(fraction => {
+        const lineY = plot.bottom - fraction * (plot.bottom - plot.top);
+        page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: lineY, y2: lineY, stroke: "#9bb4d0", "stroke-opacity": .2 }));
+        text(`${Math.round(yMax * fraction)}`, { x: plot.left - 6, y: lineY + 4, "text-anchor": "end", fill: "#8fa6c1", "font-size": 10.7 });
+      });
+      const fiftyY = plot.bottom - Math.min(1, 50 / yMax) * (plot.bottom - plot.top) + 14;
+      text("Werte in %", { x: (plot.left + plot.right) / 2, y: fiftyY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 10.7 });
+    }
     const exportBlockKey = ({ party, item }) => state.groupBy === "party" ? item.region : party;
     const exportBreaks = cluster.bars.slice(1).reduce((count, bar, barIndex) => count + (exportBlockKey(bar) !== exportBlockKey(cluster.bars[barIndex]) ? 1 : 0), 0);
     const slotCount = splitClusterRow ? 30 : Math.max(1, cluster.bars.length);
@@ -1013,11 +1036,11 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const barX = plot.left + slot * barIndex + passedExportBreaks * exportBlockGap + (slot - barWidth) / 2;
       exportBarCenters.push(barX + barWidth / 2);
       const barY = plot.bottom - barHeight;
-      const color = rootStyle.getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow;
+      const color = state.barColors ? (rootStyle.getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow) : "#7d8794";
       const fillOpacity = item.average ? .72 : [.68, .34, .14][item.rank] ?? .14;
       const strokeOpacity = item.average ? 1 : [1, .7, .4][item.rank] ?? .4;
-      page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": fillOpacity, stroke: PARTY_META[party].glow, "stroke-opacity": strokeOpacity, "stroke-width": 1.5 }));
-      text(`${item.average ? "Ø " : ""}${formatPercent(value, false, true).replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
+      page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": fillOpacity, stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4", "stroke-opacity": strokeOpacity, "stroke-width": 1.5 }));
+      if (state.showPercentValues) text(`${item.average ? "Ø " : ""}${formatPercent(value, false, true).replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
       const electionValue = Number(state.data.elections?.[item.region]?.values?.[party] || 0);
       const delta = value - electionValue;
       if (state.showSinceElection) text(formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
@@ -1050,13 +1073,13 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const labelY = plot.bottom + (runCount > 1 && state.showBrackets
         ? (state.showSinceElection ? 47 : 28)
         : (state.showSinceElection ? 39 : 20));
-      const labelNode = text("", { x: runCenter, y: labelY, "text-anchor": rotateRegion ? "end" : "middle", fill: "#a8bfd9", "font-size": 9.33, "font-weight": 700, ...(rotateRegion ? { transform: `rotate(-90 ${runCenter} ${labelY})` } : {}) });
-      if (wrapRegion) {
+      const labelNode = state.showLabels ? text("", { x: runCenter, y: labelY, "text-anchor": rotateRegion ? "end" : "middle", fill: "#a8bfd9", "font-size": 9.33, "font-weight": 700, ...(rotateRegion ? { transform: `rotate(-90 ${runCenter} ${labelY})` } : {}) }) : null;
+      if (state.showLabels && wrapRegion) {
         const split = hyphenIndex + 1;
         const firstLine = svgEl("tspan", { x: runCenter }); firstLine.textContent = runLabel.slice(0, split);
         const secondLine = svgEl("tspan", { x: runCenter, dy: 10.5 }); secondLine.textContent = runLabel.slice(split);
         labelNode.append(firstLine, secondLine);
-      } else labelNode.textContent = runLabel;
+      } else if (state.showLabels) labelNode.textContent = runLabel;
       runStart = runEnd + 1;
     }
     if (layout.sharedPollLegend && !state.averageMode) {
@@ -1363,6 +1386,13 @@ fetchLatestData()
     els.mobileView.checked = state.mobileView;
     els.electionDates.checked = state.electionDates;
     els.showBrackets.checked = state.showBrackets;
+    els.fullRegionNames.checked = !state.fullRegionNames;
+    els.showLabels.checked = state.showLabels;
+    els.showBarColors.checked = state.barColors;
+    els.showPercentValues.checked = state.showPercentValues;
+    els.showLut.checked = state.showLut;
+    els.showBackground.checked = state.showBackground;
+    if (startsMobile) document.querySelector("#chart-view-settings").hidden = true;
     updateHeaderTimestamp(data);
     buildControls();
     updateComparisonButtons();
@@ -1404,6 +1434,7 @@ fetchLatestData()
     });
     els.mobileView.addEventListener("change", event => {
       state.mobileView = event.currentTarget.checked;
+      document.querySelector("#chart-view-settings").hidden = state.mobileView;
       render(false);
     });
     els.electionDates.addEventListener("change", event => {
@@ -1411,7 +1442,7 @@ fetchLatestData()
       render(false);
     });
     els.fullRegionNames.addEventListener("change", event => {
-      state.fullRegionNames = event.currentTarget.checked;
+      state.fullRegionNames = !event.currentTarget.checked;
       render(false);
     });
     els.showSinceElection.addEventListener("change", event => {
@@ -1420,6 +1451,26 @@ fetchLatestData()
     });
     els.showBrackets.addEventListener("change", event => {
       state.showBrackets = event.currentTarget.checked;
+      render(false);
+    });
+    els.showLabels.addEventListener("change", event => {
+      state.showLabels = event.currentTarget.checked;
+      render(false);
+    });
+    els.showBarColors.addEventListener("change", event => {
+      state.barColors = event.currentTarget.checked;
+      render(false);
+    });
+    els.showPercentValues.addEventListener("change", event => {
+      state.showPercentValues = event.currentTarget.checked;
+      render(false);
+    });
+    els.showLut.addEventListener("change", event => {
+      state.showLut = event.currentTarget.checked;
+      render(false);
+    });
+    els.showBackground.addEventListener("change", event => {
+      state.showBackground = event.currentTarget.checked;
       render(false);
     });
     document.querySelectorAll(".cluster-mode-button").forEach(button => button.addEventListener("click", event => {
@@ -1431,6 +1482,16 @@ fetchLatestData()
       button.setAttribute("aria-expanded", String(!panel.hidden));
     });
     togglePanel(document.querySelector("#settings-toggle"), document.querySelector("#chart-settings"));
+    togglePanel(document.querySelector("#chart-view-settings-toggle"), document.querySelector("#chart-view-settings"));
+    document.addEventListener("pointerdown", event => {
+      const menu = document.querySelector(".chart-view-menu");
+      const panel = document.querySelector("#chart-view-settings");
+      const button = document.querySelector("#chart-view-settings-toggle");
+      if (!panel.hidden && !menu.contains(event.target)) {
+        panel.hidden = true;
+        button.setAttribute("aria-expanded", "false");
+      }
+    });
     togglePanel(document.querySelector("#export-settings-toggle"), document.querySelector("#export-settings"));
     document.querySelector("#preview-export").addEventListener("click", () => {
       try { showExportPreview(); }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-160">
+  <link rel="stylesheet" href="styles.css?v=report-book-164">
 </head>
 <body>
   <main>
@@ -75,17 +75,42 @@
         </div>
         <div class="chart-heading-actions">
           <p id="chart-meta" class="chart-meta"></p>
-          <div class="full-region-names-choice choice">
-            <input id="full-region-names" type="checkbox">
-            <label for="full-region-names">Parlamente ausschreiben</label>
-          </div>
-          <div class="since-election-choice choice">
-            <input id="show-since-election" type="checkbox" checked>
-            <label for="show-since-election">Seit Wahl</label>
-          </div>
-          <div class="brackets-choice choice">
-            <input id="show-brackets" type="checkbox" checked>
-            <label for="show-brackets">Klammern</label>
+          <div class="chart-view-menu">
+            <button id="chart-view-settings-toggle" class="chart-view-settings-toggle" type="button" aria-label="Ansicht einstellen" aria-expanded="false" aria-controls="chart-view-settings">⚙</button>
+            <div id="chart-view-settings" class="chart-view-settings">
+              <div class="full-region-names-choice choice">
+                <input id="full-region-names" type="checkbox" checked>
+                <label for="full-region-names">Abkürzungen</label>
+              </div>
+              <div class="since-election-choice choice">
+                <input id="show-since-election" type="checkbox" checked>
+                <label for="show-since-election">Seit Wahl</label>
+              </div>
+              <div class="brackets-choice choice">
+                <input id="show-brackets" type="checkbox" checked>
+                <label for="show-brackets">Klammern</label>
+              </div>
+              <div class="labels-choice choice">
+                <input id="show-labels" type="checkbox" checked>
+                <label for="show-labels">Beschriftung</label>
+              </div>
+              <div class="bar-colors-choice choice">
+                <input id="show-bar-colors" type="checkbox" checked>
+                <label for="show-bar-colors">Balkenfarben</label>
+              </div>
+              <div class="percent-values-choice choice">
+                <input id="show-percent-values" type="checkbox" checked>
+                <label for="show-percent-values">Prozentwerte</label>
+              </div>
+              <div class="lut-choice choice">
+                <input id="show-lut" type="checkbox" checked>
+                <label for="show-lut">LUT</label>
+              </div>
+              <div class="background-choice choice">
+                <input id="show-background" type="checkbox" checked>
+                <label for="show-background">Hintergrund</label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -199,6 +224,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-158" defer></script>
+  <script src="app.js?v=report-book-163" defer></script>
 </body>
 </html>
