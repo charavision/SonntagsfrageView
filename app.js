@@ -805,7 +805,11 @@ function updateExportSummary() {
 
 function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const { width, height, columns } = layout;
-  const rows = layout.sharedPollLegend ? 2 : Math.max(1, Math.min(layout.rows, Math.ceil(clusters.length / columns)));
+  const rows = layout.sharedPollLegend
+    ? 2
+    : pageCount > 1
+      ? layout.rows
+      : Math.max(1, Math.min(layout.rows, Math.ceil(clusters.length / columns)));
   const page = svgEl("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${width} ${height}`, width, height });
   const defs = svgEl("defs");
   const pageBase = svgEl("linearGradient", { id: "page-base", x1: "0", y1: "0", x2: "1", y2: "1" });
