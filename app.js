@@ -19,7 +19,7 @@ const REGION_CODES = {
 };
 
 const startsMobile = window.matchMedia("(max-width: 900px)").matches;
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, export3d: false, groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -96,7 +96,7 @@ function configurationCode() {
   value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
   const orientationBits = state.a4Orientation === "portrait" ? 64n : state.a4Orientation === "landscape" ? 128n : 0n;
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n);
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n);
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
@@ -199,15 +199,56 @@ function updatePerspective() {
     line.setAttribute("x1", center + (left - center) * scale);
     line.setAttribute("x2", center + (right - center) * scale);
   });
-  scene.bars.forEach(({ top, side, x, y, width, baseline, maxDepth }) => {
+  scene.bars.forEach(({ top, side, x, y, width, baseline, maxDepth, value }) => {
     const barCenter = x + width / 2;
     const distance = Math.min(1, Math.abs(center - barCenter) / Math.max(1, els.scroll.clientWidth / 2));
     const dx = Math.sign(center - barCenter || 1) * maxDepth * (.35 + distance * .65);
     const dy = Math.min(6, Math.max(2.5, width * .11));
-    top.setAttribute("points", `${x},${y} ${x + dx},${y - dy} ${x + width + dx},${y - dy} ${x + width},${y}`);
+    const topDepthY = !scene.desktopVanishingPoint
+      ? -dy
+      : value <= 10
+        ? -dy
+        : value < 18
+          ? 0
+          : value < 25
+            ? dy
+            : dy * 1.45;
+    const baselineDepthY = scene.desktopVanishingPoint ? Math.sign(scene.vanishY - baseline) * dy : -dy;
+    top.setAttribute("points", `${x},${y} ${x + dx},${y + topDepthY} ${x + width + dx},${y + topDepthY} ${x + width},${y}`);
     const edgeX = dx >= 0 ? x + width : x;
-    side.setAttribute("points", `${edgeX},${y} ${edgeX + dx},${y - dy} ${edgeX + dx},${baseline - dy} ${edgeX},${baseline}`);
+    side.setAttribute("points", `${edgeX},${y} ${edgeX + dx},${y + topDepthY} ${edgeX + dx},${baseline + baselineDepthY} ${edgeX},${baseline}`);
   });
+}
+
+function exportDepthY(value, depth) {
+  if (value <= 10) return -depth;
+  if (value < 18) return 0;
+  if (value < 25) return depth;
+  return depth * 1.45;
+}
+
+function prepareChartExport3d(chart) {
+  const tops = [...chart.querySelectorAll(".bar-top")];
+  const sides = [...chart.querySelectorAll(".bar-side")];
+  if (!state.export3d) {
+    [...tops, ...sides].forEach(face => face.remove());
+    return chart;
+  }
+  tops.forEach((top, index) => {
+    const side = sides[index];
+    if (!side) return;
+    const x = Number(top.dataset.barX), y = Number(top.dataset.barY), width = Number(top.dataset.barWidth);
+    const baseline = Number(top.dataset.baseline), value = Number(top.dataset.value), clusterCenter = Number(top.dataset.clusterCenter);
+    const depthX = Math.min(8, Math.max(4, width * .16));
+    const dx = Math.max(-depthX, Math.min(depthX, (clusterCenter - (x + width / 2)) * .12));
+    const depth = Math.min(6, Math.max(2.5, width * .11));
+    const topDepthY = exportDepthY(value, depth);
+    const baselineDepthY = -depth;
+    top.setAttribute("points", `${x},${y} ${x + dx},${y + topDepthY} ${x + width + dx},${y + topDepthY} ${x + width},${y}`);
+    const edgeX = dx >= 0 ? x + width : x;
+    side.setAttribute("points", `${edgeX},${y} ${edgeX + dx},${y + topDepthY} ${edgeX + dx},${baseline + baselineDepthY} ${edgeX},${baseline}`);
+  });
+  return chart;
 }
 
 function formatPercent(value, signed = false, omitZeroDecimal = false) {
@@ -474,10 +515,15 @@ function render(animate = true) {
           points: `${x},${y} ${x + depthX},${y - depthY} ${x + barWidth + depthX},${y - depthY} ${x + barWidth},${y}`,
           fill: state.barColors ? PARTY_META[party].glow : "#9aa5b2", stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4",
           "fill-opacity": fillOpacity * .62, "stroke-opacity": strokeOpacity * .86,
-          "stroke-width": 1.1, class: "bar-top"
+          "stroke-width": 1.1, class: "bar-top",
+          "data-bar-x": x, "data-bar-y": y, "data-bar-width": barWidth,
+          "data-baseline": margin.top + innerH, "data-value": value, "data-cluster-center": center
         })
       ];
-      if (faces.length) perspectiveBars.push({ top: faces[1], side: faces[0], x, y, width: barWidth, baseline: margin.top + innerH, maxDepth: depthX });
+      if (faces.length) {
+        ["barX", "barY", "barWidth", "baseline", "value", "clusterCenter"].forEach(key => { faces[0].dataset[key] = faces[1].dataset[key]; });
+      }
+      if (faces.length) perspectiveBars.push({ top: faces[1], side: faces[0], x, y, width: barWidth, baseline: margin.top + innerH, maxDepth: depthX, value });
       const bar = svgEl("rect", {
         x, y, width: barWidth, height: h,
         fill: state.barColors ? PARTY_META[party].color : "#7d8794",
@@ -603,7 +649,9 @@ function render(animate = true) {
   state.chartLayout = nextLayout;
   state.perspective = {
     floorLines: perspectiveFloorLines, floorRows: perspectiveFloorRows, bars: perspectiveBars,
-    floorLeft, floorRight, backScale: floorBackScale, frontScale: floorFrontScale, staticFloor: compact
+    floorLeft, floorRight, backScale: floorBackScale, frontScale: floorFrontScale, staticFloor: compact,
+    desktopVanishingPoint: !compact,
+    vanishY: baselineY - (18 / yMax) * innerH
   };
   updatePerspective();
   els.outputCode.textContent = configurationCode();
@@ -640,7 +688,7 @@ function applyConfigurationCode(text) {
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 32767) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 65535) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
@@ -655,6 +703,7 @@ function applyConfigurationCode(text) {
   state.showPercentValues = !(mode & 4096);
   state.showLut = !(mode & 8192);
   state.showBackground = !(mode & 16384);
+  state.export3d = !(mode & 32768);
   if (state.mobileView) state.electionDates = false;
   document.querySelector("#chart-view-settings").hidden = state.mobileView;
   value %= legacySpace;
@@ -676,6 +725,7 @@ function applyConfigurationCode(text) {
   els.showPercentValues.checked = state.showPercentValues;
   els.showLut.checked = state.showLut;
   els.showBackground.checked = state.showBackground;
+  document.querySelector("#export-3d").checked = state.export3d;
   els.electionDates.checked = state.electionDates;
   document.querySelector("#a4-mode").checked = state.a4Mode;
   document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
@@ -691,7 +741,7 @@ async function exportChartImage(format = "jpeg") {
   const isPng = format === "png";
   const formatLabel = isPng ? "PNG" : "JPEG";
   els.exportMessage.textContent = `${formatLabel} wird erstellt …`;
-  const clone = els.chart.cloneNode(true);
+  const clone = prepareChartExport3d(els.chart.cloneNode(true));
   const originalTexts = [...els.chart.querySelectorAll("text")];
   const clonedTexts = [...clone.querySelectorAll("text")];
   clonedTexts.forEach((text, index) => {
@@ -1039,6 +1089,25 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const color = state.barColors ? (rootStyle.getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow) : "#7d8794";
       const fillOpacity = item.average ? .72 : [.68, .34, .14][item.rank] ?? .14;
       const strokeOpacity = item.average ? 1 : [1, .7, .4][item.rank] ?? .4;
+      if (state.export3d && barHeight > 0) {
+        const clusterCenter = (plot.left + plot.right) / 2;
+        const depthX = Math.min(6, Math.max(2.5, barWidth * .16));
+        const dx = Math.max(-depthX, Math.min(depthX, (clusterCenter - (barX + barWidth / 2)) * .12));
+        const depth = Math.min(4.5, Math.max(1.8, barWidth * .11));
+        const topDepthY = exportDepthY(value, depth);
+        const rearBaselineY = plot.bottom - depth;
+        const edgeX = dx >= 0 ? barX + barWidth : barX;
+        page.append(svgEl("polygon", {
+          points: `${edgeX},${barY} ${edgeX + dx},${barY + topDepthY} ${edgeX + dx},${rearBaselineY} ${edgeX},${plot.bottom}`,
+          fill: color, "fill-opacity": fillOpacity * .42,
+          stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4", "stroke-opacity": strokeOpacity * .72, "stroke-width": 1
+        }));
+        page.append(svgEl("polygon", {
+          points: `${barX},${barY} ${barX + dx},${barY + topDepthY} ${barX + barWidth + dx},${barY + topDepthY} ${barX + barWidth},${barY}`,
+          fill: state.barColors ? PARTY_META[party].glow : "#9aa5b2", "fill-opacity": fillOpacity * .62,
+          stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4", "stroke-opacity": strokeOpacity * .86, "stroke-width": 1
+        }));
+      }
       page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": fillOpacity, stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4", "stroke-opacity": strokeOpacity, "stroke-width": 1.5 }));
       if (state.showPercentValues) text(`${item.average ? "Ø " : ""}${formatPercent(value, false, true).replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
       const electionValue = Number(state.data.elections?.[item.region]?.values?.[party] || 0);
@@ -1208,7 +1277,7 @@ function showExportPreview() {
     });
     els.previewPageStatus.textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"}`;
   } else {
-    const chart = els.chart.cloneNode(true);
+    const chart = prepareChartExport3d(els.chart.cloneNode(true));
     chart.classList.add("preview-sheet");
     chart.removeAttribute("width");
     chart.removeAttribute("height");
@@ -1611,6 +1680,11 @@ fetchLatestData()
     });
     const exportFormat = document.querySelector("#export-format");
     const a4Mode = document.querySelector("#a4-mode");
+    const export3d = document.querySelector("#export-3d");
+    export3d.addEventListener("change", event => {
+      state.export3d = event.currentTarget.checked;
+      els.outputCode.textContent = configurationCode();
+    });
     a4Mode.addEventListener("change", event => { state.a4Mode = event.currentTarget.checked; render(false); });
     exportFormat.addEventListener("change", event => {
       if (event.currentTarget.value === "pdf" && !state.a4Mode) {

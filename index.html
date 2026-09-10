@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-164">
+  <link rel="stylesheet" href="styles.css?v=report-book-172">
 </head>
 <body>
   <main>
@@ -16,7 +16,7 @@
         <div class="view-switch"><span>Desktop</span><label class="switch"><input id="mobile-view" type="checkbox" aria-label="Ansicht zwischen Desktop und Mobil wechseln"><span></span></label><span>Mobil</span></div>
         <label><input id="election-dates" type="checkbox" checked> Wahltermine</label>
       </div>
-      <div>
+      <div class="hero-copy">
         <div class="title-lockup">
           <h1>Sonntagsfragen</h1>
           <p class="creator">visualizer by <a href="https://www.instagram.com/charavision/" target="_blank" rel="noreferrer">charavision</a></p>
@@ -132,6 +132,7 @@
         <label>Dateiformat <select id="export-format"><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf" selected>PDF</option></select></label>
         <fieldset><legend>Ausgabeform</legend><label><input type="radio" name="output-shape" value="a4" checked> A4</label><label><input type="radio" name="output-shape" value="tube"> Schlauch</label></fieldset>
         <fieldset id="a4-orientation-settings"><legend>A4-Ausrichtung</legend><label><input type="radio" name="a4-orientation" value="auto" checked> Automatisch</label><label><input type="radio" name="a4-orientation" value="portrait"> Hochkant</label><label><input type="radio" name="a4-orientation" value="landscape"> Horizontal</label></fieldset>
+        <label><input id="export-3d" type="checkbox"> 3D</label>
         <input id="a4-mode" type="checkbox" checked hidden>
       </div>
       <div class="export-actions">
@@ -224,6 +225,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-163" defer></script>
+  <script src="app.js?v=report-book-168" defer></script>
 </body>
 </html>
