@@ -271,17 +271,13 @@ function render(animate = true) {
   }
 
   const compact = state.mobileView || window.innerWidth < 900;
-  const regionRunCounts = selectedRegions.map(region => {
-    const polls = series.filter(item => item.region === region).length;
-    return state.groupBy === "region" ? polls * parties.length : polls;
-  });
-  const needsVerticalRegionNames = state.fullRegionNames && regionRunCounts.some(count => compact ? count < 3 : count === 1 && selectedRegions.length > 1);
-  const needsWrappedRegionNames = state.fullRegionNames && !needsVerticalRegionNames && regionRunCounts.some(count => count < 4);
+  const regionRunCounts = selectedRegions.map(region => series.filter(item => item.region === region).length);
+  const needsVerticalRegionNames = state.fullRegionNames && selectedRegions.length > 1 && state.groupBy === "party" && regionRunCounts.some(count => compact ? count < 3 : count === 1);
   // On phones the scale sits on the actual edge while the bars retain a small
   // inset, so the first bar never collides with the tick labels.
   const axisX = compact ? 1 : 160;
   const longestRegion = Math.max(0, ...selectedRegions.map(region => (state.fullRegionNames ? region : REGION_CODES[region]).replace("-", "").length));
-  const regionSpace = needsVerticalRegionNames ? Math.max(58, Math.min(126, longestRegion * (compact ? 4.1 : 5.2))) : needsWrappedRegionNames ? 42 : 24;
+  const regionSpace = needsVerticalRegionNames ? Math.max(58, Math.min(126, longestRegion * (compact ? 4.1 : 5.2))) : 24;
   const partySpace = compact ? 54 : 38;
   const margin = { top: 62, right: compact ? 12 : 34, bottom: 58 + regionSpace + partySpace, left: compact ? 48 : 160 };
   const totalBarCount = parties.length * series.length;
