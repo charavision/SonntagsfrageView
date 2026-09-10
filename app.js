@@ -1494,7 +1494,7 @@ function applyDeveloperSettings() {
   state.showBackground = Boolean(settings.background.value);
   state.a4Mode = Boolean(settings.a4Output.value);
   state.export3d = Boolean(settings.export3d.value);
-  state.tabMode = Boolean(settings.tabMode?.visible && settings.tabMode?.value);
+  state.tabMode = Boolean(settings.tabMode?.value);
   document.querySelector("#header-tab-mode-setting").hidden = !settings.tabMode?.visible;
   updateSelectionTabMode();
   setVisible("#chart-settings .view-switch", settings.deviceForce.visible);
