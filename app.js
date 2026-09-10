@@ -1346,8 +1346,9 @@ const defaultDeveloperSettings = () => ({
 let developerSettings = defaultDeveloperSettings();
 let publicDeveloperSettingsPromise;
 
-async function fetchDeveloperSettings() {
-  if (!publicDeveloperSettingsPromise) publicDeveloperSettingsPromise = fetch(`${reportApiUrl}/settings/developer`, { cache: "no-store" })
+async function fetchDeveloperSettings(force = false) {
+  if (force) publicDeveloperSettingsPromise = null;
+  if (!publicDeveloperSettingsPromise) publicDeveloperSettingsPromise = fetch(`${reportApiUrl}/settings/developer?update=${Date.now()}`, { cache: "no-store" })
     .then(async response => {
       const payload = await response.json();
       if (!response.ok || !payload.settings) throw new Error("Entwicklereinstellungen sind nicht erreichbar.");
@@ -1356,6 +1357,16 @@ async function fetchDeveloperSettings() {
     .catch(() => defaultDeveloperSettings());
   developerSettings = await publicDeveloperSettingsPromise;
   return developerSettings;
+}
+
+async function refreshDeveloperSettings() {
+  const previous = JSON.stringify(developerSettings);
+  await fetchDeveloperSettings(true);
+  if (JSON.stringify(developerSettings) === previous) return;
+  applyDeveloperSettings();
+  if (state.data) render(false);
+  const panel = document.querySelector("#report-developer");
+  if (panel && !panel.hidden && currentReportRole) renderDeveloperSettings(currentReportRole !== "Admin");
 }
 
 function platformDeveloperSettings() {
@@ -2078,3 +2089,15 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     }, { passive: true });
   })
   .catch(error => { els.updated.textContent = "nicht verfügbar"; els.empty.hidden = false; els.empty.textContent = error.message; els.scroll.hidden = true; });
+
+let developerRefreshRunning = false;
+const syncDeveloperSettings = async () => {
+  if (developerRefreshRunning || document.hidden) return;
+  developerRefreshRunning = true;
+  try { await refreshDeveloperSettings(); }
+  catch (error) { /* Bei einem kurzen Netzausfall bleiben die zuletzt geladenen Werte aktiv. */ }
+  finally { developerRefreshRunning = false; }
+};
+document.addEventListener("visibilitychange", () => { if (!document.hidden) syncDeveloperSettings(); });
+window.addEventListener("focus", syncDeveloperSettings);
+window.setInterval(syncDeveloperSettings, 15000);
