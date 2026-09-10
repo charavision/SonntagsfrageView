@@ -580,7 +580,7 @@ function hideTooltip() { els.tooltip.hidden = true; }
 function formatDate(value) { return new Intl.DateTimeFormat("de-DE").format(new Date(`${value}T12:00:00`)); }
 
 function applyConfigurationCode(text) {
-  if (!/^[0-9A-Za-z]{13}$/.test(text)) throw new Error("Bitte einen gültigen 13-stelligen Code eingeben.");
+  if (!/^[0-9A-Za-z]{13,14}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
   const partyUniverse = Object.keys(PARTY_META);
   const partyCount = orderedChoiceCount(partyUniverse.length);
   const regionCount = orderedChoiceCount(state.data.regions.length);
@@ -696,8 +696,8 @@ async function exportChartImage(format = "jpeg") {
   const creatorName = svgEl("tspan", { fill: "#b9dff1", "font-weight": 800 });
   creatorName.textContent = "charavision";
   creator.append(creatorPrefix, creatorName);
-  addHeaderText(minuteStamp, { x: headerMetaX, y: 54 + headerOffsetY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
-  addHeaderText(configurationCode(), { x: headerMetaX, y: 70 + headerOffsetY, "text-anchor": "middle", fill: "#b9cee5", "font-size": 7, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  addHeaderText(minuteStamp, { x: headerMetaX, y: 54 + headerOffsetY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 10 });
+  addHeaderText(configurationCode(), { x: headerMetaX, y: 72 + headerOffsetY, "text-anchor": "middle", fill: "#b9cee5", "font-size": 9, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
   addHeaderText(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: headerMetaX, y: 84 + headerOffsetY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 7, "font-weight": 400 });
 
   clone.setAttribute("x", (documentWidth - viewBox.width) / 2);
@@ -789,7 +789,7 @@ function a4LayoutFor(clusters) {
   const landscape = forcedLandscape || (!forcedPortrait && largestCluster > 34);
   if (landscape) {
     if (largestCluster > 34) return { width: 1754, height: 1240, columns: 1, rows: 2, capacity: 2, landscape: true };
-    return { width: 1754, height: 1240, columns: 3, rows: 2, capacity: 6, landscape: true };
+    return { width: 1754, height: 1240, columns: 3, rows: 2, capacity: 5, landscape: true, sharedPollLegend: true };
   }
   if (largestCluster > 34) return { width: 1240, height: 1754, columns: 1, rows: 2, capacity: 1, landscape: false, splitLargeCluster: true };
   if (largestCluster > 17) return { width: 1240, height: 1754, columns: 1, rows: state.fullRegionNames ? 3 : 4, capacity: state.fullRegionNames ? 3 : 4, landscape: false };
@@ -807,7 +807,7 @@ function updateExportSummary() {
 
 function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const { width, height, columns } = layout;
-  const rows = Math.max(1, Math.min(layout.rows, Math.ceil(clusters.length / columns)));
+  const rows = layout.sharedPollLegend ? 2 : Math.max(1, Math.min(layout.rows, Math.ceil(clusters.length / columns)));
   const page = svgEl("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${width} ${height}`, width, height });
   const defs = svgEl("defs");
   const pageBase = svgEl("linearGradient", { id: "page-base", x1: "0", y1: "0", x2: "1", y2: "1" });
@@ -832,8 +832,8 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const introY = brandY + brandSize * .48;
   const metaY = introY + 27;
   text("Die aktuellen Sonntagsfragen von Bund & Ländern im Vergleich.", { x: 42, y: introY, fill: "#8fa6c1", "font-size": landscapeHeader ? 20 : 15, "font-weight": 400 });
-  text(minuteStamp, { x: 42, y: metaY, fill: "#8fa6c1", "font-size": 9 });
-  text(configurationCode(), { x: 208, y: metaY, fill: "#b9cee5", "font-size": 9, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
+  text(minuteStamp, { x: 42, y: metaY, fill: "#8fa6c1", "font-size": 11 });
+  text(configurationCode(), { x: 208, y: metaY, fill: "#b9cee5", "font-size": 11, style: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace", "letter-spacing": ".05em" });
   text(state.mobileView || window.innerWidth < 900 ? "(mobil)" : "(desktop)", { x: 315, y: metaY, fill: "#8fa6c1", "font-size": 8.5 });
   const selectedRegions = [...state.regions], selectedParties = [...state.parties];
   const headerLegend = (x, y, title, items, columns, columnWidth, colorItems = false) => {
@@ -855,14 +855,17 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     page.append(svgEl("rect", { x: itemX, y: partyY + 11, width: 4, height: 9, fill: getComputedStyle(document.documentElement).getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow }));
     text(party, { x: itemX + 8, y: partyY + 20, fill: "#dce8f7", "font-size": 10.7 });
   });
-  text("* = Differenz seit der letzten Wahl", { x: partyX, y: partyY + 43, fill: "#8fa6c1", "font-size": 8 });
   const regionsY = partyY + 70;
   headerLegend(partyX, regionsY, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 3, rightLegendWidth / 3);
   const regionLegendRows = Math.ceil(selectedRegions.length / 3);
-  const gapX = 18, gapY = 18, left = 42, top = Math.max(landscapeHeader ? 265 : 300, regionsY + 62 + regionLegendRows * 12);
+  text("* = Differenz seit der letzten Wahl", { x: partyX, y: regionsY + 31 + regionLegendRows * 12, fill: "#8fa6c1", "font-size": 8 });
+  const gapX = 18, gapY = 18, left = 42;
+  const standardTop = Math.max(landscapeHeader ? 265 : 300, regionsY + 62 + regionLegendRows * 12);
+  const top = layout.splitLargeCluster ? Math.max(245, standardTop - 42) : standardTop;
   text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: top - 24, fill: "#59d9ff", "font-size": 18, "font-weight": 800 });
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
-  const tileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
+  const naturalTileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
+  const tileHeight = layout.splitLargeCluster ? naturalTileHeight * .92 : naturalTileHeight;
   const allValues = clusters.flatMap(cluster => cluster.bars.map(({ party, item }) => Number(item.poll.values[party] || 0)));
   const yMax = Math.max(50, Math.ceil(Math.max(0, ...allValues) / 10) * 10);
   const rootStyle = getComputedStyle(document.documentElement);
@@ -871,9 +874,12 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     const x = left + column * (tileWidth + gapX), y = top + row * (tileHeight + gapY);
     text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 18, "font-weight": 800 });
     text(minuteStamp, { x: x + 16, y: y + 43, fill: "#8fa6c1", "font-size": 10.7 });
-    const sideLegend = Boolean(layout.splitLargeCluster && cluster.continuation);
-    const plotWidth = sideLegend ? tileWidth * .56 - 52 : tileWidth - 52;
-    const clusterRegions = [...new Set(cluster.bars.map(({ item }) => item.region))];
+    const splitClusterRow = Boolean(layout.splitLargeCluster);
+    const showSideLegend = Boolean(splitClusterRow && cluster.continuation);
+    const fullRowPlotWidth = tileWidth - 52;
+    const plotWidth = splitClusterRow ? fullRowPlotWidth : tileWidth - 52;
+    const legendBars = cluster.legendBars || cluster.bars;
+    const clusterRegions = [...new Set(legendBars.map(({ item }) => item.region))];
     const pollLegendGroups = state.averageMode ? [{
       label: "Verwendete Umfragen", noSwatch: true,
       items: [...state.selectedPollRanks].sort().flatMap(rank => clusterRegions.map(region => {
@@ -889,7 +895,9 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
       }).filter(Boolean)
     })).filter(group => group.items.length);
-    const pollGroupWidth = plotWidth / Math.max(1, pollLegendGroups.length);
+    const pollGroupWidth = showSideLegend
+      ? tileWidth * .16
+      : plotWidth / Math.max(1, pollLegendGroups.length);
     const pollGroupLayouts = pollLegendGroups.map(group => {
       const columns = Math.max(1, Math.min(group.items.length, Math.floor(pollGroupWidth / 145)));
       return { columns, rows: Math.ceil(group.items.length / columns) };
@@ -908,14 +916,30 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       labelRuns.push({ key, count: labelRunEnd - labelRunStart + 1 });
       labelRunStart = labelRunEnd + 1;
     }
-    const sparseHorizontalLabels = cluster.bars.length <= 2;
+    const sparseHorizontalLabels = layout.splitLargeCluster || cluster.bars.length <= 2;
+    const labelSlotCount = splitClusterRow ? 30 : Math.max(1, cluster.bars.length);
+    const estimatedLabelSlot = fullRowPlotWidth / labelSlotCount;
+    const labelFontSize = 9.33;
+    const horizontalLabelFits = run => {
+      if (sparseHorizontalLabels) return true;
+      if (run.count < 3) return false;
+      const parts = String(run.key).split(/(?<=-)/);
+      const estimatedTextWidth = Math.max(...parts.map(part => part.length)) * labelFontSize * .58;
+      const safetyGap = labelFontSize * .58 * 2.5;
+      return estimatedLabelSlot * run.count >= estimatedTextWidth + safetyGap;
+    };
     const maxVerticalLabelLength = state.groupBy === "party" && state.fullRegionNames && !sparseHorizontalLabels
-      ? Math.max(0, ...labelRuns.map(run => Math.max(...String(run.key).split(/(?<=-)/).map(part => part.length))))
+      ? Math.max(0, ...labelRuns.filter(run => !horizontalLabelFits(run)).map(run => Math.max(...String(run.key).split(/(?<=-)/).map(part => part.length))))
       : 0;
     const regionLabelSpace = maxVerticalLabelLength ? maxVerticalLabelLength * 5.3 : 38;
     const pollLegendOffset = 59 + regionLabelSpace;
-    const lowerLegendSpace = sideLegend ? 72 : Math.max(160, pollLegendOffset + 38 + noteRows * 11);
-    const plot = { left: x + 40, right: sideLegend ? x + tileWidth * .58 : x + tileWidth - 12, top: y + 62, bottom: y + tileHeight - lowerLegendSpace };
+    const lowerLegendSpace = splitClusterRow
+      ? 72
+      : layout.sharedPollLegend
+        ? Math.max(92, pollLegendOffset + 28)
+        : Math.max(160, pollLegendOffset + 38 + noteRows * 11);
+    const splitRowFraction = showSideLegend ? Math.max(1, cluster.bars.length) / 30 : 1;
+    const plot = { left: x + 40, right: splitClusterRow ? x + 40 + fullRowPlotWidth * splitRowFraction : x + tileWidth - 12, top: y + 62, bottom: y + tileHeight - lowerLegendSpace };
     page.append(svgEl("line", { x1: plot.left, x2: plot.left, y1: plot.top, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
     page.append(svgEl("line", { x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom, stroke: "#9bb4d0", "stroke-opacity": .58, "stroke-width": 1.2 }));
     [0, .5, 1].forEach(fraction => {
@@ -927,8 +951,13 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     text("Werte in %", { x: (plot.left + plot.right) / 2, y: fiftyY, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 10.7 });
     const exportBlockKey = ({ party, item }) => state.groupBy === "party" ? item.region : party;
     const exportBreaks = cluster.bars.slice(1).reduce((count, bar, barIndex) => count + (exportBlockKey(bar) !== exportBlockKey(cluster.bars[barIndex]) ? 1 : 0), 0);
-    const exportBlockGap = exportBreaks ? Math.max(4, Math.min(10, (plot.right - plot.left) * .008)) : 0;
-    const slot = ((plot.right - plot.left) - exportBreaks * exportBlockGap) / Math.max(1, cluster.bars.length);
+    const slotCount = splitClusterRow ? 30 : Math.max(1, cluster.bars.length);
+    const countExportBreaks = bars => bars.slice(1).reduce((count, bar, barIndex) => count + (exportBlockKey(bar) !== exportBlockKey(bars[barIndex]) ? 1 : 0), 0);
+    const sharedExportBreaks = splitClusterRow
+      ? Math.max(countExportBreaks(legendBars.slice(0, 30)), countExportBreaks(legendBars.slice(30)))
+      : exportBreaks;
+    const exportBlockGap = sharedExportBreaks ? Math.max(4, Math.min(10, fullRowPlotWidth * .008)) : 0;
+    const slot = (fullRowPlotWidth - sharedExportBreaks * exportBlockGap) / slotCount;
     const barWidth = Math.max(2, Math.min(34, slot * .68));
     const exportBarCenters = [];
     let passedExportBreaks = 0;
@@ -960,11 +989,20 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       }
       const runCenter = (exportBarCenters[runStart] + exportBarCenters[runEnd]) / 2;
       const runCount = runEnd - runStart + 1;
+      if (runCount > 1) {
+        const bracketLeft = exportBarCenters[runStart] - barWidth * .62;
+        const bracketRight = exportBarCenters[runEnd] + barWidth * .62;
+        const bracketY = plot.bottom + 31;
+        page.append(svgEl("path", {
+          d: `M ${bracketLeft} ${bracketY - 5} V ${bracketY} H ${bracketRight} V ${bracketY - 5}`,
+          fill: "none", stroke: "#7693b4", "stroke-opacity": .72, "stroke-width": 1.15
+        }));
+      }
       const runLabel = state.groupBy === "party" ? (state.fullRegionNames ? runKey : REGION_CODES[runKey]) : partyDisplayLabel(runKey, cluster.bars[runStart].item.region);
       const hyphenIndex = runLabel.indexOf("-");
       const wrapRegion = state.groupBy === "party" && state.fullRegionNames && runCount < 4 && hyphenIndex >= 0;
-      const rotateRegion = state.groupBy === "party" && state.fullRegionNames && !sparseHorizontalLabels;
-      const labelY = plot.bottom + 39;
+      const rotateRegion = state.groupBy === "party" && state.fullRegionNames && !horizontalLabelFits({ key: runKey, count: runCount });
+      const labelY = plot.bottom + (runCount > 1 ? 47 : 39);
       const labelNode = text("", { x: runCenter, y: labelY, "text-anchor": rotateRegion ? "end" : "middle", fill: "#a8bfd9", "font-size": 9.33, "font-weight": 700, ...(rotateRegion ? { transform: `rotate(-90 ${runCenter} ${labelY})` } : {}) });
       if (wrapRegion) {
         const split = hyphenIndex + 1;
@@ -974,10 +1012,18 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       } else labelNode.textContent = runLabel;
       runStart = runEnd + 1;
     }
-    pollLegendGroups.forEach((group, groupIndex) => {
-      const groupX = sideLegend ? x + tileWidth * .64 : plot.left + groupIndex * pollGroupWidth;
+    if (layout.sharedPollLegend && !state.averageMode) {
+      const transparencyY = plot.bottom + pollLegendOffset;
+      pollLegendGroups.forEach((group, groupIndex) => {
+        const groupX = plot.left + groupIndex * ((plot.right - plot.left) / Math.max(1, pollLegendGroups.length));
+        page.append(svgEl("rect", { x: groupX, y: transparencyY - 8, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
+        text(group.label, { x: groupX + 24, y: transparencyY, fill: "#8fa6c1", "font-size": 9.33, "font-weight": 700 });
+      });
+    }
+    if (!layout.sharedPollLegend && (!splitClusterRow || showSideLegend)) pollLegendGroups.forEach((group, groupIndex) => {
+      const groupX = showSideLegend ? x + tileWidth * .82 : plot.left + groupIndex * pollGroupWidth;
       const layout = pollGroupLayouts[groupIndex];
-      const legendBaseY = sideLegend ? plot.top + 22 + groupIndex * (42 + noteRows * 11) : plot.bottom + pollLegendOffset;
+      const legendBaseY = showSideLegend ? plot.top + 22 + groupIndex * (42 + noteRows * 11) : plot.bottom + pollLegendOffset;
       if (!group.noSwatch) page.append(svgEl("rect", { x: groupX, y: legendBaseY - 8, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
       text(group.label, { x: groupX + (group.noSwatch ? 0 : 24), y: legendBaseY, fill: "#8fa6c1", "font-size": 9.33, "font-weight": 700, "letter-spacing": ".03em" });
       const itemColumnWidth = pollGroupWidth / layout.columns;
@@ -987,6 +1033,30 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       });
     });
   });
+  if (layout.sharedPollLegend) {
+    const legendX = left + 2 * (tileWidth + gapX) + 16;
+    const legendY = top + tileHeight + gapY + 28;
+    const legendWidth = tileWidth - 32;
+    const pageRegions = [...new Set(clusters.flatMap(cluster => cluster.bars.map(({ item }) => item.region)))];
+    const sharedGroups = [...state.selectedPollRanks].sort().map(rank => ({
+      rank,
+      label: rank === 0 ? "Neueste Umfragen" : `${rank + 1}. jüngste Umfragen`,
+      fill: [.68, .34, .14][rank], stroke: [1, .7, .4][rank],
+      items: pageRegions.map(region => {
+        const poll = (state.data.polls[region] || [])[rank];
+        return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
+      }).filter(Boolean)
+    })).filter(group => group.items.length);
+    text("UMFRAGEDATEN", { x: legendX, y: legendY, fill: "#59d9ff", "font-size": 14, "font-weight": 800, "letter-spacing": ".06em" });
+    const groupWidth = legendWidth / Math.max(1, sharedGroups.length);
+    sharedGroups.forEach((group, groupIndex) => {
+      const groupX = legendX + groupIndex * groupWidth;
+      const groupY = legendY + 24;
+      page.append(svgEl("rect", { x: groupX, y: groupY - 8, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
+      text(group.label, { x: groupX + 24, y: groupY, fill: "#dce8f7", "font-size": 9.33, "font-weight": 700 });
+      group.items.forEach((item, itemIndex) => text(item, { x: groupX, y: groupY + 16 + itemIndex * 11, fill: "#9bb0c9", "font-size": 9.33 }));
+    });
+  }
   const footerStamp = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(now);
   text(footerStamp, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
   text("Quelle der Daten: Wahlrecht.de", { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
@@ -1035,10 +1105,10 @@ async function exportA4(format) {
   const layout = a4LayoutFor(clusters);
   const pageGroups = layout.splitLargeCluster
     ? clusters.map(cluster => {
-      const splitAt = Math.ceil(cluster.bars.length / 2);
+      const splitAt = 30;
       return [
-        { ...cluster, bars: cluster.bars.slice(0, splitAt) },
-        { ...cluster, title: `${cluster.title} · Fortsetzung`, bars: cluster.bars.slice(splitAt), continuation: true }
+        { ...cluster, bars: cluster.bars.slice(0, splitAt), legendBars: cluster.bars },
+        { ...cluster, title: `${cluster.title} · Fortsetzung`, bars: cluster.bars.slice(splitAt), legendBars: cluster.bars, continuation: true }
       ];
     })
     : Array.from({ length: Math.ceil(clusters.length / layout.capacity) }, (_, index) => clusters.slice(index * layout.capacity, index * layout.capacity + layout.capacity));
