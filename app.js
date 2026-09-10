@@ -1291,6 +1291,7 @@ function installPreviewGestures() {
   let startDistance = 0;
   let startZoom = 100;
   let lastTap = 0;
+  let pinchActive = false;
   const distance = () => {
     const [first, second] = [...pointers.values()];
     return first && second ? Math.hypot(second.x - first.x, second.y - first.y) : 0;
@@ -1299,7 +1300,12 @@ function installPreviewGestures() {
     if (event.pointerType === "mouse") return;
     surface.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (pointers.size === 2) { startDistance = distance(); startZoom = Number(els.previewZoom.value); }
+    if (pointers.size === 2) {
+      startDistance = distance();
+      startZoom = Number(els.previewZoom.value);
+      pinchActive = true;
+      lastTap = 0;
+    }
   });
   surface.addEventListener("pointermove", event => {
     const previous = pointers.get(event.pointerId);
@@ -1318,9 +1324,11 @@ function installPreviewGestures() {
   }, { passive: false });
   const release = event => {
     if (!pointers.has(event.pointerId)) return;
+    const endedPinch = pinchActive;
     pointers.delete(event.pointerId);
     if (pointers.size < 2) startDistance = 0;
-    if (event.type === "pointerup" && event.pointerType !== "mouse") {
+    if (!pointers.size) pinchActive = false;
+    if (!endedPinch && event.type === "pointerup" && event.pointerType !== "mouse") {
       const now = Date.now();
       if (now - lastTap < 320) {
         els.previewZoom.value = Number(els.previewZoom.value) === 100 ? "200" : "100";
@@ -1335,12 +1343,14 @@ function installPreviewGestures() {
 
 async function loadAppRelease() {
   const version = document.querySelector("#android-app-version");
+  const reportVersion = document.querySelector("#report-current-version");
   const message = document.querySelector("#android-app-message");
   try {
     const response = await fetch(`app-version.json?update=${Date.now()}`, { cache: "no-store" });
     const release = await response.json();
     if (!response.ok || !release.version || !release.downloadUrl) throw new Error("Versionsinformation nicht verfügbar.");
     version.textContent = release.version;
+    reportVersion.textContent = release.version;
     document.querySelector("#android-app-download").onclick = () => {
       message.textContent = window.AndroidApp ? "Update wird geöffnet …" : "Download wird gestartet …";
       if (window.AndroidApp?.installUpdate) window.AndroidApp.installUpdate(release.downloadUrl);
@@ -1351,7 +1361,11 @@ async function loadAppRelease() {
         link.click();
       }
     };
-  } catch (error) { version.textContent = "nicht verfügbar"; message.textContent = error.message; }
+  } catch (error) {
+    version.textContent = "nicht verfügbar";
+    reportVersion.textContent = "nicht verfügbar";
+    message.textContent = error.message;
+  }
 }
 
 function showExportPreview() {
@@ -2111,7 +2125,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         pinFields[Math.min(pasted.length, 5) - 1].focus();
       });
     });
-    document.querySelector("#report-open").addEventListener("click", () => reportDialog.showModal());
+    document.querySelector("#report-open").addEventListener("click", () => {
+      reportDialog.showModal();
+      loadAppRelease();
+    });
     document.querySelector("#report-close").addEventListener("click", () => reportDialog.close());
     document.querySelector("#report-login").addEventListener("submit", async event => {
       event.preventDefault();
