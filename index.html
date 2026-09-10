@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-186">
+  <link rel="stylesheet" href="styles.css?v=report-book-188">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro" aria-label="Sonntagsfragen wird gestartet">
@@ -231,8 +231,10 @@
         <form id="report-form" class="report-form">
           <label id="report-subject-field" hidden>Titel <input id="report-subject" maxlength="100"></label>
           <label>Problem und gewünschte Änderung <textarea id="report-body" maxlength="3000" rows="6" required></textarea></label>
-          <label class="report-configuration"><input id="report-include-config" type="checkbox" checked> Aktuelle Konfiguration mitsenden</label>
-          <button type="submit">Eintrag verfassen</button>
+          <div class="report-submit-row">
+            <label class="report-configuration"><input id="report-include-config" type="checkbox" checked> Aktuelle Konfiguration mitsenden</label>
+            <button class="report-submit-icon" type="submit" aria-label="Eintrag absenden" title="Eintrag absenden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 4.5 21 12 3.5 19.5l3-6.2L15 12l-8.5-1.3z"/></svg></button>
+          </div>
           <small id="report-form-message" aria-live="polite"></small>
         </form>
         <section class="report-list-section" aria-labelledby="report-list-title">
