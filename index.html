@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-182">
+  <link rel="stylesheet" href="styles.css?v=report-book-183">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro" aria-label="Sonntagsfragen wird gestartet">
@@ -188,7 +188,13 @@
         <div class="report-session-actions">
           <button id="report-accounts-open" type="button" hidden>Accounts verwalten</button>
           <button id="report-developer-open" type="button">Entwicklereinstellungen ansehen</button>
+          <button id="report-app-open" type="button" hidden>App</button>
         </div>
+      </section>
+      <section id="report-app" class="report-app" hidden aria-labelledby="report-app-title">
+        <div class="report-list-heading"><h2 id="report-app-title">App</h2><button id="report-app-close" class="panel-close" type="button" aria-label="App schließen">×</button></div>
+        <div class="report-app-row"><button id="android-app-download" type="button">Android</button><span>Version <strong id="android-app-version">wird geladen …</strong></span></div>
+        <small id="android-app-message" aria-live="polite"></small>
       </section>
       <section id="report-developer" class="report-developer" hidden aria-labelledby="report-developer-title">
         <div class="report-list-heading"><h2 id="report-developer-title">Entwicklereinstellungen</h2><button id="report-developer-close" class="panel-close" type="button" aria-label="Entwicklereinstellungen schließen">×</button></div>
@@ -245,6 +251,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-181" defer></script>
+  <script src="app.js?v=report-book-183" defer></script>
 </body>
 </html>

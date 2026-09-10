@@ -1265,6 +1265,75 @@ function applyPreviewZoom() {
   });
 }
 
+function installPreviewGestures() {
+  const surface = els.previewPages;
+  const pointers = new Map();
+  let startDistance = 0;
+  let startZoom = 100;
+  let lastTap = 0;
+  const distance = () => {
+    const [first, second] = [...pointers.values()];
+    return first && second ? Math.hypot(second.x - first.x, second.y - first.y) : 0;
+  };
+  surface.addEventListener("pointerdown", event => {
+    if (event.pointerType === "mouse") return;
+    surface.setPointerCapture(event.pointerId);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) { startDistance = distance(); startZoom = Number(els.previewZoom.value); }
+  });
+  surface.addEventListener("pointermove", event => {
+    const previous = pointers.get(event.pointerId);
+    if (!previous) return;
+    event.preventDefault();
+    if (pointers.size === 1) {
+      surface.scrollLeft -= event.clientX - previous.x;
+      surface.scrollTop -= event.clientY - previous.y;
+    }
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size >= 2 && startDistance) {
+      const next = Math.max(Number(els.previewZoom.min), Math.min(Number(els.previewZoom.max), startZoom * distance() / startDistance));
+      els.previewZoom.value = String(Math.round(next));
+      applyPreviewZoom();
+    }
+  }, { passive: false });
+  const release = event => {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) startDistance = 0;
+    if (event.type === "pointerup" && event.pointerType !== "mouse") {
+      const now = Date.now();
+      if (now - lastTap < 320) {
+        els.previewZoom.value = Number(els.previewZoom.value) === 100 ? "200" : "100";
+        applyPreviewZoom();
+        lastTap = 0;
+      } else lastTap = now;
+    }
+  };
+  surface.addEventListener("pointerup", release);
+  surface.addEventListener("pointercancel", release);
+}
+
+async function loadAppRelease() {
+  const version = document.querySelector("#android-app-version");
+  const message = document.querySelector("#android-app-message");
+  try {
+    const response = await fetch(`app-version.json?update=${Date.now()}`, { cache: "no-store" });
+    const release = await response.json();
+    if (!response.ok || !release.version || !release.downloadUrl) throw new Error("Versionsinformation nicht verfügbar.");
+    version.textContent = release.version;
+    document.querySelector("#android-app-download").onclick = () => {
+      message.textContent = window.AndroidApp ? "Update wird geöffnet …" : "Download wird gestartet …";
+      if (window.AndroidApp?.installUpdate) window.AndroidApp.installUpdate(release.downloadUrl);
+      else {
+        const link = document.createElement("a");
+        link.href = release.downloadUrl;
+        link.download = `Sonntagsfragen-Android-v${release.version}.apk`;
+        link.click();
+      }
+    };
+  } catch (error) { version.textContent = "nicht verfügbar"; message.textContent = error.message; }
+}
+
 function showExportPreview() {
   els.previewPages.replaceChildren();
   if (state.a4Mode) {
@@ -1921,6 +1990,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#close-preview").addEventListener("click", () => els.previewDialog.close());
     els.previewDialog.addEventListener("click", event => { if (event.target === els.previewDialog) els.previewDialog.close(); });
     els.previewZoom.addEventListener("input", applyPreviewZoom);
+    installPreviewGestures();
     const changePreviewZoom = direction => {
       els.previewZoom.value = String(Math.max(Number(els.previewZoom.min), Math.min(Number(els.previewZoom.max), Number(els.previewZoom.value) + direction * Number(els.previewZoom.step))));
       applyPreviewZoom();
@@ -1965,6 +2035,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-login").hidden = true;
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
+        document.querySelector("#report-app-open").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-developer-open").textContent = currentReportRole === "Admin" ? "Entwicklereinstellungen" : "Entwicklereinstellungen ansehen";
         document.querySelector("#report-logout").hidden = false;
         document.querySelector("#report-book").hidden = false;
@@ -1981,6 +2052,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#report-session").hidden = true;
       document.querySelector("#report-accounts").hidden = true;
       document.querySelector("#report-developer").hidden = true;
+      document.querySelector("#report-app").hidden = true;
       document.querySelector("#report-book").hidden = true;
       document.querySelector("#report-logout").hidden = true;
       document.querySelector("#report-login").hidden = false;
@@ -2008,6 +2080,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     document.querySelector("#report-developer-close").addEventListener("click", () => { document.querySelector("#report-developer").hidden = true; });
     document.querySelector("#report-accounts-close").addEventListener("click", () => { document.querySelector("#report-accounts").hidden = true; });
+    document.querySelector("#report-app-open").addEventListener("click", () => {
+      document.querySelector("#report-app").hidden = false;
+      loadAppRelease();
+    });
+    document.querySelector("#report-app-close").addEventListener("click", () => { document.querySelector("#report-app").hidden = true; });
     document.querySelector("#report-account-form").addEventListener("submit", async event => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -2095,7 +2172,7 @@ const syncDeveloperSettings = async () => {
   if (developerRefreshRunning || document.hidden) return;
   developerRefreshRunning = true;
   try { await refreshDeveloperSettings(); }
-  catch (error) { /* Bei einem kurzen Netzausfall bleiben die zuletzt geladenen Werte aktiv. */ }
+  catch (error) { /* Die zuletzt geladenen Einstellungen bleiben bei einem kurzen Netzausfall aktiv. */ }
   finally { developerRefreshRunning = false; }
 };
 document.addEventListener("visibilitychange", () => { if (!document.hidden) syncDeveloperSettings(); });
