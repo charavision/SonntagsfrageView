@@ -1,1 +1,121 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
+  <title>Sonntagsfragen – Bund & Länder</title>
+  <link rel="stylesheet" href="styles.css?v=header-settings-position-109">
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <button id="settings-toggle" class="settings-toggle" type="button" title="Einstellungen" aria-label="Einstellungen" aria-expanded="false" aria-controls="chart-settings">⚙</button>
+      <div id="chart-settings" class="settings-popover" hidden>
+        <strong>Einstellungen</strong>
+        <label><input id="mobile-view" type="checkbox"> Mobile Ansicht</label>
+        <label><input id="election-dates" type="checkbox" checked> Wahltermine</label>
+      </div>
+      <div>
+        <div class="title-lockup">
+          <h1>Sonntagsfragen</h1>
+          <p class="creator">visualizer by <a href="https://www.instagram.com/charavision/" target="_blank" rel="noreferrer">charavision</a></p>
+        </div>
+          <p class="intro">Die aktuellen Sonntagsfragen von Bund &amp; Ländern im Vergleich.</p>
+      </div>
+      <div class="status" aria-live="polite">
+        <span>Stand</span>
+        <strong id="updated">wird geladen …</strong>
+      </div>
+      <form id="code-input" class="code-box code-input" novalidate>
+        <label class="sr-only" for="input-code">Input-Code</label>
+        <input id="input-code" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Input-Code">
+        <button type="submit">Anwenden</button>
+        <small id="code-message" aria-live="polite"></small>
+      </form>
+    </header>
 
+    <section class="controls" aria-label="Auswahl">
+      <div class="control-group regions">
+        <div class="control-heading">
+          <div class="cluster-heading"><button class="cluster-mode-button" type="button" data-group="party">Parlament</button><span class="comparison-state">wird verglichen</span></div>
+          <button id="region-toggle" class="text-button" type="button">Alle auswählen</button>
+        </div>
+        <div id="region-options" class="option-grid"></div>
+        <p class="region-legend"><span aria-hidden="true">📅</span> = Nächster Wahltermin</p>
+      </div>
+
+      <div class="control-group">
+        <div class="control-heading">
+          <div class="cluster-heading"><button class="cluster-mode-button" type="button" data-group="region">Parteien</button><span class="comparison-state">werden verglichen</span></div>
+          <button id="party-toggle" class="text-button" type="button">Alle abwählen</button>
+        </div>
+        <div id="party-options" class="party-options"></div>
+      </div>
+
+      <div class="control-group poll-picker">
+        <div class="control-heading">
+          <h2>Umfragen vergleichen</h2>
+          <span class="desktop-poll-hint">maximal die letzten drei</span>
+          <span class="mobile-poll-hint">max. die letzten drei</span>
+        </div>
+        <div class="poll-actions">
+          <div id="poll-options" class="poll-options"></div>
+          <div class="average-choice choice">
+            <input id="average-mode" type="checkbox">
+            <label for="average-mode" aria-label="Durchschnitt anzeigen"><span class="average-symbol" aria-hidden="true">Ø</span><span class="average-text">Durchschnitt anzeigen</span></label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chart-section" aria-labelledby="chart-title">
+      <div class="chart-heading">
+        <div>
+          <h2 id="chart-title">Umfrageverlauf</h2>
+        </div>
+        <div class="chart-heading-actions">
+          <p id="chart-meta" class="chart-meta"></p>
+          <div class="full-region-names-choice choice">
+            <input id="full-region-names" type="checkbox">
+            <label for="full-region-names">Parlamente ausschreiben</label>
+          </div>
+          <div class="since-election-choice choice">
+            <input id="show-since-election" type="checkbox" checked>
+            <label for="show-since-election">Seit Wahl</label>
+          </div>
+        </div>
+      </div>
+      <div id="chart-scroll" class="chart-scroll">
+        <svg id="chart" role="img" aria-labelledby="chart-title chart-description"></svg>
+      </div>
+      <p id="chart-description" class="sr-only"></p>
+      <div id="empty-state" class="empty-state" hidden>Für diese Auswahl sind noch keine Daten verfügbar.</div>
+    </section>
+
+    <section class="outputs" aria-label="Ausgabe">
+      <button id="export-settings-toggle" class="export-settings-toggle" type="button" aria-expanded="false" aria-controls="export-settings">Ausgabeeinstellungen</button>
+      <div id="export-settings" class="export-settings-panel" hidden>
+        <label>Dateiformat <select id="export-format"><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf" selected>PDF</option></select></label>
+        <fieldset><legend>Ausgabeform</legend><label><input type="radio" name="output-shape" value="a4" checked> A4</label><label><input type="radio" name="output-shape" value="tube"> Schlauch</label></fieldset>
+        <fieldset id="a4-orientation-settings"><legend>A4-Ausrichtung</legend><label><input type="radio" name="a4-orientation" value="auto" checked> Automatisch</label><label><input type="radio" name="a4-orientation" value="portrait"> Hochkant</label><label><input type="radio" name="a4-orientation" value="landscape"> Horizontal</label></fieldset>
+        <input id="a4-mode" type="checkbox" checked hidden>
+      </div>
+      <small id="export-summary">– Diagramme auf – Seiten</small>
+      <button id="export-file" class="export-button" type="button">Download</button>
+      <div class="code-box output-code">
+        <label for="output-code">Output-Code</label>
+        <output id="output-code" for="input-code" tabindex="0" title="Code kopieren"></output>
+        <button id="copy-code" type="button">Kopieren</button>
+      </div>
+      <small id="export-message" aria-live="polite"></small>
+    </section>
+
+    <footer>
+      <p>Daten: <a href="https://www.wahlrecht.de/umfragen/" target="_blank" rel="noreferrer">Wahlrecht.de</a>. Die Werte werden automatisiert übernommen; maßgeblich ist die Originalquelle.</p>
+    </footer>
+  </main>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+  <script src="app.js?v=independent-brackets-119" defer></script>
+</body>
+</html>
