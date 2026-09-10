@@ -9,6 +9,7 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urljoin
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -245,7 +246,8 @@ def main() -> None:
         ]
         for region in regions
     }
-    payload = {"updated": date.today().isoformat(), "regions": regions, "parties": PARTIES, "polls": compact_polls, "elections": compact_elections, "nextElections": extract_next_elections()}
+    retrieved_at = datetime.now(ZoneInfo("Europe/Berlin"))
+    payload = {"updated": retrieved_at.date().isoformat(), "updatedAt": retrieved_at.isoformat(), "regions": regions, "parties": PARTIES, "polls": compact_polls, "elections": compact_elections, "nextElections": extract_next_elections()}
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     total = sum(len(v) for v in polls.values())
