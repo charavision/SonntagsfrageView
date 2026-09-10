@@ -581,6 +581,15 @@ function showTooltip(event, region, poll, party, value) {
 }
 function hideTooltip() { els.tooltip.hidden = true; }
 function formatDate(value) { return new Intl.DateTimeFormat("de-DE").format(new Date(`${value}T12:00:00`)); }
+function formatTimestamp(value) {
+  return new Intl.DateTimeFormat("de-DE", {
+    weekday: "long", day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
+  }).format(value instanceof Date ? value : new Date(value));
+}
+function dataRetrievalStamp() {
+  return state.data?.updatedAt ? formatTimestamp(state.data.updatedAt) : `${formatDate(state.data.updated)} · Uhrzeit nicht verfügbar`;
+}
 
 function applyConfigurationCode(text) {
   if (!/^[0-9A-Za-z]{13,14}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
@@ -723,9 +732,9 @@ async function exportChartImage(format = "jpeg") {
   const footerCenter = documentWidth / 2;
   const footerY = headerHeight + viewBox.height + 8;
   const footerDevice = state.mobileView || window.innerWidth < 900 ? "mobil" : "desktop";
-  addText(`${secondStamp} · ${configurationCode()} · ${footerDevice}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
-  addText("Quelle der Daten: Wahlrecht.de", { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
-  addText("© charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
+  addText(`Code: ${configurationCode()} · Gerät: ${footerDevice} · ${secondStamp}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
+  addText(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
+  addText("© 2026 charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
 
   const rootStyle = getComputedStyle(document.documentElement);
   let source = new XMLSerializer().serializeToString(documentSvg).replace(/var\((--[\w-]+)\)/g, (_, name) => rootStyle.getPropertyValue(name).trim());
@@ -1059,11 +1068,11 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       group.items.forEach((item, itemIndex) => text(item, { x: groupX, y: groupY + 16 + itemIndex * 11, fill: "#9bb0c9", "font-size": 9.33 }));
     });
   }
-  const footerStamp = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(now);
+  const footerStamp = formatTimestamp(now);
   const footerDevice = state.mobileView || window.innerWidth < 900 ? "mobil" : "desktop";
-  text(`${footerStamp} · ${configurationCode()} · ${footerDevice}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
-  text("Quelle der Daten: Wahlrecht.de", { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
-  text("© charavision", { x: width / 2, y: height - 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 9, "font-weight": 700 });
+  text(`Code: ${configurationCode()} · Gerät: ${footerDevice} · ${footerStamp}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
+  text(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
+  text("© 2026 charavision", { x: width / 2, y: height - 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 9, "font-weight": 700 });
   text(`Seite ${pageNumber} / ${pageCount}`, { x: width - 42, y: height - 30, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
   return page;
 }
