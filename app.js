@@ -19,7 +19,7 @@ const REGION_CODES = {
 };
 
 const startsMobile = window.matchMedia("(max-width: 900px)").matches;
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, export3d: false, groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -52,6 +52,25 @@ function updateComparisonButtons() {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   });
+  document.querySelectorAll("#selection-tabs button").forEach(button => {
+    const grouped = (button.dataset.panel === "regions" && state.groupBy === "party") || (button.dataset.panel === "parties" && state.groupBy === "region");
+    button.classList.toggle("grouped", grouped);
+  });
+  const groupingSwitch = document.querySelector("#tab-grouping-switch");
+  if (groupingSwitch) groupingSwitch.checked = state.groupBy === "party";
+}
+
+function updateSelectionTabMode() {
+  document.body.classList.toggle("selection-tab-mode", state.tabMode);
+  document.querySelector("#selection-tabs").hidden = !state.tabMode;
+  document.querySelector("#tab-grouping").hidden = !state.tabMode;
+  document.querySelectorAll("[data-selection-panel]").forEach(panel => { panel.hidden = state.tabMode && panel.dataset.selectionPanel !== state.selectionTab; });
+  document.querySelectorAll("#selection-tabs button").forEach(button => button.classList.toggle("active", button.dataset.panel === state.selectionTab));
+  const headerToggle = document.querySelector("#header-tab-mode");
+  if (headerToggle) headerToggle.checked = state.tabMode;
+  const averageToggle = document.querySelector("#tab-average-switch");
+  if (averageToggle) averageToggle.checked = state.averageMode;
+  updateComparisonButtons();
 }
 
 function updateElectionVisibility() {
@@ -162,7 +181,8 @@ function updatePollOptions(reset = false) {
     wrap.style.setProperty("--poll-opacity", [1, .62, .34][index]);
     const id = `poll-${index}`;
     const detail = poll ? `${poll.institute} · ${formatDate(poll.date)}` : `für jedes ausgewählte Parlament`;
-    wrap.innerHTML = `<input id="${id}" type="checkbox" value="${index}" ${state.selectedPollRanks.has(index) ? "checked" : ""}><label for="${id}"><span><strong>${index === 0 ? "Neueste" : `${index + 1}. jüngste`}</strong><small>${detail}</small></span></label>`;
+    const expandedDetail = poll ? [poll.client, poll.institute, formatDate(poll.date)].filter(Boolean).join(" · ") : detail;
+    wrap.innerHTML = `<input id="${id}" type="checkbox" value="${index}" ${state.selectedPollRanks.has(index) ? "checked" : ""}><label for="${id}"><span><strong>${index === 0 ? "Neueste" : `${index + 1}. jüngste`}</strong><small class="poll-basic-detail">${detail}</small><small class="poll-tab-detail">${expandedDetail}</small></span></label>`;
     const input = wrap.querySelector("input");
     input.addEventListener("change", () => {
       if (input.checked) state.selectedPollRanks.add(index); else state.selectedPollRanks.delete(index);
@@ -1403,18 +1423,31 @@ async function reportRequest(path, options = {}) {
 }
 
 const developerFeatures = [
-  ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["dataUpdate", "Datenupdate"],
+  ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
   ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"], ["brackets", "Klammern"],
   ["labels", "Beschriftungen"], ["barColors", "Balkenfarbe"], ["percentValues", "Prozentwerte"],
   ["lut", "LUT"], ["background", "Hintergrund"], ["preview", "Vorschau"],
   ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
 ];
 const defaultDeveloperSettings = () => ({
-  mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "mobile" : key !== "export3d" }])),
-  desktop: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "desktop" : key !== "export3d" }]))
+  mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "mobile" : !["export3d", "tabMode"].includes(key) }])),
+  desktop: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "desktop" : !["export3d", "tabMode"].includes(key) }]))
 });
 let developerSettings = defaultDeveloperSettings();
 let publicDeveloperSettingsPromise;
+const completeDeveloperSettings = input => {
+  const defaults = defaultDeveloperSettings();
+  ["mobile", "desktop"].forEach(platform => developerFeatures.forEach(([key]) => {
+    if (input?.[platform]?.[key]) defaults[platform][key] = input[platform][key];
+  }));
+  if (!input?.mobile?.tabMode || !input?.desktop?.tabMode) {
+    try {
+      const local = JSON.parse(localStorage.getItem("developer-tab-mode") || "null");
+      if (local) ["mobile", "desktop"].forEach(platform => { if (typeof local[platform] === "boolean") defaults[platform].tabMode.value = local[platform]; });
+    } catch (error) { /* Ungültige alte lokale Einstellung ignorieren. */ }
+  }
+  return defaults;
+};
 
 async function fetchDeveloperSettings(force = false) {
   if (force) publicDeveloperSettingsPromise = null;
@@ -1422,7 +1455,7 @@ async function fetchDeveloperSettings(force = false) {
     .then(async response => {
       const payload = await response.json();
       if (!response.ok || !payload.settings) throw new Error("Entwicklereinstellungen sind nicht erreichbar.");
-      return payload.settings;
+      return completeDeveloperSettings(payload.settings);
     })
     .catch(() => defaultDeveloperSettings());
   developerSettings = await publicDeveloperSettingsPromise;
@@ -1461,6 +1494,9 @@ function applyDeveloperSettings() {
   state.showBackground = Boolean(settings.background.value);
   state.a4Mode = Boolean(settings.a4Output.value);
   state.export3d = Boolean(settings.export3d.value);
+  state.tabMode = Boolean(settings.tabMode?.visible && settings.tabMode?.value);
+  document.querySelector("#header-tab-mode-setting").hidden = !settings.tabMode?.visible;
+  updateSelectionTabMode();
   setVisible("#chart-settings .view-switch", settings.deviceForce.visible);
   setVisible("#update-data", settings.dataUpdate.visible);
   setVisible(".full-region-names-choice", settings.abbreviations.visible);
@@ -1520,8 +1556,16 @@ function renderDeveloperSettings(readOnly) {
         cell.append(visibleLabel, valueLabel);
       }
       value.disabled = readOnly;
-      visible.addEventListener("change", () => { developerSettings[platform][key].visible = visible.checked; saveDeveloperSettings(); });
-      value.addEventListener("change", () => { developerSettings[platform][key].value = key === "deviceForce" ? value.value : value.checked; saveDeveloperSettings(); });
+      visible.addEventListener("change", () => {
+        developerSettings[platform][key].visible = visible.checked;
+        saveDeveloperSettings();
+        if (platform === (startsMobile ? "mobile" : "desktop")) { applyDeveloperSettings(); if (state.data) render(false); }
+      });
+      value.addEventListener("change", () => {
+        developerSettings[platform][key].value = key === "deviceForce" ? value.value : value.checked;
+        saveDeveloperSettings();
+        if (platform === (startsMobile ? "mobile" : "desktop")) { applyDeveloperSettings(); if (state.data) render(false); }
+      });
       if (key === "deviceForce") cell.append(visibleLabel, value);
       row.append(cell);
     });
@@ -1536,8 +1580,12 @@ function saveDeveloperSettings() {
   message.textContent = "Änderungen werden gespeichert …";
   developerSaveTimer = setTimeout(async () => {
     try {
+      const pending = structuredClone(developerSettings);
+      localStorage.setItem("developer-tab-mode", JSON.stringify({ mobile: pending.mobile.tabMode.value, desktop: pending.desktop.tabMode.value }));
       const payload = await reportRequest("/settings/developer", { method: "PATCH", body: JSON.stringify({ settings: developerSettings }) });
-      developerSettings = payload.settings;
+      developerSettings = completeDeveloperSettings(payload.settings);
+      if (!payload.settings?.mobile?.tabMode) developerSettings.mobile.tabMode = pending.mobile.tabMode;
+      if (!payload.settings?.desktop?.tabMode) developerSettings.desktop.tabMode = pending.desktop.tabMode;
       publicDeveloperSettingsPromise = Promise.resolve(developerSettings);
       message.textContent = "Einstellungen gespeichert.";
     } catch (error) { message.textContent = error.message; }
@@ -1924,6 +1972,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     document.querySelector("#average-mode").addEventListener("change", event => {
       state.averageMode = event.currentTarget.checked;
+      document.querySelector("#tab-average-switch").checked = state.averageMode;
       render();
     });
     els.mobileView.addEventListener("change", event => {
@@ -1934,6 +1983,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     els.electionDates.addEventListener("change", event => {
       state.electionDates = event.currentTarget.checked;
       render(false);
+    });
+    document.querySelector("#header-tab-mode").addEventListener("change", event => {
+      state.tabMode = event.currentTarget.checked;
+      updateSelectionTabMode();
     });
     els.fullRegionNames.addEventListener("change", event => {
       state.fullRegionNames = !event.currentTarget.checked;
@@ -1971,6 +2024,21 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       state.groupBy = event.currentTarget.dataset.group;
       render();
     }));
+    document.querySelectorAll("#selection-tabs button").forEach(button => button.addEventListener("click", event => {
+      const selectedPanel = event.currentTarget.dataset.panel;
+      state.selectionTab = state.selectionTab === selectedPanel ? "" : selectedPanel;
+      document.querySelectorAll("[data-selection-panel]").forEach(panel => { panel.hidden = panel.dataset.selectionPanel !== state.selectionTab; });
+      document.querySelectorAll("#selection-tabs button").forEach(tab => tab.classList.toggle("active", tab.dataset.panel === state.selectionTab));
+    }));
+    document.querySelector("#tab-grouping-switch").addEventListener("change", event => {
+      state.groupBy = event.currentTarget.checked ? "party" : "region";
+      render();
+    });
+    document.querySelector("#tab-average-switch").addEventListener("change", event => {
+      state.averageMode = event.currentTarget.checked;
+      document.querySelector("#average-mode").checked = state.averageMode;
+      render();
+    });
     const togglePanel = (button, panel) => button.addEventListener("click", () => {
       panel.hidden = !panel.hidden;
       button.setAttribute("aria-expanded", String(!panel.hidden));
@@ -1978,6 +2046,12 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     togglePanel(document.querySelector("#settings-toggle"), document.querySelector("#chart-settings"));
     togglePanel(document.querySelector("#chart-view-settings-toggle"), document.querySelector("#chart-view-settings"));
     document.addEventListener("pointerdown", event => {
+      const mainPanel = document.querySelector("#chart-settings");
+      const mainButton = document.querySelector("#settings-toggle");
+      if (!mainPanel.hidden && !mainPanel.contains(event.target) && !mainButton.contains(event.target)) {
+        mainPanel.hidden = true;
+        mainButton.setAttribute("aria-expanded", "false");
+      }
       const menu = document.querySelector(".chart-view-menu");
       const panel = document.querySelector("#chart-view-settings");
       const button = document.querySelector("#chart-view-settings-toggle");
