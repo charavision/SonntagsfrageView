@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-183">
+  <link rel="stylesheet" href="styles.css?v=report-book-184">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro" aria-label="Sonntagsfragen wird gestartet">
@@ -186,24 +186,25 @@
           <span id="report-session-work"></span>
         </div>
         <div class="report-session-actions">
-          <button id="report-accounts-open" type="button" hidden>Accounts verwalten</button>
-          <button id="report-developer-open" type="button">Entwicklereinstellungen ansehen</button>
-          <button id="report-app-open" type="button" hidden>App</button>
+          <button id="report-book-open" class="report-tab" type="button">Meldebuch</button>
+          <button id="report-accounts-open" class="report-tab" type="button" hidden>Accounts</button>
+          <button id="report-developer-open" class="report-tab" type="button">Entwicklereinstellungen</button>
+          <button id="report-app-open" class="report-tab" type="button" hidden>App</button>
         </div>
       </section>
       <section id="report-app" class="report-app" hidden aria-labelledby="report-app-title">
-        <div class="report-list-heading"><h2 id="report-app-title">App</h2><button id="report-app-close" class="panel-close" type="button" aria-label="App schließen">×</button></div>
+        <div class="report-list-heading"><h2 id="report-app-title">App</h2></div>
         <div class="report-app-row"><button id="android-app-download" type="button">Android</button><span>Version <strong id="android-app-version">wird geladen …</strong></span></div>
         <small id="android-app-message" aria-live="polite"></small>
       </section>
       <section id="report-developer" class="report-developer" hidden aria-labelledby="report-developer-title">
-        <div class="report-list-heading"><h2 id="report-developer-title">Entwicklereinstellungen</h2><button id="report-developer-close" class="panel-close" type="button" aria-label="Entwicklereinstellungen schließen">×</button></div>
+        <div class="report-list-heading"><h2 id="report-developer-title">Entwicklereinstellungen</h2></div>
         <p id="report-developer-note"></p>
         <div id="report-developer-list" class="report-developer-list"></div>
         <small id="report-developer-message" aria-live="polite"></small>
       </section>
       <section id="report-accounts" class="report-accounts" hidden aria-labelledby="report-accounts-title">
-        <div class="report-list-heading"><h2 id="report-accounts-title">Accounts</h2><button id="report-accounts-close" class="panel-close" type="button" aria-label="Accounts schließen">×</button></div>
+        <div class="report-list-heading"><h2 id="report-accounts-title">Accounts</h2></div>
         <div id="report-account-list" class="report-account-list"></div>
         <form id="report-account-form" class="report-account-form">
           <h3>Neuer Account</h3>
@@ -225,7 +226,7 @@
           <small id="report-form-message" aria-live="polite"></small>
         </form>
         <section class="report-list-section" aria-labelledby="report-list-title">
-          <div class="report-list-heading"><h2 id="report-list-title">Einträge</h2><button id="report-refresh" type="button">Aktualisieren</button></div>
+          <div class="report-list-heading"><h2 id="report-list-title">Einträge</h2><div class="report-list-actions"><button id="report-refresh" class="round-action" type="button" title="Aktualisieren" aria-label="Einträge aktualisieren">↻</button><button id="report-sort" class="round-action" type="button" title="Neu nach alt" aria-label="Sortierung der Einträge ändern">↕</button></div></div>
           <div id="report-list" class="report-list"></div>
         </section>
       </div>
@@ -251,6 +252,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-183" defer></script>
+  <script src="app.js?v=report-book-184" defer></script>
 </body>
 </html>

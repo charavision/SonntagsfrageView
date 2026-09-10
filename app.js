@@ -1384,6 +1384,7 @@ function downloadBlob(blob, filename) {
 const reportApiUrl = String(window.REPORT_API_URL || "").replace(/\/$/, "");
 let reportPin = "";
 let currentReportRole = "";
+let reportsNewestFirst = true;
 const reportIdentities = {
   Admin: { person: "Sebastian", work: "Admin" },
   Helper2: { person: "Theresa", work: "Helper2" },
@@ -1578,7 +1579,10 @@ async function loadReports() {
   const { reports } = await reportRequest("/reports");
   list.replaceChildren();
   if (!reports.length) { list.innerHTML = '<p class="report-empty">Noch keine Einträge vorhanden.</p>'; return; }
-  reports.forEach(report => {
+  [...reports].sort((left, right) => {
+    const difference = new Date(right.created_at) - new Date(left.created_at);
+    return reportsNewestFirst ? difference : -difference;
+  }).forEach(report => {
     const article = document.createElement("article");
     article.className = "report-entry";
     const head = document.createElement("div"); head.className = "report-entry-head";
@@ -1998,6 +2002,23 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#preview-zoom-out").addEventListener("click", () => changePreviewZoom(-1));
     document.querySelector("#preview-zoom-in").addEventListener("click", () => changePreviewZoom(1));
     const reportDialog = document.querySelector("#report-dialog");
+    const reportTabs = {
+      "report-book-open": "report-book",
+      "report-accounts-open": "report-accounts",
+      "report-developer-open": "report-developer",
+      "report-app-open": "report-app"
+    };
+    const toggleReportTab = button => {
+      const targetId = reportTabs[button.id];
+      const target = document.querySelector(`#${targetId}`);
+      const willOpen = target.hidden;
+      Object.entries(reportTabs).forEach(([buttonId, panelId]) => {
+        document.querySelector(`#${panelId}`).hidden = true;
+        document.querySelector(`#${buttonId}`).classList.remove("active");
+      });
+      if (willOpen) { target.hidden = false; button.classList.add("active"); }
+      return willOpen;
+    };
     const pinFields = [...document.querySelectorAll("#report-pin input")];
     const readReportPin = () => pinFields.map(input => input.value).join("").toUpperCase();
     pinFields.forEach((input, index) => {
@@ -2039,6 +2060,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-developer-open").textContent = currentReportRole === "Admin" ? "Entwicklereinstellungen" : "Entwicklereinstellungen ansehen";
         document.querySelector("#report-logout").hidden = false;
         document.querySelector("#report-book").hidden = false;
+        document.querySelector("#report-book-open").classList.add("active");
         const identityHeader = document.querySelector(".report-session-user");
         identityHeader.classList.remove("is-revealed");
         requestAnimationFrame(() => identityHeader.classList.add("is-revealed"));
@@ -2060,14 +2082,12 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       pinFields[0].focus();
     });
     document.querySelector("#report-accounts-open").addEventListener("click", async () => {
-      const panel = document.querySelector("#report-accounts");
-      panel.hidden = false;
+      if (!toggleReportTab(document.querySelector("#report-accounts-open"))) return;
       try { await loadReportAccounts(); }
       catch (error) { const list = document.querySelector("#report-account-list"); list.replaceChildren(); const notice = document.createElement("p"); notice.className = "report-empty"; notice.textContent = error.message; list.append(notice); }
     });
     document.querySelector("#report-developer-open").addEventListener("click", async () => {
-      const panel = document.querySelector("#report-developer");
-      panel.hidden = false;
+      if (!toggleReportTab(document.querySelector("#report-developer-open"))) return;
       document.querySelector("#report-developer-note").textContent = currentReportRole === "Admin"
         ? "Sichtbarkeit und Aktivzustand getrennt für Mobil & App und Desktop festlegen."
         : "Diese Einstellungen können nur von einem Admin verändert werden.";
@@ -2078,13 +2098,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         renderDeveloperSettings(currentReportRole !== "Admin");
       } catch (error) { document.querySelector("#report-developer-message").textContent = error.message; }
     });
-    document.querySelector("#report-developer-close").addEventListener("click", () => { document.querySelector("#report-developer").hidden = true; });
-    document.querySelector("#report-accounts-close").addEventListener("click", () => { document.querySelector("#report-accounts").hidden = true; });
     document.querySelector("#report-app-open").addEventListener("click", () => {
-      document.querySelector("#report-app").hidden = false;
+      if (!toggleReportTab(document.querySelector("#report-app-open"))) return;
       loadAppRelease();
     });
-    document.querySelector("#report-app-close").addEventListener("click", () => { document.querySelector("#report-app").hidden = true; });
+    document.querySelector("#report-book-open").addEventListener("click", () => toggleReportTab(document.querySelector("#report-book-open")));
     document.querySelector("#report-account-form").addEventListener("submit", async event => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -2108,6 +2126,13 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       list.replaceChildren();
       const message = document.createElement("p"); message.className = "report-empty"; message.textContent = error.message; list.append(message);
     }));
+    document.querySelector("#report-sort").addEventListener("click", event => {
+      reportsNewestFirst = !reportsNewestFirst;
+      event.currentTarget.textContent = reportsNewestFirst ? "↓" : "↑";
+      event.currentTarget.title = reportsNewestFirst ? "Neu nach alt" : "Alt nach neu";
+      event.currentTarget.setAttribute("aria-label", `Einträge ${event.currentTarget.title} sortieren`);
+      loadReports().catch(() => {});
+    });
     document.querySelector("#report-form").addEventListener("submit", async event => {
       event.preventDefault();
       const form = event.currentTarget;

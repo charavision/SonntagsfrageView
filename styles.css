@@ -29,7 +29,7 @@ body.intro-running.intro-reveal main { opacity: 1; transition: opacity .9s ease;
 .report-header-actions { display: flex; align-items: center; gap: 8px; }
 .preview-header .report-logout-icon[hidden] { display: none; }
 .preview-header .report-logout-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 0 rgba(255,255,255,.28)) drop-shadow(0 2px 2px rgba(0,0,0,.65)); }
-.report-developer, .report-app { margin-bottom: 24px; padding: 16px; border: 1px solid var(--line); border-radius: 13px; background: rgba(10,27,49,.96); }
+.report-developer, .report-app { margin-bottom: 24px; padding: 18px 0 0; border: 0; background: transparent; }
 .report-developer > p { margin: 4px 0 14px; color: var(--muted); font-size: 12px; }
 .report-developer-list { display: grid; gap: 8px; }
 .developer-head, .developer-row { display: grid; grid-template-columns: minmax(145px, 1.2fr) repeat(2, minmax(210px, 1fr)); gap: 10px; align-items: center; }
@@ -287,13 +287,15 @@ footer a { color: inherit; }
 .report-pin-fields input:focus { border-color: var(--accent); outline: 2px solid rgba(71,205,255,.24); box-shadow: 0 0 18px rgba(71,205,255,.16); }
 .report-login button, .report-form button, .report-list-heading button { min-height: 38px; padding: 8px 12px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
 .report-login small, .report-form small { min-height: 1.2em; color: var(--muted); }
-.report-session { max-width: 520px; margin: 8px auto 26px; padding: 0; }
+.report-session { margin: 8px auto 18px; padding: 0; }
 .report-session-user { display: grid; gap: 2px; text-align: center; }
 .report-session-user strong { color: #fff; font-size: 21px; text-shadow: 0 0 7px rgba(255,255,255,.75), 0 0 20px rgba(89,217,255,.5); }
 .report-session-user span { color: var(--accent); font-size: 12px; font-weight: 850; letter-spacing: .12em; text-shadow: 0 0 7px rgba(89,217,255,.9), 0 0 20px rgba(89,217,255,.65), 0 0 34px rgba(194,82,255,.35); }
-.report-session-actions { display: flex; justify-content: center; gap: 9px; margin-top: 12px; }
-.report-session-actions button, .report-account-form button { min-height: 36px; padding: 7px 12px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
-.report-accounts { margin-bottom: 24px; padding: 16px; border: 1px solid var(--line); border-radius: 13px; background: rgba(10,27,49,.96); }
+.report-session-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 2px; margin-top: 16px; border-bottom: 1px solid var(--line); }
+.report-session-actions .report-tab { min-height: 38px; margin-bottom: -1px; padding: 8px 14px; border: 1px solid transparent; border-bottom-color: var(--line); border-radius: 9px 9px 0 0; background: transparent; color: var(--muted); cursor: pointer; font-weight: 800; }
+.report-session-actions .report-tab.active { border-color: var(--line); border-bottom-color: #071326; background: #071326; color: var(--accent); }
+.report-account-form button { min-height: 36px; padding: 7px 12px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
+.report-accounts { margin-bottom: 24px; padding: 18px 0 0; border: 0; background: transparent; }
 .report-account-list { display: grid; gap: 8px; margin: 14px 0 20px; }
 .report-account-row { padding: 10px 11px; border: 1px solid rgba(75,109,150,.6); border-radius: 8px; }
 .report-account-main { display: flex; align-items: center; gap: 9px; }
@@ -323,6 +325,8 @@ footer a { color: inherit; }
 .report-list-section { margin-top: 26px; }
 .report-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .report-list-heading h2 { margin: 0; }
+.report-list-actions { display: flex; gap: 7px; }
+.report-list-heading .round-action { display: grid; width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0; place-items: center; border-radius: 50%; font-size: 21px; line-height: 1; }
 .report-list { display: grid; gap: 10px; margin-top: 12px; }
 .report-entry { padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: rgba(16,31,56,.75); }
 .report-entry-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; }
