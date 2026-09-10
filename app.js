@@ -818,6 +818,9 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   page.append(svgEl("rect", { width, height, fill: "url(#page-glow)" }));
   const text = (value, attrs = {}) => { const node = svgEl("text", { fill: "#f4f8ff", style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', ...attrs }); node.textContent = value; page.append(node); return node; };
   const now = new Date();
+  const minuteStamp = new Intl.DateTimeFormat("de-DE", {
+    weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+  }).format(now);
   const landscapeHeader = width > 1400;
   const brandSize = landscapeHeader ? 118 : 84;
   const brandY = landscapeHeader ? 128 : 102;
