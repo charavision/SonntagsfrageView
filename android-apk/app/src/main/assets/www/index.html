@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-216">
+  <link rel="stylesheet" href="styles.css?v=report-book-221">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -17,7 +17,6 @@
       <strong>Sonntagsfragen</strong>
       <small>visualizer by <b>charavision</b></small>
     </div>
-    <button id="intro-skip" type="button" aria-label="Intro überspringen">Überspringen</button>
   </div>
   <main>
     <header class="hero">
@@ -100,45 +99,43 @@
           <div class="chart-view-menu">
             <button id="chart-view-settings-toggle" class="chart-view-settings-toggle" type="button" aria-label="Ansicht einstellen" aria-expanded="false" aria-controls="chart-view-settings">⚙</button>
             <div id="chart-view-settings" class="chart-view-settings">
-              <div class="full-region-names-choice choice">
-                <input id="full-region-names" type="checkbox" checked>
-                <label for="full-region-names">Abkürzungen</label>
-              </div>
-              <div class="since-election-choice choice">
-                <input id="show-since-election" type="checkbox" checked>
-                <label for="show-since-election">Seit Wahl</label>
-              </div>
-              <div class="brackets-choice choice">
-                <input id="show-brackets" type="checkbox" checked>
-                <label for="show-brackets">Klammern</label>
-              </div>
               <div class="labels-choice choice">
-                <input id="show-labels" type="checkbox" checked>
-                <label for="show-labels">Beschriftung</label>
+                <input id="show-labels" type="checkbox" checked hidden>
+                <button id="labels-menu-toggle" class="labels-menu-toggle" type="button" aria-expanded="false"><span class="labels-check" aria-label="Beschriftung ein- oder ausschalten">✓</span><span>Beschriftung</span></button>
+                <div class="label-options" aria-label="Optionen für Beschriftung">
+                  <input id="full-region-names" type="checkbox" checked hidden>
+                  <button id="abbreviation-mode" class="label-option-row" type="button" data-value="on"><span>Abkürzungen:</span><strong class="label-option-value">An</strong></button>
+                  <button id="region-label-mode" class="label-option-row" type="button" data-value="auto"><span>Parlament:</span><strong class="label-option-value">Auto</strong></button>
+                  <button id="party-label-mode" class="label-option-row" type="button" data-value="auto"><span>Parteien:</span><strong class="label-option-value">Auto</strong></button>
+                  <button id="percent-label-mode" class="label-option-row" type="button" data-value="without"><span>Prozentwerte:</span><strong class="label-option-value">Ohne %</strong></button>
+                  <button id="since-election-mode" class="label-option-row" type="button" data-value="color"><span>Seit Wahl:</span><strong class="label-option-value">Farbig</strong></button>
+                </div>
               </div>
               <div class="bar-colors-choice choice">
                 <input id="show-bar-colors" type="checkbox" checked>
                 <label for="show-bar-colors">Balkenfarben</label>
               </div>
-              <div class="percent-values-choice choice">
-                <input id="show-percent-values" type="checkbox" checked>
-                <label for="show-percent-values">Prozentwerte</label>
-              </div>
+              <input id="show-since-election" type="checkbox" checked hidden>
+              <input id="show-percent-values" type="checkbox" checked hidden>
               <div class="lut-choice choice">
-                <input id="show-lut" type="checkbox" checked>
-                <label for="show-lut">LUT</label>
+                <input id="show-lut" type="checkbox" checked hidden>
+                <button id="lut-menu-toggle" class="lut-menu-toggle" type="button" aria-expanded="false"><span class="lut-check" aria-label="LUT ein- oder ausschalten">✓</span><span>LUT</span></button>
+                <div class="lut-options" aria-label="Optionen für LUT">
+                  <input id="show-background" type="checkbox" checked hidden>
+                  <input id="show-brackets" type="checkbox" checked hidden>
+                  <button id="y-axis-mode" class="lut-option-row" type="button" data-value="dynamic"><span>Y-Achse:</span><strong class="label-option-value">Dynamisch</strong></button>
+                  <button id="background-mode" class="lut-option-row" type="button" data-value="on"><span>Hintergrund:</span><strong class="label-option-value">An</strong></button>
+                  <button id="brackets-mode" class="lut-option-row" type="button" data-value="on"><span>Klammern:</span><strong class="label-option-value">An</strong></button>
+                </div>
               </div>
-              <div class="background-choice choice">
-                <input id="show-background" type="checkbox" checked>
-                <label for="show-background">Hintergrund</label>
-              </div>
-              <div class="view-zoom-choice choice">
-                <input id="view-zoom-enabled" type="checkbox" checked>
-                <label for="view-zoom-enabled">Zoom</label>
-              </div>
+              <input id="view-zoom-enabled" type="checkbox" checked hidden>
               <div class="fullscreen-choice choice">
                 <input id="fullscreen-enabled" type="checkbox" checked>
                 <label for="fullscreen-enabled">Vollbild</label>
+              </div>
+              <div class="view-3d-choice choice">
+                <input id="export-3d" type="checkbox">
+                <label for="export-3d">3D</label>
               </div>
             </div>
           </div>
@@ -147,9 +144,12 @@
       <div class="chart-view-frame">
         <button id="view-fullscreen-enter" class="view-fullscreen-enter" type="button" aria-label="Vollbild öffnen">⛶</button>
         <button id="fullscreen-view-settings-toggle" class="fullscreen-view-settings-toggle" type="button" aria-label="View-Einstellungen anzeigen" aria-expanded="false">⚙</button>
-        <button id="fullscreen-selection-toggle" class="fullscreen-tool fullscreen-selection-toggle" type="button" aria-label="Parlamente, Parteien und Umfragen anzeigen" aria-expanded="false">⌨</button>
-        <button id="fullscreen-output-toggle" class="fullscreen-tool fullscreen-output-toggle" type="button" aria-label="Ausgabe, Vorschau und Konfiguration anzeigen" aria-expanded="false">💾</button>
-        <button id="fullscreen-help" class="fullscreen-help" type="button" aria-label="Meldungsbuch öffnen">?</button>
+        <button id="fullscreen-selection-toggle" class="fullscreen-tool fullscreen-selection-toggle" type="button" aria-label="Parlamente, Parteien und Umfragen anzeigen" aria-expanded="false"><svg class="bar-chart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9H4Zm6 0V4h4v16h-4Zm6 0v-6h4v6h-4Z"/></svg></button>
+        <button id="fullscreen-output-toggle" class="fullscreen-tool fullscreen-output-toggle" type="button" aria-label="Ausgabe und Download anzeigen" aria-expanded="false">⬇</button>
+        <button id="fullscreen-help" class="fullscreen-help" type="button" aria-label="Info öffnen">i</button>
+        <button id="ui-scale-toggle" class="ui-scale-toggle" type="button" aria-label="Größe der Bedienelemente einstellen" aria-expanded="false">⌕</button>
+        <div id="ui-scale-panel" class="ui-scale-panel" hidden><label for="ui-scale-range">Bedienelemente <strong id="ui-scale-value">100 %</strong></label><input id="ui-scale-range" type="range" min="50" max="300" step="10" value="100"></div>
+        <button id="project-picker-toggle" class="project-picker-toggle" type="button" aria-label="Projekte öffnen" hidden>P</button>
         <button id="view-fullscreen-exit" class="view-fullscreen-exit" type="button" aria-label="Vollbild schließen">×</button>
         <div id="chart-scroll" class="chart-scroll">
           <svg id="chart" role="img" aria-labelledby="chart-title chart-description"></svg>
@@ -166,27 +166,27 @@
     </section>
 
     <section class="outputs" aria-label="Ausgabe">
-      <form id="code-input" class="code-box code-input output-input" novalidate>
+      <form id="code-input" class="code-box code-input output-input" novalidate hidden>
         <label class="sr-only" for="input-code">Input Configuration</label>
-        <input id="input-code" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
+        <input id="input-code" maxlength="15" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
         <button type="submit">Anwenden</button>
         <small id="code-message" aria-live="polite"></small>
       </form>
-      <div id="export-settings" class="export-settings-panel" hidden>
+      <div id="export-settings" class="export-settings-panel">
         <label>Dateiformat <select id="export-format"><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf" selected>PDF</option></select></label>
         <fieldset><legend>Ausgabeform</legend><label><input type="radio" name="output-shape" value="a4" checked> A4</label><label><input type="radio" name="output-shape" value="tube"> Schlauch</label></fieldset>
         <fieldset id="a4-orientation-settings"><legend>A4-Ausrichtung</legend><label><input type="radio" name="a4-orientation" value="auto" checked> Automatisch</label><label><input type="radio" name="a4-orientation" value="portrait"> Hochkant</label><label><input type="radio" name="a4-orientation" value="landscape"> Horizontal</label></fieldset>
-        <label><input id="export-3d" type="checkbox"> 3D</label>
         <input id="a4-mode" type="checkbox" checked hidden>
       </div>
       <div class="export-actions">
-        <button id="export-settings-toggle" class="export-settings-toggle icon-action" type="button" aria-expanded="false" aria-controls="export-settings"><span class="relief-icon" aria-hidden="true">⚙</span><span>Ausgabeeinstellungen</span></button>
+        <button id="export-settings-toggle" class="export-settings-toggle icon-action" type="button" aria-expanded="true" aria-controls="export-settings" hidden><span class="relief-icon" aria-hidden="true">⚙</span><span>Ausgabeeinstellungen</span></button>
         <button id="preview-export" class="preview-button icon-action" type="button"><span class="relief-icon eye-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></span><span>Vorschau</span></button>
         <button id="export-file" class="export-button" type="button">Download</button>
       </div>
       <small id="export-summary">– Diagramme auf – Seiten</small>
-      <div class="output-code">
+      <div class="output-code" hidden>
         <button id="copy-code" type="button">Copy Configuration</button>
+        <button id="save-project" class="save-project-button" type="button" aria-label="Konfiguration als Projekt speichern" title="Konfiguration speichern" hidden>💾</button>
         <output id="output-code" for="input-code"></output>
       </div>
       <small id="export-message" aria-live="polite"></small>
@@ -194,14 +194,13 @@
 
     <footer>
       <p>Daten: <a href="https://www.wahlrecht.de/umfragen/" target="_blank" rel="noreferrer">Wahlrecht.de</a>. Die Werte werden automatisiert übernommen; maßgeblich ist die Originalquelle. Für die Richtigkeit der Daten ist die Quelle verantwortlich; eine Gewähr wird nicht übernommen.</p>
-      <button id="report-open" class="report-open" type="button">📖 Problem melden / Meldungsbuch</button>
+      <button id="report-open" class="report-open" type="button">ⓘ Info</button>
     </footer>
   </main>
   <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-title">
-    <div class="preview-header"><strong id="report-title">Meldungsbuch</strong><div class="report-header-actions"><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Meldungsbuch schließen">×</button></div></div>
+    <div class="preview-header"><strong id="report-title">Info</strong><div class="report-header-actions"><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Info schließen">×</button></div></div>
     <div class="report-content">
       <form id="report-login" class="report-login">
-        <p>Bitte PIN eingeben, um Meldungen zu lesen oder zu verfassen.</p>
         <fieldset class="report-pin-group">
           <legend>PIN</legend>
           <div id="report-pin" class="report-pin-fields" aria-label="Fünfstellige PIN">
@@ -212,14 +211,9 @@
             <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 5" required>
           </div>
         </fieldset>
-        <button type="submit">Login</button>
+        <button type="submit">Log in</button>
+        <button id="start-without-login" class="start-without-login" type="button">Ohne Login</button>
         <small id="report-login-message" aria-live="polite"></small>
-        <div id="fullscreen-report-tools" class="fullscreen-report-tools">
-          <button id="report-update-data" type="button">Datenupdate</button>
-          <small id="report-data-stand"></small>
-          <small class="report-data-hint">Daten: Wahlrecht.de. Maßgeblich ist die Originalquelle; für die Richtigkeit der Daten wird keine Gewähr übernommen.</small>
-          <div class="view-switch"><span>Desktop</span><label class="switch"><input id="report-mobile-view" type="checkbox" aria-label="Ansicht zwischen Desktop und Mobil wechseln"><span></span></label><span>Mobil</span></div>
-        </div>
       </form>
       <section id="report-session" class="report-session" hidden aria-live="polite">
         <div class="report-session-user">
@@ -228,9 +222,19 @@
         </div>
         <div class="report-session-actions">
           <button id="report-book-open" class="report-tab" type="button">Meldebuch</button>
+          <button id="report-info-open" class="report-tab report-info-tab" type="button" aria-label="Info" title="Info"><span class="report-tab-info-icon" aria-hidden="true">i</span></button>
+          <button id="report-projects-open" class="report-tab" type="button">Projekte</button>
           <button id="report-accounts-open" class="report-tab" type="button" hidden>Accounts</button>
           <button id="report-developer-open" class="report-tab" type="button">Master <span class="report-tab-gear" aria-hidden="true">⚙</span></button>
           <button id="report-app-open" class="report-tab" type="button" hidden>App</button>
+        </div>
+      </section>
+      <section id="report-info" class="report-info" aria-label="Informationen und Datenupdate">
+        <div id="fullscreen-report-tools" class="fullscreen-report-tools">
+          <button id="report-update-data" type="button">Datenupdate</button>
+          <small id="report-data-stand"></small>
+          <small class="report-data-hint">Daten: Wahlrecht.de. Maßgeblich ist die Originalquelle; für die Richtigkeit der Daten wird keine Gewähr übernommen.</small>
+          <div class="view-switch"><span>Desktop</span><label class="switch"><input id="report-mobile-view" type="checkbox" aria-label="Ansicht zwischen Desktop und Mobil wechseln"><span></span></label><span>Mobil</span></div>
         </div>
       </section>
       <section id="report-app" class="report-app" hidden aria-labelledby="report-app-title">
@@ -243,6 +247,24 @@
         <div class="report-app-row"><button id="mac-app-download" type="button">macOS</button><span>Version <strong id="mac-app-version">wird geladen …</strong></span></div>
         <div id="android-intro-update-row" class="report-app-row" hidden><button id="android-intro-update" type="button">Update Intro</button></div>
         <small id="android-app-message" aria-live="polite"></small>
+      </section>
+      <section id="report-projects" class="report-projects" hidden aria-labelledby="report-projects-title">
+        <form id="project-code-input" class="project-code-input">
+          <label class="sr-only" for="project-input-code">Input Configuration</label>
+          <input id="project-input-code" maxlength="15" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
+          <button type="submit">Anwenden</button>
+          <small id="project-code-message" aria-live="polite"></small>
+        </form>
+        <div class="report-list-heading"><h2 id="report-projects-title">Deine Projekte</h2></div>
+        <div id="report-project-list" class="report-project-list"></div>
+        <button id="project-new" class="project-new" type="button">Neu</button>
+        <div id="project-picker-output" class="project-picker-output" hidden>
+          <span>Output Configuration</span>
+          <output id="project-output-code"></output>
+          <button id="project-copy" type="button">Copy Configuration</button>
+          <button id="project-save" type="button" aria-label="Konfiguration als Projekt speichern">💾 Save Project</button>
+          <small id="project-save-message" aria-live="polite"></small>
+        </div>
       </section>
       <section id="report-developer" class="report-developer" hidden aria-labelledby="report-developer-title">
         <div class="report-list-heading"><h2 id="report-developer-title">Entwicklereinstellungen</h2></div>
@@ -302,6 +324,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-216" defer></script>
+  <script src="app.js?v=report-book-221" defer></script>
 </body>
 </html>

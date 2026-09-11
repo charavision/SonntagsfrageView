@@ -1,0 +1,11 @@
+name = "sonntagsfragen-report"
+main = "src/index.js"
+compatibility_date = "2026-09-10"
+
+[vars]
+ALLOWED_ORIGIN = "https://charavision.github.io"
+
+[[d1_databases]]
+binding = "REPORTS"
+database_name = "sonntagsfragen-reports"
+database_id = "27b0dad6-038e-418d-9378-b5c4b6ef2664"

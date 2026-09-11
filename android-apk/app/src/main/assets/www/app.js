@@ -28,7 +28,24 @@ try {
     else if (value && typeof value === "object") storedViewScales[platform] = { x: Number(value.x) || 1, y: Number(value.y) || 1 };
   });
 } catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+let savedProjectConfiguration = null;
+function currentPlatformLabel() {
+  if (window.AndroidApp) return "Android";
+  if (window.MacApp) return "macOS";
+  return state.mobileView ? "Web (Mobil)" : "Web (Desktop)";
+}
+function currentOutputPlatformLabel() {
+  const target = document.querySelector("#report-current-version");
+  const version = window.MacApp ? target?.dataset.macVersion : target?.dataset.androidVersion;
+  return version ? `Version ${version} · ${currentPlatformLabel()}` : currentPlatformLabel();
+}
+function updateReportVersionLabel() {
+  const target = document.querySelector("#report-current-version");
+  if (!target?.dataset.androidVersion) return;
+  const version = window.MacApp ? target.dataset.macVersion : target.dataset.androidVersion;
+  target.textContent = `${version} · ${currentPlatformLabel()}`;
+}
 let fullscreenPreviousTabMode = null;
 function setFullscreenView(active) {
   const wasActive = document.body.classList.contains("view-fullscreen-active");
@@ -55,7 +72,7 @@ const els = {
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataStand: document.querySelector("#report-data-stand"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), abbreviationMode: document.querySelector("#abbreviation-mode"), showSinceElection: document.querySelector("#show-since-election"), sinceElectionMode: document.querySelector("#since-election-mode"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), labelsMenuToggle: document.querySelector("#labels-menu-toggle"), regionLabelMode: document.querySelector("#region-label-mode"), partyLabelMode: document.querySelector("#party-label-mode"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), percentLabelMode: document.querySelector("#percent-label-mode"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataStand: document.querySelector("#report-data-stand"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
@@ -73,6 +90,7 @@ function applyViewMode() {
     els.electionDates.checked = false;
   }
   els.electionDates.disabled = state.mobileView;
+  updateReportVersionLabel();
 }
 
 function updateComparisonButtons() {
@@ -144,9 +162,26 @@ function configurationCode() {
   value = value * partyCount + rankOrdered([...state.parties], partyUniverse);
   value = value * 7n + BigInt(pollMask - 1);
   const orientationBits = state.a4Orientation === "portrait" ? 64n : state.a4Orientation === "landscape" ? 128n : 0n;
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n);
+  const regionLabelBits = BigInt({ auto: 0, 0: 1, 90: 2, off: 3 }[state.regionLabelMode] || 0) << 16n;
+  const partyLabelBits = BigInt({ auto: 0, 0: 1, 90: 2, off: 3 }[state.partyLabelMode] || 0) << 18n;
+  const percentLabelBits = BigInt({ without: 0, with: 1, off: 2 }[state.percentLabelMode] || 0) << 20n;
+  const sinceElectionBits = BigInt({ color: 0, gray: 1, off: 2 }[state.sinceElectionMode] || 0) << 22n;
+  const yAxisBits = BigInt({ dynamic: 0, static: 1, off: 2 }[yAxisMode] || 0) << 24n;
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits;
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
+}
+
+function updateConfigurationCode() {
+  const code = configurationCode();
+  els.outputCode.textContent = code;
+  const projectOutput = document.querySelector("#project-output-code");
+  if (projectOutput) projectOutput.textContent = code;
+  if (savedProjectConfiguration && code !== savedProjectConfiguration && els.exportMessage.textContent === "Projekt zentral gespeichert.") {
+    els.exportMessage.textContent = "";
+    savedProjectConfiguration = null;
+  }
+  return code;
 }
 
 function makeChoice(container, group, value, checked, color, code, nextElection) {
@@ -308,6 +343,35 @@ function formatPercent(value, signed = false, omitZeroDecimal = false) {
   return `${value > 0 ? "+" : "−"}${absolute}`;
 }
 
+const labelModeOptions = {
+  rotation: [["0", "0°"], ["90", "90°"], ["auto", "Auto"], ["off", "Aus"]],
+  percent: [["with", "Mit %"], ["without", "Ohne %"], ["off", "Aus"]],
+  since: [["color", "Farbig"], ["gray", "Grau"], ["off", "Aus"]]
+};
+let yAxisMode = "dynamic";
+function updateYAxisPosition() {
+  const offset = yAxisMode === "static" ? els.scroll.scrollLeft : 0;
+  els.chart.querySelectorAll(".axis-label, .axis-line").forEach(node => {
+    if (yAxisMode === "static") {
+      node.setAttribute("transform", `translate(${offset} 0)`);
+      els.chart.append(node);
+    } else node.removeAttribute("transform");
+  });
+}
+function setCycleButton(button, value, options) {
+  const option = options.find(([key]) => key === value) || options[0];
+  button.dataset.value = option[0];
+  const valueNode = button.querySelector(".label-option-value");
+  if (valueNode) valueNode.textContent = option[1];
+  else button.textContent = option[1];
+}
+function advanceCycleButton(button, options) {
+  const index = options.findIndex(([key]) => key === button.dataset.value);
+  const option = options[(index + 1 + options.length) % options.length];
+  setCycleButton(button, option[0], options);
+  return option[0];
+}
+
 function partyDisplayLabel(party, region) {
   if (party !== "CDU/CSU") return party;
   if (region === "Bundestag") return "CDU/CSU";
@@ -358,8 +422,10 @@ function setViewScale(axis, next) {
 
 function render(animate = true) {
   applyViewMode();
+  const backgroundVisible = state.showLut && state.showBackground;
   els.chartSection.classList.toggle("mobile-view", state.mobileView);
-  els.chartSection.classList.toggle("hide-chart-background", !state.showBackground);
+  els.chartSection.classList.toggle("hide-chart-background", !backgroundVisible);
+  els.chartSection.classList.toggle("view-3d-active", state.export3d);
   updateComparisonButtons();
   updateElectionVisibility();
   const selectedRegions = [...state.regions];
@@ -471,14 +537,15 @@ function render(animate = true) {
       ...(depth > .76 ? { filter: "url(#star-wide)" } : depth > .38 ? { filter: "url(#star-soft)" } : {})
     }));
   }
-  if (state.showBackground) els.chart.append(stars);
+  if (backgroundVisible) els.chart.append(stars);
 
+  const use3dGrid = state.export3d && backgroundVisible;
   const floor = svgEl("g", { class: "perspective-floor", "aria-hidden": "true" });
   const floorLeft = axisX;
   const floorRight = width - margin.right;
   const floorCenter = (floorLeft + floorRight) / 2;
-  const floorBackScale = compact ? .86 : .82;
-  const floorFrontScale = compact ? 1.62 : 1.4;
+  const floorBackScale = use3dGrid ? .82 : compact ? .86 : .82;
+  const floorFrontScale = use3dGrid ? 1.4 : compact ? 1.62 : 1.4;
   const perspectiveFloorLines = [];
   const perspectiveFloorRows = [];
   for (let index = 0; index <= 18; index += 1) {
@@ -487,17 +554,17 @@ function render(animate = true) {
     const foregroundX = floorCenter + (axisPointX - floorCenter) * floorFrontScale;
     const line = svgEl("line", {
       x1: backgroundX, y1: floorBackY, x2: foregroundX, y2: floorFrontY,
-      stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1
+      stroke: "url(#floor-line-fade)", "stroke-width": use3dGrid ? 1 : compact ? .8 : 1
     });
     floor.append(line);
     perspectiveFloorLines.push({ line, axisX: axisPointX, ratio: index / 18 });
   }
   const floorRows = [
     [floorBackY, floorBackScale],
-    [baselineY - (compact ? 12 : 29), compact ? .91 : .88],
-    [baselineY - (compact ? 6 : 14), compact ? .955 : .94],
+    [baselineY - (use3dGrid ? 29 : compact ? 12 : 29), use3dGrid ? .88 : compact ? .91 : .88],
+    [baselineY - (use3dGrid ? 14 : compact ? 6 : 14), use3dGrid ? .94 : compact ? .955 : .94],
     [baselineY, 1],
-    [baselineY + (compact ? 36 : 50), compact ? 1.31 : 1.14],
+    [baselineY + (use3dGrid ? 50 : compact ? 36 : 50), use3dGrid ? 1.14 : compact ? 1.31 : 1.14],
     [floorFrontY, floorFrontScale]
   ];
   floorRows.forEach(([y, scale], index) => {
@@ -505,15 +572,13 @@ function render(animate = true) {
     const rowRight = floorCenter + (floorRight - floorCenter) * scale;
     const line = svgEl("line", {
       x1: rowLeft, y1: y, x2: rowRight, y2: y,
-      stroke: "url(#floor-line-fade)", "stroke-width": compact ? .8 : 1,
+      stroke: "url(#floor-line-fade)", "stroke-width": use3dGrid ? 1 : compact ? .8 : 1,
       ...(index === 0 || index === floorRows.length - 1 ? { filter: "url(#floor-soft)" } : {})
     });
     floor.append(line);
     perspectiveFloorRows.push({ line, scale });
   });
-  if (compact || !state.showBackground) {
-    // On phones the floor is a single static background asset. Keeping these
-    // arrays empty also removes all grid work from the horizontal scroll path.
+  if (!use3dGrid) {
     perspectiveFloorLines.length = 0;
     perspectiveFloorRows.length = 0;
   } else {
@@ -526,9 +591,9 @@ function render(animate = true) {
       els.chart.append(svgEl("line", { x1: axisX, x2: width - margin.right, y1: y, y2: y, class: "grid-line" }));
       const label = svgEl("text", { x: compact ? axisX + 7 : axisX - 10, y: y + 4, "text-anchor": compact ? "start" : "end", class: "axis-label" });
       label.textContent = `${tick} %`;
-      els.chart.append(label);
+      if (yAxisMode !== "off") els.chart.append(label);
     }
-    els.chart.append(svgEl("line", { x1: axisX, x2: axisX, y1: margin.top, y2: height - 18, class: "axis-line" }));
+    if (yAxisMode !== "off") els.chart.append(svgEl("line", { x1: axisX, x2: axisX, y1: margin.top, y2: height - 18, class: "axis-line" }));
   }
 
   const maxBarsPerGroup = Math.max(...groupedBars.map(group => group.bars.length));
@@ -573,7 +638,7 @@ function render(animate = true) {
       });
       const depthX = Math.min(8, Math.max(4, barWidth * .16));
       const depthY = Math.min(6, Math.max(2.5, barWidth * .11));
-      const faces = compact || h <= 0 ? [] : [
+      const faces = h <= 0 || !state.export3d ? [] : [
         svgEl("polygon", {
           points: `${x + barWidth},${y} ${x + barWidth + depthX},${y - depthY} ${x + barWidth + depthX},${margin.top + innerH - depthY} ${x + barWidth},${margin.top + innerH}`,
           fill: state.barColors ? PARTY_META[party].color : "#7d8794", stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4",
@@ -615,12 +680,13 @@ function render(animate = true) {
       }
       if (state.showPercentValues) {
         const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
-        valueLabel.textContent = `${item.average ? "Ø " : ""}${formatPercent(value, false, compact).replace(" %", "")}`;
+        const percentText = formatPercent(value, false, compact);
+        valueLabel.textContent = `${item.average ? "Ø " : ""}${state.percentLabelMode === "with" ? percentText : percentText.replace(" %", "")}`;
         els.chart.append(valueLabel);
         old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       }
       if (state.showSinceElection) {
-        const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${delta >= 0 ? "positive" : "negative"}` });
+        const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${state.sinceElectionMode === "gray" ? "gray" : delta >= 0 ? "positive" : "negative"}` });
         const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
         deltaLine.textContent = formatPercent(delta, true);
         deltaLabel.append(deltaLine);
@@ -652,6 +718,8 @@ function render(animate = true) {
   }
 
   const appendGroupedLabels = (labelFor, y, className, labelKind = "party") => {
+    const labelMode = labelKind === "region" ? state.regionLabelMode : state.partyLabelMode;
+    if (labelMode === "off") return;
     let start = 0;
     while (start < displayedBars.length) {
       const text = labelFor(displayedBars[start]);
@@ -662,7 +730,7 @@ function render(animate = true) {
       const stackedUnion = labelKind === "party" && !compact && text === "CDU/CSU" && count === 1 && parties.length > 1;
       const rotateParty = labelKind === "party" && compact && count === 1 && !stackedUnion;
       const rotateRegion = labelKind === "region" && state.fullRegionNames && (compact ? count < 3 : count === 1 && selectedRegions.length > 1);
-      const rotate = rotateParty || rotateRegion;
+      const rotate = labelMode === "90" || (labelMode === "auto" && (rotateParty || rotateRegion));
       const wrapRegion = labelKind === "region" && state.fullRegionNames && count < 4 && text.includes("-");
       const label = svgEl("text", {
         x, y: stackedUnion ? y - 5 : y, "text-anchor": "middle",
@@ -718,12 +786,13 @@ function render(animate = true) {
   state.chartLayout = nextLayout;
   state.perspective = {
     floorLines: perspectiveFloorLines, floorRows: perspectiveFloorRows, bars: perspectiveBars,
-    floorLeft, floorRight, backScale: floorBackScale, frontScale: floorFrontScale, staticFloor: compact,
-    desktopVanishingPoint: !compact,
+    floorLeft, floorRight, backScale: floorBackScale, frontScale: floorFrontScale, staticFloor: false,
+    desktopVanishingPoint: state.export3d,
     vanishY: baselineY - (18 / yMax) * innerH
   };
   updatePerspective();
-  els.outputCode.textContent = configurationCode();
+  updateYAxisPosition();
+  updateConfigurationCode();
   updateExportSummary();
 }
 
@@ -749,15 +818,59 @@ function dataRetrievalStamp() {
   return state.data?.updatedAt ? formatTimestamp(state.data.updatedAt) : `${formatDate(state.data.updated)} · Uhrzeit nicht verfügbar`;
 }
 
+async function loadProjects() {
+  const list = document.querySelector("#report-project-list");
+  if (!list) return;
+  list.replaceChildren();
+  const { projects } = await reportRequest("/projects");
+  if (!projects.length) {
+    const empty = document.createElement("p");
+    empty.className = "report-empty";
+    empty.textContent = "Noch keine gespeicherten Projekte.";
+    list.append(empty);
+    return;
+  }
+  projects.forEach(project => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "report-project-button";
+    const title = document.createElement("strong");
+    title.textContent = project.title;
+    const detail = document.createElement("span");
+    detail.textContent = project.detail;
+    const meta = document.createElement("small");
+    meta.textContent = `${project.configuration} · ${formatTimestamp(project.updated_at)}`;
+    button.append(title, detail, meta);
+    button.addEventListener("click", () => {
+      applyConfigurationCode(project.configuration);
+      els.inputCode.value = project.configuration;
+      document.querySelector("#report-dialog").classList.remove("project-picker-dialog", "startup-project-dialog");
+      document.querySelector("#report-dialog").close();
+    });
+    list.append(button);
+  });
+}
+
+async function saveCurrentProject() {
+  if (!currentReportRole || !state.data) throw new Error("Bitte zuerst anmelden.");
+  const payload = {
+    configuration: configurationCode(),
+    title: document.querySelector("#chart-title")?.textContent?.trim() || "Sonntagsfragen",
+    detail: document.querySelector("#chart-meta")?.textContent?.trim() || "Aktuelle Konfiguration"
+  };
+  await reportRequest("/projects", { method: "POST", body: JSON.stringify(payload) });
+  return payload.configuration;
+}
+
 function applyConfigurationCode(text) {
-  if (!/^[0-9A-Za-z]{13,14}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
+  if (!/^[0-9A-Za-z]{13,15}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
   const partyUniverse = Object.keys(PARTY_META);
   const partyCount = orderedChoiceCount(partyUniverse.length);
   const regionCount = orderedChoiceCount(state.data.regions.length);
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 65535) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 67108863) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
@@ -773,6 +886,11 @@ function applyConfigurationCode(text) {
   state.showLut = !(mode & 8192);
   state.showBackground = !(mode & 16384);
   state.export3d = !(mode & 32768);
+  state.regionLabelMode = ["auto", "0", "90", "off"][(mode >> 16) & 3];
+  state.partyLabelMode = ["auto", "0", "90", "off"][(mode >> 18) & 3];
+  state.percentLabelMode = ["without", "with", "off", "without"][(mode >> 20) & 3];
+  state.sinceElectionMode = ["color", "gray", "off", "color"][(mode >> 22) & 3];
+  yAxisMode = ["dynamic", "static", "off", "dynamic"][(mode >> 24) & 3];
   if (state.mobileView) state.electionDates = false;
   document.querySelector("#chart-view-settings").hidden = state.mobileView;
   value %= legacySpace;
@@ -787,13 +905,21 @@ function applyConfigurationCode(text) {
   document.querySelector("#average-mode").checked = state.averageMode;
   els.mobileView.checked = state.mobileView;
   els.fullRegionNames.checked = !state.fullRegionNames;
+  setCycleButton(els.abbreviationMode, state.fullRegionNames ? "off" : "on", [["on", "An"], ["off", "Aus"]]);
   els.showSinceElection.checked = state.showSinceElection;
   els.showBrackets.checked = state.showBrackets;
   els.showLabels.checked = state.showLabels;
+  setCycleButton(els.regionLabelMode, state.regionLabelMode, labelModeOptions.rotation);
+  setCycleButton(els.partyLabelMode, state.partyLabelMode, labelModeOptions.rotation);
+  setCycleButton(els.percentLabelMode, state.showPercentValues ? state.percentLabelMode : "off", labelModeOptions.percent);
+  setCycleButton(els.sinceElectionMode, state.showSinceElection ? state.sinceElectionMode : "off", labelModeOptions.since);
   els.showBarColors.checked = state.barColors;
   els.showPercentValues.checked = state.showPercentValues;
   els.showLut.checked = state.showLut;
   els.showBackground.checked = state.showBackground;
+  setCycleButton(document.querySelector("#y-axis-mode"), yAxisMode, [["static", "Statisch"], ["dynamic", "Dynamisch"], ["off", "Aus"]]);
+  setCycleButton(document.querySelector("#background-mode"), state.showBackground ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
+  setCycleButton(document.querySelector("#brackets-mode"), state.showBrackets ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
   document.querySelector("#export-3d").checked = state.export3d;
   els.electionDates.checked = state.electionDates;
   document.querySelector("#a4-mode").checked = state.a4Mode;
@@ -907,8 +1033,7 @@ async function exportChartImage(format = "jpeg") {
 
   const footerCenter = documentWidth / 2;
   const footerY = headerHeight + viewBox.height + 8;
-  const footerDevice = state.mobileView ? "mobil" : "desktop";
-  addText(`${configurationCode()} · ${footerDevice} · ${secondStamp}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
+  addText(`${configurationCode()} · ${currentOutputPlatformLabel()} · ${secondStamp}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
   addText(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
   addText("© 2026 charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
 
@@ -1178,10 +1303,13 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         }));
       }
       page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": fillOpacity, stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4", "stroke-opacity": strokeOpacity, "stroke-width": 1.5 }));
-      if (state.showPercentValues) text(`${item.average ? "Ø " : ""}${formatPercent(value, false, true).replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
+      if (state.showPercentValues) {
+        const percentText = formatPercent(value, false, true);
+        text(`${item.average ? "Ø " : ""}${state.percentLabelMode === "with" ? percentText : percentText.replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
+      }
       const electionValue = Number(state.data.elections?.[item.region]?.values?.[party] || 0);
       const delta = value - electionValue;
-      if (state.showSinceElection) text(formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
+      if (state.showSinceElection) text(formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
     });
     if (state.showSinceElection) text("Seit Wahl*", { x: plot.left - 5, y: plot.bottom + 19, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8, "font-weight": 700 });
     let runStart = 0;
@@ -1266,8 +1394,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     });
   }
   const footerStamp = formatTimestamp(now);
-  const footerDevice = state.mobileView ? "mobil" : "desktop";
-  text(`${configurationCode()} · ${footerDevice} · ${footerStamp}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
+  text(`${configurationCode()} · ${currentOutputPlatformLabel()} · ${footerStamp}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
   text(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
   text("© 2026 charavision", { x: width / 2, y: height - 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 9, "font-weight": 700 });
   text(`Seite ${pageNumber} / ${pageCount}`, { x: width - 42, y: height - 30, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
@@ -1417,7 +1544,9 @@ async function loadAppRelease() {
     if (!response.ok || !release.version || !release.downloadUrl || !release.macVersion || !release.macDownloadUrl) throw new Error("Versionsinformation nicht verfügbar.");
     version.textContent = release.version;
     macVersion.textContent = release.macVersion;
-    reportVersion.textContent = runsInMacApp ? release.macVersion : release.version;
+    reportVersion.dataset.androidVersion = release.version;
+    reportVersion.dataset.macVersion = release.macVersion;
+    updateReportVersionLabel();
     appButton.onclick = () => {
       message.textContent = window.AndroidApp ? "Update wird geöffnet …" : "Download wird gestartet …";
       if (window.AndroidApp?.installUpdate) window.AndroidApp.installUpdate(release.downloadUrl);
@@ -1442,10 +1571,12 @@ async function loadAppRelease() {
   } catch (error) {
     version.textContent = "nicht verfügbar";
     macVersion.textContent = "nicht verfügbar";
-    reportVersion.textContent = "nicht verfügbar";
+    reportVersion.textContent = `nicht verfügbar · ${currentPlatformLabel()}`;
     message.textContent = error.message;
   }
 }
+
+loadAppRelease();
 
 function showExportPreview() {
   els.previewPages.replaceChildren();
@@ -1519,7 +1650,7 @@ const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
   ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"], ["brackets", "Klammern"],
   ["labels", "Beschriftungen"], ["barColors", "Balkenfarbe"], ["percentValues", "Prozentwerte"],
-  ["lut", "LUT"], ["background", "Hintergrund"], ["viewSize", "Zoom"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
+  ["lut", "LUT"], ["yAxisStatic", "Y-Achse statisch"], ["background", "Hintergrund"], ["viewSize", "Zoom"], ["uiScale", "Bediengrößen-Regler"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
   ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
 ];
 const defaultDeveloperSettings = () => {
@@ -1605,13 +1736,14 @@ function applyDeveloperSettings() {
   state.barColors = Boolean(settings.barColors.value);
   state.showPercentValues = Boolean(settings.percentValues.value);
   state.showLut = Boolean(settings.lut.value);
+  yAxisMode = settings.yAxisStatic.value ? "static" : "dynamic";
   state.showBackground = Boolean(settings.background.value);
   state.viewSizeEnabled = Boolean(settings.viewSize.value);
   state.viewZoomEnabled = state.viewSizeEnabled;
   els.viewZoomEnabled.checked = state.viewZoomEnabled;
-  state.fullscreenEnabled = Boolean(settings.fullscreen.value);
+  state.fullscreenEnabled = true;
   els.fullscreenEnabled.checked = state.fullscreenEnabled;
-  state.fullscreenDefault = Boolean(settings.fullscreenDefault.value);
+  state.fullscreenDefault = true;
   state.a4Mode = Boolean(settings.a4Output.value);
   state.export3d = Boolean(settings.export3d.value);
   state.tabMode = Boolean(settings.tabMode?.value);
@@ -1619,15 +1751,21 @@ function applyDeveloperSettings() {
   updateSelectionTabMode();
   setVisible("#chart-settings .view-switch", settings.deviceForce.visible);
   setVisible("#update-data", settings.dataUpdate.visible);
-  setVisible(".full-region-names-choice", settings.abbreviations.visible);
-  setVisible(".since-election-choice", settings.sinceElection.visible);
-  setVisible(".brackets-choice", settings.brackets.visible);
+  setVisible("#abbreviation-mode", settings.abbreviations.visible);
+  setVisible("#since-election-mode", settings.sinceElection.visible);
+  setVisible("#brackets-mode", settings.brackets.visible);
   setVisible(".labels-choice", settings.labels.visible);
   setVisible(".bar-colors-choice", settings.barColors.visible);
-  setVisible(".percent-values-choice", settings.percentValues.visible);
+  setVisible("#percent-label-mode", settings.percentValues.visible);
   setVisible(".lut-choice", settings.lut.visible);
-  setVisible(".background-choice", settings.background.visible);
-  setVisible(".view-zoom-choice", settings.viewSize.visible);
+  setVisible("#background-mode", settings.background.visible);
+  setVisible("#ui-scale-toggle", settings.uiScale.visible);
+  const uiScaleToggle = document.querySelector("#ui-scale-toggle");
+  if (uiScaleToggle) uiScaleToggle.disabled = !settings.uiScale.value;
+  if (!settings.uiScale.visible || !settings.uiScale.value) {
+    const uiScalePanel = document.querySelector("#ui-scale-panel");
+    if (uiScalePanel) uiScalePanel.hidden = true;
+  }
   els.viewZoomControls.hidden = !settings.viewSize.visible || !state.viewZoomEnabled;
   setVisible(".fullscreen-choice", settings.fullscreen.visible);
   els.fullscreenEnter.hidden = !settings.fullscreen.visible || !state.fullscreenEnabled;
@@ -1642,7 +1780,7 @@ function applyDeveloperSettings() {
   els.viewWidthDown.disabled = !state.viewSizeEnabled;
   els.viewWidthUp.disabled = !state.viewSizeEnabled;
   els.fullscreenEnter.disabled = !state.fullscreenEnabled;
-  setFullscreenView(state.fullscreenEnabled && state.fullscreenDefault);
+  setFullscreenView(true);
   applyViewMode();
 }
 
@@ -2142,23 +2280,24 @@ async function startSimpleAppIntro() {
     ], { duration: 7200, delay, easing: "cubic-bezier(.4,0,.18,1)", fill: "both" });
     return [centerAnimation, destinationAnimation];
   });
-  let revealTimer = setTimeout(() => document.body.classList.add("intro-reveal"), 6550);
-  let finishTimer;
-  const finish = () => {
-    clearTimeout(revealTimer);
-    clearTimeout(finishTimer);
-    letterAnimations.forEach(animation => animation.cancel());
-    document.body.classList.add("intro-reveal");
-    intro.remove();
-    document.body.classList.remove("intro-running", "intro-reveal");
-  };
-  finishTimer = setTimeout(finish, 7700);
-  intro.addEventListener("click", finish, { once: true });
-  document.addEventListener("keydown", event => { if (["Escape", "Enter", " "].includes(event.key)) finish(); }, { once: true });
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) finish();
+  await new Promise(resolve => {
+    let revealTimer = setTimeout(() => document.body.classList.add("intro-reveal"), 6550);
+    let finishTimer;
+    const finish = () => {
+      clearTimeout(revealTimer);
+      clearTimeout(finishTimer);
+      letterAnimations.forEach(animation => animation.cancel());
+      document.body.classList.add("intro-reveal");
+      intro.remove();
+      document.body.classList.remove("intro-running", "intro-reveal");
+      resolve();
+    };
+    finishTimer = setTimeout(finish, 7700);
+    intro.addEventListener("click", finish, { once: true });
+    document.addEventListener("keydown", event => { if (["Escape", "Enter", " "].includes(event.key)) finish(); }, { once: true });
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) finish();
+  });
 }
-
-startSimpleAppIntro();
 
 Promise.all([fetchLatestData(), fetchDeveloperSettings()])
   .then(([data]) => {
@@ -2169,6 +2308,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     els.showSinceElection.checked = state.showSinceElection;
     els.showBrackets.checked = state.showBrackets;
     els.fullRegionNames.checked = !state.fullRegionNames;
+    setCycleButton(els.abbreviationMode, state.fullRegionNames ? "off" : "on", [["on", "An"], ["off", "Aus"]]);
     els.showLabels.checked = state.showLabels;
     els.showBarColors.checked = state.barColors;
     els.showPercentValues.checked = state.showPercentValues;
@@ -2236,6 +2376,13 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       state.fullRegionNames = !event.currentTarget.checked;
       render(false);
     });
+    els.abbreviationMode.addEventListener("click", event => {
+      if (!state.showLabels) return;
+      const value = advanceCycleButton(event.currentTarget, [["on", "An"], ["off", "Aus"]]);
+      state.fullRegionNames = value === "off";
+      els.fullRegionNames.checked = !state.fullRegionNames;
+      render(false);
+    });
     els.showSinceElection.addEventListener("change", event => {
       state.showSinceElection = event.currentTarget.checked;
       render(false);
@@ -2248,6 +2395,44 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       state.showLabels = event.currentTarget.checked;
       render(false);
     });
+    els.labelsMenuToggle.addEventListener("click", event => {
+      const choice = event.currentTarget.closest(".labels-choice");
+      if (!choice.classList.contains("is-open")) {
+        document.querySelector(".lut-choice")?.classList.remove("is-open");
+        choice.classList.add("is-open");
+        event.currentTarget.setAttribute("aria-expanded", "true");
+        return;
+      }
+      if (event.target.closest(".labels-check")) {
+        state.showLabels = !state.showLabels;
+        els.showLabels.checked = state.showLabels;
+        render(false);
+      }
+    });
+    els.regionLabelMode.addEventListener("click", event => {
+      if (!state.showLabels) return;
+      state.regionLabelMode = advanceCycleButton(event.currentTarget, labelModeOptions.rotation);
+      render(false);
+    });
+    els.partyLabelMode.addEventListener("click", event => {
+      if (!state.showLabels) return;
+      state.partyLabelMode = advanceCycleButton(event.currentTarget, labelModeOptions.rotation);
+      render(false);
+    });
+    els.percentLabelMode.addEventListener("click", event => {
+      if (!state.showLabels) return;
+      state.percentLabelMode = advanceCycleButton(event.currentTarget, labelModeOptions.percent);
+      state.showPercentValues = state.percentLabelMode !== "off";
+      els.showPercentValues.checked = state.showPercentValues;
+      render(false);
+    });
+    els.sinceElectionMode.addEventListener("click", event => {
+      if (!state.showLabels) return;
+      state.sinceElectionMode = advanceCycleButton(event.currentTarget, labelModeOptions.since);
+      state.showSinceElection = state.sinceElectionMode !== "off";
+      els.showSinceElection.checked = state.showSinceElection;
+      render(false);
+    });
     els.showBarColors.addEventListener("change", event => {
       state.barColors = event.currentTarget.checked;
       render(false);
@@ -2258,6 +2443,41 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     els.showLut.addEventListener("change", event => {
       state.showLut = event.currentTarget.checked;
+      render(false);
+    });
+    const lutMenuToggle = document.querySelector("#lut-menu-toggle");
+    const yAxisButton = document.querySelector("#y-axis-mode");
+    const backgroundButton = document.querySelector("#background-mode");
+    const bracketsButton = document.querySelector("#brackets-mode");
+    lutMenuToggle.addEventListener("click", event => {
+      const choice = event.currentTarget.closest(".lut-choice");
+      if (!choice.classList.contains("is-open")) {
+        document.querySelector(".labels-choice")?.classList.remove("is-open");
+        choice.classList.add("is-open");
+        event.currentTarget.setAttribute("aria-expanded", "true");
+        return;
+      }
+      if (event.target.closest(".lut-check")) {
+        state.showLut = !state.showLut;
+        els.showLut.checked = state.showLut;
+        render(false);
+      }
+    });
+    yAxisButton.addEventListener("click", event => {
+      if (!state.showLut) return;
+      yAxisMode = advanceCycleButton(event.currentTarget, [["static", "Statisch"], ["dynamic", "Dynamisch"], ["off", "Aus"]]);
+      render(false);
+    });
+    backgroundButton.addEventListener("click", event => {
+      if (!state.showLut) return;
+      state.showBackground = advanceCycleButton(event.currentTarget, [["on", "An"], ["off", "Aus"]]) === "on";
+      els.showBackground.checked = state.showBackground;
+      render(false);
+    });
+    bracketsButton.addEventListener("click", event => {
+      if (!state.showLut) return;
+      state.showBrackets = advanceCycleButton(event.currentTarget, [["on", "An"], ["off", "Aus"]]) === "on";
+      els.showBrackets.checked = state.showBrackets;
       render(false);
     });
     els.showBackground.addEventListener("change", event => {
@@ -2300,6 +2520,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     const togglePanel = (button, panel) => button.addEventListener("click", () => {
       panel.hidden = !panel.hidden;
+      if (!panel.hidden) panel.scrollTop = 0;
       button.setAttribute("aria-expanded", String(!panel.hidden));
     });
     togglePanel(document.querySelector("#settings-toggle"), document.querySelector("#chart-settings"));
@@ -2336,16 +2557,50 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       els.reportDataStand.textContent = `Stand: ${els.updated.textContent}${els.updatedTime.textContent ? ` · ${els.updatedTime.textContent}` : ""}`;
       document.querySelector("#report-open").click();
     });
+    const uiScaleToggle = document.querySelector("#ui-scale-toggle");
+    const uiScalePanel = document.querySelector("#ui-scale-panel");
+    const uiScaleRange = document.querySelector("#ui-scale-range");
+    const uiScaleValue = document.querySelector("#ui-scale-value");
+    const applyUiScale = rawValue => {
+      const percent = Math.max(50, Math.min(300, Math.round(Number(rawValue) / 10) * 10));
+      document.documentElement.style.setProperty("--ui-scale", String(percent / 100));
+      uiScaleRange.value = String(percent);
+      uiScaleValue.textContent = `${percent} %`;
+      localStorage.setItem("ui-control-scale", String(percent));
+    };
+    applyUiScale(localStorage.getItem("ui-control-scale") || "100");
+    uiScaleToggle.addEventListener("click", event => {
+      event.stopPropagation();
+      uiScalePanel.hidden = !uiScalePanel.hidden;
+      uiScaleToggle.setAttribute("aria-expanded", String(!uiScalePanel.hidden));
+    });
+    uiScalePanel.addEventListener("pointerdown", event => event.stopPropagation());
+    uiScaleRange.addEventListener("input", event => applyUiScale(event.currentTarget.value));
     els.reportMobileView.addEventListener("change", event => {
       els.mobileView.checked = event.currentTarget.checked;
       els.mobileView.dispatchEvent(new Event("change", { bubbles: true }));
     });
     els.reportUpdateData.addEventListener("click", () => els.updateData.click());
     document.addEventListener("fullscreenchange", () => {
-      const active = Boolean(document.fullscreenElement);
-      setFullscreenView(active);
+      setFullscreenView(true);
     });
     document.addEventListener("pointerdown", event => {
+      if (!uiScalePanel.hidden && event.target !== uiScaleToggle) {
+        uiScalePanel.hidden = true;
+        uiScaleToggle.setAttribute("aria-expanded", "false");
+      }
+      const labelsChoice = document.querySelector(".labels-choice");
+      const closedLabelsSubmenu = labelsChoice.classList.contains("is-open") && !labelsChoice.contains(event.target);
+      if (closedLabelsSubmenu) {
+        labelsChoice.classList.remove("is-open");
+        els.labelsMenuToggle.setAttribute("aria-expanded", "false");
+      }
+      const lutChoice = document.querySelector(".lut-choice");
+      const closedLutSubmenu = lutChoice.classList.contains("is-open") && !lutChoice.contains(event.target);
+      if (closedLutSubmenu) {
+        lutChoice.classList.remove("is-open");
+        document.querySelector("#lut-menu-toggle").setAttribute("aria-expanded", "false");
+      }
       const mainPanel = document.querySelector("#chart-settings");
       const mainButton = document.querySelector("#settings-toggle");
       if (!mainPanel.hidden && !mainPanel.contains(event.target) && !mainButton.contains(event.target)) {
@@ -2355,7 +2610,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       const menu = document.querySelector(".chart-view-menu");
       const panel = document.querySelector("#chart-view-settings");
       const button = document.querySelector("#chart-view-settings-toggle");
-      if (!panel.hidden && !menu.contains(event.target) && !els.fullscreenSettings.contains(event.target)) {
+      if (!closedLabelsSubmenu && !closedLutSubmenu && !panel.hidden && !menu.contains(event.target) && !els.fullscreenSettings.contains(event.target)) {
         panel.hidden = true;
         button.setAttribute("aria-expanded", "false");
         els.fullscreenSettings.setAttribute("aria-expanded", "false");
@@ -2385,8 +2640,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#preview-zoom-out").addEventListener("click", () => changePreviewZoom(-1));
     document.querySelector("#preview-zoom-in").addEventListener("click", () => changePreviewZoom(1));
     const reportDialog = document.querySelector("#report-dialog");
+    let startupPending = true;
     const reportTabs = {
       "report-book-open": "report-book",
+      "report-info-open": "report-info",
+      "report-projects-open": "report-projects",
       "report-accounts-open": "report-accounts",
       "report-developer-open": "report-developer",
       "report-app-open": "report-app"
@@ -2404,6 +2662,22 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     };
     const pinFields = [...document.querySelectorAll("#report-pin input")];
     const readReportPin = () => pinFields.map(input => input.value).join("").toUpperCase();
+    const openProjectPicker = async fromView => {
+      const guest = !currentReportRole;
+      reportDialog.classList.add("project-picker-dialog");
+      reportDialog.classList.toggle("guest-project-dialog", guest);
+      reportDialog.classList.toggle("startup-project-dialog", !fromView);
+      document.querySelector("#report-title").textContent = "Projekte";
+      Object.values(reportTabs).forEach(panelId => { document.querySelector(`#${panelId}`).hidden = true; });
+      document.querySelector("#report-projects").hidden = false;
+      document.querySelector("#project-picker-output").hidden = !fromView && !guest;
+      document.querySelector("#project-output-code").textContent = configurationCode();
+      document.querySelector("#project-code-message").textContent = "";
+      document.querySelector("#project-save-message").textContent = "";
+      if (!reportDialog.open) reportDialog.showModal();
+      if (!guest) try { await loadProjects(); }
+      catch (error) { document.querySelector("#project-code-message").textContent = error.message; }
+    };
     pinFields.forEach((input, index) => {
       input.addEventListener("input", event => {
         event.currentTarget.value = event.currentTarget.value.slice(-1).toUpperCase();
@@ -2421,10 +2695,21 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       });
     });
     document.querySelector("#report-open").addEventListener("click", () => {
+      reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog");
+      document.querySelector("#report-title").textContent = "Info";
+      document.querySelector("#project-picker-output").hidden = true;
       reportDialog.showModal();
       loadAppRelease();
+      if (currentReportRole) {
+        Object.entries(reportTabs).forEach(([buttonId, panelId]) => {
+          document.querySelector(`#${panelId}`).hidden = true;
+          document.querySelector(`#${buttonId}`).classList.remove("active");
+        });
+        document.querySelector("#report-info").hidden = false;
+        document.querySelector("#report-info-open").classList.add("active");
+      }
     });
-    document.querySelector("#report-close").addEventListener("click", () => reportDialog.close());
+    document.querySelector("#report-close").addEventListener("click", () => { reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog"); reportDialog.close(); });
     document.querySelector("#report-login").addEventListener("submit", async event => {
       event.preventDefault();
       const message = document.querySelector("#report-login-message");
@@ -2440,6 +2725,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-session-work").textContent = `(${identity.work})`;
         document.querySelector("#report-subject-field").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-login").hidden = true;
+        document.querySelector("#report-info").hidden = true;
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-app-open").hidden = currentReportRole !== "Admin" && !helperAppAccessEnabled();
@@ -2450,13 +2736,23 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         const developerTab = document.querySelector("#report-developer-open");
         developerTab.innerHTML = `${currentReportRole === "Admin" ? "Master" : "View Master"} <span class="report-tab-gear" aria-hidden="true">⚙</span>`;
         document.querySelector("#report-logout").hidden = false;
-        document.querySelector("#report-book").hidden = false;
-        document.querySelector("#report-book-open").classList.add("active");
+        document.querySelector("#save-project").hidden = true;
+        document.querySelector("#project-picker-toggle").hidden = false;
         const identityHeader = document.querySelector(".report-session-user");
         identityHeader.classList.remove("is-revealed");
         requestAnimationFrame(() => identityHeader.classList.add("is-revealed"));
         message.textContent = "";
-        await loadReports();
+        if (startupPending) {
+          reportDialog.classList.remove("startup-login-dialog");
+          reportDialog.close();
+          await startSimpleAppIntro();
+          startupPending = false;
+          await openProjectPicker(false);
+        } else {
+          document.querySelector("#report-book").hidden = false;
+          document.querySelector("#report-book-open").classList.add("active");
+          await loadReports();
+        }
       } catch (error) { reportPin = ""; currentReportRole = ""; currentReportIdentity = null; pinFields.forEach(field => { field.value = ""; }); pinFields[0].focus(); message.textContent = error.message; }
     });
     document.querySelector("#report-logout").addEventListener("click", () => {
@@ -2466,8 +2762,12 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#report-accounts").hidden = true;
       document.querySelector("#report-developer").hidden = true;
       document.querySelector("#report-app").hidden = true;
+      document.querySelector("#report-projects").hidden = true;
       document.querySelector("#report-book").hidden = true;
+      document.querySelector("#report-info").hidden = false;
       document.querySelector("#report-logout").hidden = true;
+      document.querySelector("#save-project").hidden = true;
+      document.querySelector("#project-picker-toggle").hidden = true;
       document.querySelector("#report-login").hidden = false;
       document.querySelector("#report-login-message").textContent = "";
       pinFields[0].focus();
@@ -2501,6 +2801,54 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       saveDeveloperSettings();
     });
     document.querySelector("#report-book-open").addEventListener("click", () => toggleReportTab(document.querySelector("#report-book-open")));
+    document.querySelector("#report-info-open").addEventListener("click", () => toggleReportTab(document.querySelector("#report-info-open")));
+    document.querySelector("#report-projects-open").addEventListener("click", () => {
+      if (!toggleReportTab(document.querySelector("#report-projects-open"))) return;
+      loadProjects().catch(error => {
+        const list = document.querySelector("#report-project-list");
+        list.replaceChildren();
+        const message = document.createElement("p"); message.className = "report-empty"; message.textContent = error.message; list.append(message);
+      });
+    });
+    document.querySelector("#project-picker-toggle").addEventListener("click", () => openProjectPicker(true).catch(error => { document.querySelector("#project-code-message").textContent = error.message; }));
+    document.querySelector("#project-code-input").addEventListener("submit", event => {
+      event.preventDefault();
+      const input = document.querySelector("#project-input-code");
+      const message = document.querySelector("#project-code-message");
+      try {
+        applyConfigurationCode(input.value.trim());
+        els.inputCode.value = input.value.trim();
+        reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog");
+        reportDialog.close();
+      } catch (error) { message.textContent = error.message; }
+    });
+    document.querySelector("#project-new").addEventListener("click", () => { reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog"); reportDialog.close(); });
+    document.querySelector("#project-copy").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(document.querySelector("#project-output-code").textContent);
+      document.querySelector("#project-save-message").textContent = "Code kopiert.";
+    });
+    document.querySelector("#project-save").addEventListener("click", async event => {
+      const button = event.currentTarget;
+      const message = document.querySelector("#project-save-message");
+      button.disabled = true;
+      try { savedProjectConfiguration = await saveCurrentProject(); message.textContent = "Projekt zentral gespeichert."; await loadProjects(); }
+      catch (error) { message.textContent = error.message; }
+      finally { button.disabled = false; }
+    });
+    document.querySelector("#start-without-login").addEventListener("click", async () => {
+      reportDialog.classList.remove("startup-login-dialog");
+      reportDialog.close();
+      startupPending = false;
+      await startSimpleAppIntro();
+      document.querySelector("#project-picker-toggle").hidden = false;
+    });
+    document.querySelector("#save-project").addEventListener("click", async () => {
+      const button = document.querySelector("#save-project");
+      button.disabled = true;
+      try { savedProjectConfiguration = await saveCurrentProject(); els.exportMessage.textContent = "Projekt zentral gespeichert."; }
+      catch (error) { els.exportMessage.textContent = error.message; }
+      finally { button.disabled = false; }
+    });
     document.querySelector("#report-account-form").addEventListener("submit", async event => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -2554,7 +2902,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     const export3d = document.querySelector("#export-3d");
     export3d.addEventListener("change", event => {
       state.export3d = event.currentTarget.checked;
-      els.outputCode.textContent = configurationCode();
+      render(false);
     });
     a4Mode.addEventListener("change", event => { state.a4Mode = event.currentTarget.checked; render(false); });
     exportFormat.addEventListener("change", event => {
@@ -2583,10 +2931,16 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     window.addEventListener("resize", () => render(false));
     let perspectiveFrame = 0;
     els.scroll.addEventListener("scroll", () => {
+      updateYAxisPosition();
       if (!state.perspective?.floorLines.length && !state.perspective?.bars.length) return;
       cancelAnimationFrame(perspectiveFrame);
       perspectiveFrame = requestAnimationFrame(updatePerspective);
     }, { passive: true });
+    document.querySelector("#report-info").hidden = true;
+    document.querySelector("#report-title").textContent = "Log in";
+    reportDialog.classList.add("startup-login-dialog");
+    reportDialog.showModal();
+    pinFields[0].focus();
   })
   .catch(error => { els.updated.textContent = "nicht verfügbar"; els.empty.hidden = false; els.empty.textContent = error.message; els.scroll.hidden = true; });
 
