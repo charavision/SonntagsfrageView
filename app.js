@@ -809,7 +809,7 @@ async function saveCurrentProject() {
 }
 
 function applyConfigurationCode(text) {
-  if (!/^[0-9A-Za-z]{13,14}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
+  if (!/^[0-9A-Za-z]{13,15}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
   const partyUniverse = Object.keys(PARTY_META);
   const partyCount = orderedChoiceCount(partyUniverse.length);
   const regionCount = orderedChoiceCount(state.data.regions.length);
