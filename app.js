@@ -766,6 +766,48 @@ function dataRetrievalStamp() {
   return state.data?.updatedAt ? formatTimestamp(state.data.updatedAt) : `${formatDate(state.data.updated)} · Uhrzeit nicht verfügbar`;
 }
 
+async function loadProjects() {
+  const list = document.querySelector("#report-project-list");
+  if (!list) return;
+  list.replaceChildren();
+  const { projects } = await reportRequest("/projects");
+  if (!projects.length) {
+    const empty = document.createElement("p");
+    empty.className = "report-empty";
+    empty.textContent = "Noch keine gespeicherten Projekte.";
+    list.append(empty);
+    return;
+  }
+  projects.forEach(project => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "report-project-button";
+    const title = document.createElement("strong");
+    title.textContent = project.title;
+    const detail = document.createElement("span");
+    detail.textContent = project.detail;
+    const meta = document.createElement("small");
+    meta.textContent = `${project.configuration} · ${formatTimestamp(project.updated_at)}`;
+    button.append(title, detail, meta);
+    button.addEventListener("click", () => {
+      applyConfigurationCode(project.configuration);
+      els.inputCode.value = project.configuration;
+      document.querySelector("#report-dialog").close();
+    });
+    list.append(button);
+  });
+}
+
+async function saveCurrentProject() {
+  if (!currentReportRole || !state.data) throw new Error("Bitte zuerst anmelden.");
+  const payload = {
+    configuration: configurationCode(),
+    title: document.querySelector("#chart-title")?.textContent?.trim() || "Sonntagsfragen",
+    detail: document.querySelector("#chart-meta")?.textContent?.trim() || "Aktuelle Konfiguration"
+  };
+  await reportRequest("/projects", { method: "POST", body: JSON.stringify(payload) });
+}
+
 function applyConfigurationCode(text) {
   if (!/^[0-9A-Za-z]{13,14}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
   const partyUniverse = Object.keys(PARTY_META);
@@ -2406,6 +2448,8 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     const reportDialog = document.querySelector("#report-dialog");
     const reportTabs = {
       "report-book-open": "report-book",
+      "report-info-open": "report-info",
+      "report-projects-open": "report-projects",
       "report-accounts-open": "report-accounts",
       "report-developer-open": "report-developer",
       "report-app-open": "report-app"
@@ -2442,6 +2486,14 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#report-open").addEventListener("click", () => {
       reportDialog.showModal();
       loadAppRelease();
+      if (currentReportRole) {
+        Object.entries(reportTabs).forEach(([buttonId, panelId]) => {
+          document.querySelector(`#${panelId}`).hidden = true;
+          document.querySelector(`#${buttonId}`).classList.remove("active");
+        });
+        document.querySelector("#report-info").hidden = false;
+        document.querySelector("#report-info-open").classList.add("active");
+      }
     });
     document.querySelector("#report-close").addEventListener("click", () => reportDialog.close());
     document.querySelector("#report-login").addEventListener("submit", async event => {
@@ -2459,6 +2511,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-session-work").textContent = `(${identity.work})`;
         document.querySelector("#report-subject-field").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-login").hidden = true;
+        document.querySelector("#report-info").hidden = true;
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-app-open").hidden = currentReportRole !== "Admin" && !helperAppAccessEnabled();
@@ -2469,6 +2522,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         const developerTab = document.querySelector("#report-developer-open");
         developerTab.innerHTML = `${currentReportRole === "Admin" ? "Master" : "View Master"} <span class="report-tab-gear" aria-hidden="true">⚙</span>`;
         document.querySelector("#report-logout").hidden = false;
+        document.querySelector("#save-project").hidden = false;
         document.querySelector("#report-book").hidden = false;
         document.querySelector("#report-book-open").classList.add("active");
         const identityHeader = document.querySelector(".report-session-user");
@@ -2485,8 +2539,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#report-accounts").hidden = true;
       document.querySelector("#report-developer").hidden = true;
       document.querySelector("#report-app").hidden = true;
+      document.querySelector("#report-projects").hidden = true;
       document.querySelector("#report-book").hidden = true;
+      document.querySelector("#report-info").hidden = false;
       document.querySelector("#report-logout").hidden = true;
+      document.querySelector("#save-project").hidden = true;
       document.querySelector("#report-login").hidden = false;
       document.querySelector("#report-login-message").textContent = "";
       pinFields[0].focus();
@@ -2520,6 +2577,22 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       saveDeveloperSettings();
     });
     document.querySelector("#report-book-open").addEventListener("click", () => toggleReportTab(document.querySelector("#report-book-open")));
+    document.querySelector("#report-info-open").addEventListener("click", () => toggleReportTab(document.querySelector("#report-info-open")));
+    document.querySelector("#report-projects-open").addEventListener("click", () => {
+      if (!toggleReportTab(document.querySelector("#report-projects-open"))) return;
+      loadProjects().catch(error => {
+        const list = document.querySelector("#report-project-list");
+        list.replaceChildren();
+        const message = document.createElement("p"); message.className = "report-empty"; message.textContent = error.message; list.append(message);
+      });
+    });
+    document.querySelector("#save-project").addEventListener("click", async () => {
+      const button = document.querySelector("#save-project");
+      button.disabled = true;
+      try { await saveCurrentProject(); els.exportMessage.textContent = "Projekt zentral gespeichert."; }
+      catch (error) { els.exportMessage.textContent = error.message; }
+      finally { button.disabled = false; }
+    });
     document.querySelector("#report-account-form").addEventListener("submit", async event => {
       event.preventDefault();
       const form = event.currentTarget;

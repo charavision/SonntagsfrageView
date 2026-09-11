@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-217">
+  <link rel="stylesheet" href="styles.css?v=report-book-219">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -149,7 +149,7 @@
         <button id="fullscreen-view-settings-toggle" class="fullscreen-view-settings-toggle" type="button" aria-label="View-Einstellungen anzeigen" aria-expanded="false">⚙</button>
         <button id="fullscreen-selection-toggle" class="fullscreen-tool fullscreen-selection-toggle" type="button" aria-label="Parlamente, Parteien und Umfragen anzeigen" aria-expanded="false">⌨</button>
         <button id="fullscreen-output-toggle" class="fullscreen-tool fullscreen-output-toggle" type="button" aria-label="Ausgabe, Vorschau und Konfiguration anzeigen" aria-expanded="false">💾</button>
-        <button id="fullscreen-help" class="fullscreen-help" type="button" aria-label="Meldungsbuch öffnen">?</button>
+        <button id="fullscreen-help" class="fullscreen-help" type="button" aria-label="Info öffnen">i</button>
         <button id="view-fullscreen-exit" class="view-fullscreen-exit" type="button" aria-label="Vollbild schließen">×</button>
         <div id="chart-scroll" class="chart-scroll">
           <svg id="chart" role="img" aria-labelledby="chart-title chart-description"></svg>
@@ -187,6 +187,7 @@
       <small id="export-summary">– Diagramme auf – Seiten</small>
       <div class="output-code">
         <button id="copy-code" type="button">Copy Configuration</button>
+        <button id="save-project" class="save-project-button" type="button" aria-label="Konfiguration als Projekt speichern" title="Konfiguration speichern" hidden>💾</button>
         <output id="output-code" for="input-code"></output>
       </div>
       <small id="export-message" aria-live="polite"></small>
@@ -194,11 +195,11 @@
 
     <footer>
       <p>Daten: <a href="https://www.wahlrecht.de/umfragen/" target="_blank" rel="noreferrer">Wahlrecht.de</a>. Die Werte werden automatisiert übernommen; maßgeblich ist die Originalquelle. Für die Richtigkeit der Daten ist die Quelle verantwortlich; eine Gewähr wird nicht übernommen.</p>
-      <button id="report-open" class="report-open" type="button">📖 Problem melden / Meldungsbuch</button>
+      <button id="report-open" class="report-open" type="button">ⓘ Info</button>
     </footer>
   </main>
   <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-title">
-    <div class="preview-header"><strong id="report-title">Meldungsbuch</strong><div class="report-header-actions"><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Meldungsbuch schließen">×</button></div></div>
+    <div class="preview-header"><strong id="report-title">Info</strong><div class="report-header-actions"><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Info schließen">×</button></div></div>
     <div class="report-content">
       <form id="report-login" class="report-login">
         <p>Bitte PIN eingeben, um Meldungen zu lesen oder zu verfassen.</p>
@@ -214,13 +215,15 @@
         </fieldset>
         <button type="submit">Login</button>
         <small id="report-login-message" aria-live="polite"></small>
+      </form>
+      <section id="report-info" class="report-info" aria-label="Informationen und Datenupdate">
         <div id="fullscreen-report-tools" class="fullscreen-report-tools">
           <button id="report-update-data" type="button">Datenupdate</button>
           <small id="report-data-stand"></small>
           <small class="report-data-hint">Daten: Wahlrecht.de. Maßgeblich ist die Originalquelle; für die Richtigkeit der Daten wird keine Gewähr übernommen.</small>
           <div class="view-switch"><span>Desktop</span><label class="switch"><input id="report-mobile-view" type="checkbox" aria-label="Ansicht zwischen Desktop und Mobil wechseln"><span></span></label><span>Mobil</span></div>
         </div>
-      </form>
+      </section>
       <section id="report-session" class="report-session" hidden aria-live="polite">
         <div class="report-session-user">
           <strong id="report-session-person"></strong>
@@ -228,6 +231,8 @@
         </div>
         <div class="report-session-actions">
           <button id="report-book-open" class="report-tab" type="button">Meldebuch</button>
+          <button id="report-info-open" class="report-tab report-info-tab" type="button" aria-label="Info" title="Info"><span class="report-tab-info-icon" aria-hidden="true">i</span></button>
+          <button id="report-projects-open" class="report-tab" type="button">Projekte</button>
           <button id="report-accounts-open" class="report-tab" type="button" hidden>Accounts</button>
           <button id="report-developer-open" class="report-tab" type="button">Master <span class="report-tab-gear" aria-hidden="true">⚙</span></button>
           <button id="report-app-open" class="report-tab" type="button" hidden>App</button>
@@ -243,6 +248,11 @@
         <div class="report-app-row"><button id="mac-app-download" type="button">macOS</button><span>Version <strong id="mac-app-version">wird geladen …</strong></span></div>
         <div id="android-intro-update-row" class="report-app-row" hidden><button id="android-intro-update" type="button">Update Intro</button></div>
         <small id="android-app-message" aria-live="polite"></small>
+      </section>
+      <section id="report-projects" class="report-projects" hidden aria-labelledby="report-projects-title">
+        <div class="report-list-heading"><h2 id="report-projects-title">Letzte Projekte</h2></div>
+        <p>Bis zu fünf zentral gespeicherte Konfigurationen.</p>
+        <div id="report-project-list" class="report-project-list"></div>
       </section>
       <section id="report-developer" class="report-developer" hidden aria-labelledby="report-developer-title">
         <div class="report-list-heading"><h2 id="report-developer-title">Entwicklereinstellungen</h2></div>
@@ -302,6 +312,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-217" defer></script>
+  <script src="app.js?v=report-book-219" defer></script>
 </body>
 </html>
