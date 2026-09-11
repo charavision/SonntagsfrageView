@@ -27,7 +27,7 @@ const reportUsers = [
   { id: "builtin-helper3", personName: "Felix", workName: "Helper3", role: "Helper", hash: "39e91335c32659ef778fb32fcaf617d01e9efd7543a4cde2a35217503c7e3721", system: true }
 ];
 
-const developerFeatureKeys = ["intro", "deviceForce", "tabMode", "dataUpdate", "abbreviations", "sinceElection", "brackets", "labels", "barColors", "percentValues", "lut", "background", "viewSize", "fullscreen", "fullscreenDefault", "helperAppAccess", "preview", "a4Output", "export3d"];
+const developerFeatureKeys = ["intro", "deviceForce", "tabMode", "dataUpdate", "abbreviations", "sinceElection", "brackets", "labels", "barColors", "percentValues", "lut", "yAxisStatic", "background", "viewSize", "uiScale", "fullscreen", "fullscreenDefault", "helperAppAccess", "preview", "a4Output", "export3d"];
 const developerDefaults = {
   mobile: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: key !== "helperAppAccess", value: key === "deviceForce" ? "mobile" : ["export3d", "tabMode", "helperAppAccess"].includes(key) ? false : true }])),
   desktop: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: key !== "helperAppAccess", value: key === "deviceForce" ? "desktop" : ["export3d", "tabMode", "helperAppAccess"].includes(key) ? false : true }]))
