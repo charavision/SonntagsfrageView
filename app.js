@@ -36,7 +36,7 @@ const els = {
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataNote: document.querySelector("#report-data-note"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataStand: document.querySelector("#report-data-stand"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
@@ -2285,7 +2285,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     els.fullscreenHelp.addEventListener("click", () => {
       els.reportMobileView.checked = state.mobileView;
-      els.reportDataNote.textContent = `Datenstand: ${els.updated.textContent}${els.updatedTime.textContent ? ` · ${els.updatedTime.textContent}` : ""}`;
+      els.reportDataStand.textContent = `Stand: ${els.updated.textContent}${els.updatedTime.textContent ? ` · ${els.updatedTime.textContent}` : ""}`;
       document.querySelector("#report-open").click();
     });
     els.reportMobileView.addEventListener("change", event => {
@@ -2323,6 +2323,15 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       if (!panel.hidden && !menu.contains(event.target) && !els.fullscreenSettings.contains(event.target)) {
         panel.hidden = true;
         button.setAttribute("aria-expanded", "false");
+        els.fullscreenSettings.setAttribute("aria-expanded", "false");
+      }
+      if (document.body.classList.contains("fullscreen-selection-open")) {
+        const selectionPanel = document.querySelector("main > .controls");
+        if (!selectionPanel.contains(event.target) && !els.fullscreenSelection.contains(event.target)) closeFullscreenOverlays();
+      }
+      if (document.body.classList.contains("fullscreen-output-open")) {
+        const outputPanel = document.querySelector("main > .outputs");
+        if (!outputPanel.contains(event.target) && !els.fullscreenOutput.contains(event.target)) closeFullscreenOverlays();
       }
     });
     togglePanel(document.querySelector("#export-settings-toggle"), document.querySelector("#export-settings"));

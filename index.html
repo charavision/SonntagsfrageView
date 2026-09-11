@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-213">
+  <link rel="stylesheet" href="styles.css?v=report-book-214">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -211,13 +211,14 @@
             <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 5" required>
           </div>
         </fieldset>
-        <div id="fullscreen-report-tools" class="fullscreen-report-tools">
-          <div class="view-switch"><span>Desktop</span><label class="switch"><input id="report-mobile-view" type="checkbox" aria-label="Ansicht zwischen Desktop und Mobil wechseln"><span></span></label><span>Mobil</span></div>
-          <button id="report-update-data" type="button">Update</button>
-          <small id="report-data-note"></small>
-        </div>
         <button type="submit">Login</button>
         <small id="report-login-message" aria-live="polite"></small>
+        <div id="fullscreen-report-tools" class="fullscreen-report-tools">
+          <button id="report-update-data" type="button">Datenupdate</button>
+          <small id="report-data-stand"></small>
+          <small class="report-data-hint">Daten: Wahlrecht.de. Maßgeblich ist die Originalquelle; für die Richtigkeit der Daten wird keine Gewähr übernommen.</small>
+          <div class="view-switch"><span>Desktop</span><label class="switch"><input id="report-mobile-view" type="checkbox" aria-label="Ansicht zwischen Desktop und Mobil wechseln"><span></span></label><span>Mobil</span></div>
+        </div>
       </form>
       <section id="report-session" class="report-session" hidden aria-live="polite">
         <div class="report-session-user">
@@ -296,6 +297,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-213" defer></script>
+  <script src="app.js?v=report-book-214" defer></script>
 </body>
 </html>
