@@ -1382,6 +1382,7 @@ async function loadAppRelease() {
     macButton.onclick = () => {
       message.textContent = runsInMacApp ? "Mac-App-Update wird geladen …" : "Download wird gestartet …";
       if (runsInMacApp) window.MacApp.installUpdate(release.macDownloadUrl);
+      else if (window.AndroidApp?.downloadFile) window.AndroidApp.downloadFile(release.macDownloadUrl, `Sonntagsfragen-macOS-v${release.macVersion}.dmg`);
       else {
         const link = document.createElement("a");
         link.href = release.macDownloadUrl;

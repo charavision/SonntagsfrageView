@@ -24,7 +24,7 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "1.0.15";
+    private static final String APP_VERSION = "1.0.16";
     private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
     private WebView webView;
     private volatile boolean webSurfaceReady = false;
@@ -103,6 +103,21 @@ public class MainActivity extends Activity {
                 webView.clearCache(true);
                 webView.clearHistory();
                 loadCurrentWebApp("intro");
+            });
+        }
+
+        @JavascriptInterface
+        public void downloadFile(String url, String filename) {
+            if (url == null || !url.startsWith("https://github.com/charavision/SonntagsfrageView/")) return;
+            String safeName = filename == null ? "Sonntagsfragen-Download" : filename.replaceAll("[^A-Za-z0-9._-]", "_");
+            runOnUiThread(() -> {
+                DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                request.setTitle(safeName);
+                request.setDescription("Sonntagsfragen-Datei wird heruntergeladen.");
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setDestinationInExternalFilesDir(MainActivity.this, Environment.DIRECTORY_DOWNLOADS, safeName);
+                manager.enqueue(request);
             });
         }
 
