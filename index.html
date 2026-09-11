@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-212">
+  <link rel="stylesheet" href="styles.css?v=report-book-213">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -89,6 +89,7 @@
     </section>
 
     <section class="chart-section" aria-labelledby="chart-title">
+      <div class="fullscreen-logo" aria-hidden="true"><strong>Sonntagsfragen</strong><small>visualizer by <b>charavision</b></small></div>
       <div class="chart-heading">
         <div class="chart-title-block">
           <h2 id="chart-title">Umfrageverlauf</h2>
@@ -145,6 +146,9 @@
       <div class="chart-view-frame">
         <button id="view-fullscreen-enter" class="view-fullscreen-enter" type="button" aria-label="Vollbild öffnen">⛶</button>
         <button id="fullscreen-view-settings-toggle" class="fullscreen-view-settings-toggle" type="button" aria-label="View-Einstellungen anzeigen" aria-expanded="false">⚙</button>
+        <button id="fullscreen-selection-toggle" class="fullscreen-tool fullscreen-selection-toggle" type="button" aria-label="Parlamente, Parteien und Umfragen anzeigen" aria-expanded="false">⌨</button>
+        <button id="fullscreen-output-toggle" class="fullscreen-tool fullscreen-output-toggle" type="button" aria-label="Ausgabe, Vorschau und Konfiguration anzeigen" aria-expanded="false">💾</button>
+        <button id="fullscreen-help" class="fullscreen-help" type="button" aria-label="Meldungsbuch öffnen">?</button>
         <button id="view-fullscreen-exit" class="view-fullscreen-exit" type="button" aria-label="Vollbild schließen">×</button>
         <div id="chart-scroll" class="chart-scroll">
           <svg id="chart" role="img" aria-labelledby="chart-title chart-description"></svg>
@@ -207,6 +211,11 @@
             <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 5" required>
           </div>
         </fieldset>
+        <div id="fullscreen-report-tools" class="fullscreen-report-tools">
+          <div class="view-switch"><span>Desktop</span><label class="switch"><input id="report-mobile-view" type="checkbox" aria-label="Ansicht zwischen Desktop und Mobil wechseln"><span></span></label><span>Mobil</span></div>
+          <button id="report-update-data" type="button">Update</button>
+          <small id="report-data-note"></small>
+        </div>
         <button type="submit">Login</button>
         <small id="report-login-message" aria-live="polite"></small>
       </form>
@@ -287,6 +296,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-212" defer></script>
+  <script src="app.js?v=report-book-213" defer></script>
 </body>
 </html>

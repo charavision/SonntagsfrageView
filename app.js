@@ -29,13 +29,14 @@ try {
   });
 } catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
 const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+let fullscreenPreviousTabMode = null;
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataNote: document.querySelector("#report-data-note"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
@@ -392,7 +393,7 @@ function render(animate = true) {
     : Math.max(availableWidth, margin.left + margin.right + visiblePlotWidth * (totalBarCount / visibleBarLimit));
   const horizontalScale = currentViewScale("x");
   const width = Math.max(availableWidth, margin.left + margin.right + (baseWidth - margin.left - margin.right) * horizontalScale);
-  const fullscreenHeight = document.fullscreenElement === els.chartSection ? els.chartSection.clientHeight : 0;
+  const fullscreenHeight = document.fullscreenElement ? window.innerHeight : 0;
   const height = Math.max(compact ? 520 : 590, fullscreenHeight);
   const innerH = height - margin.top - margin.bottom;
   const baselineY = margin.top + innerH;
@@ -2227,7 +2228,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     els.fullscreenEnabled.addEventListener("change", async event => {
       state.fullscreenEnabled = event.currentTarget.checked;
       els.fullscreenEnter.hidden = !state.fullscreenEnabled;
-      if (!state.fullscreenEnabled && document.fullscreenElement === els.chartSection) await document.exitFullscreen();
+      if (!state.fullscreenEnabled && document.fullscreenElement) await document.exitFullscreen();
     });
     els.viewSizeDown.addEventListener("click", () => setViewScale("y", currentViewScale("y") - .1));
     els.viewSizeUp.addEventListener("click", () => setViewScale("y", currentViewScale("y") + .1));
@@ -2260,17 +2261,54 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     togglePanel(document.querySelector("#chart-view-settings-toggle"), document.querySelector("#chart-view-settings"));
     togglePanel(els.fullscreenSettings, document.querySelector("#chart-view-settings"));
     els.fullscreenEnter.addEventListener("click", async () => {
-      if (state.fullscreenEnabled && els.chartSection.requestFullscreen) await els.chartSection.requestFullscreen();
+      if (state.fullscreenEnabled && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
     });
     els.fullscreenExit.addEventListener("click", async () => {
       if (document.fullscreenElement) await document.exitFullscreen();
     });
+    const closeFullscreenOverlays = () => {
+      document.body.classList.remove("fullscreen-selection-open", "fullscreen-output-open");
+      els.fullscreenSelection.setAttribute("aria-expanded", "false");
+      els.fullscreenOutput.setAttribute("aria-expanded", "false");
+    };
+    els.fullscreenSelection.addEventListener("click", () => {
+      const open = !document.body.classList.contains("fullscreen-selection-open");
+      closeFullscreenOverlays();
+      document.body.classList.toggle("fullscreen-selection-open", open);
+      els.fullscreenSelection.setAttribute("aria-expanded", String(open));
+    });
+    els.fullscreenOutput.addEventListener("click", () => {
+      const open = !document.body.classList.contains("fullscreen-output-open");
+      closeFullscreenOverlays();
+      document.body.classList.toggle("fullscreen-output-open", open);
+      els.fullscreenOutput.setAttribute("aria-expanded", String(open));
+    });
+    els.fullscreenHelp.addEventListener("click", () => {
+      els.reportMobileView.checked = state.mobileView;
+      els.reportDataNote.textContent = `Datenstand: ${els.updated.textContent}${els.updatedTime.textContent ? ` · ${els.updatedTime.textContent}` : ""}`;
+      document.querySelector("#report-open").click();
+    });
+    els.reportMobileView.addEventListener("change", event => {
+      els.mobileView.checked = event.currentTarget.checked;
+      els.mobileView.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    els.reportUpdateData.addEventListener("click", () => els.updateData.click());
     document.addEventListener("fullscreenchange", () => {
-      const active = document.fullscreenElement === els.chartSection;
+      const active = Boolean(document.fullscreenElement);
+      document.body.classList.toggle("view-fullscreen-active", active);
       const panel = document.querySelector("#chart-view-settings");
       panel.hidden = active || state.mobileView;
       els.fullscreenSettings.setAttribute("aria-expanded", "false");
-      render(false);
+      if (active) {
+        fullscreenPreviousTabMode = state.tabMode;
+        state.tabMode = true;
+      } else if (fullscreenPreviousTabMode !== null) {
+        state.tabMode = fullscreenPreviousTabMode;
+        fullscreenPreviousTabMode = null;
+        closeFullscreenOverlays();
+      }
+      updateSelectionTabMode();
+      requestAnimationFrame(() => render(false));
     });
     document.addEventListener("pointerdown", event => {
       const mainPanel = document.querySelector("#chart-settings");

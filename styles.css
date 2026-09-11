@@ -266,26 +266,45 @@ body.mobile-mode .chart-view-settings .view-zoom-choice label { width: 100%; }
 .chart-heading h2 { font-family: Georgia, serif; font-size: clamp(28px, 4vw, 46px); font-weight: 500; }
 .chart-meta { margin: 0; color: var(--muted); font-size: 13px; text-align: left; }
 .chart-view-frame { position: relative; }
-.view-fullscreen-enter, .fullscreen-view-settings-toggle, .view-fullscreen-exit { position: absolute; z-index: 5; display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 1px solid #6682a5; border-radius: 9px; background: linear-gradient(145deg, #244a70, #0b213b); box-shadow: inset 1px 1px 1px rgba(255,255,255,.16), inset -2px -2px 4px rgba(0,0,0,.38), 0 3px 8px rgba(0,0,0,.28); color: #fff; cursor: pointer; font-size: 21px; line-height: 1; }
-.view-fullscreen-enter { top: 12px; left: 12px; }
+.view-fullscreen-enter, .fullscreen-view-settings-toggle, .fullscreen-tool, .fullscreen-help, .view-fullscreen-exit { position: absolute; z-index: 7; display: grid; width: 38px; height: 38px; padding: 0; place-items: center; border: 1px solid #6682a5; border-radius: 9px; background: linear-gradient(145deg, #244a70, #0b213b); box-shadow: inset 1px 1px 1px rgba(255,255,255,.16), inset -2px -2px 4px rgba(0,0,0,.38), 0 3px 8px rgba(0,0,0,.28); color: #fff; cursor: pointer; font-size: 21px; line-height: 1; }
+.view-fullscreen-enter { right: 12px; bottom: 12px; }
 .view-fullscreen-enter[hidden] { display: none; }
-.fullscreen-view-settings-toggle, .view-fullscreen-exit { display: none; }
-.chart-section:fullscreen { box-sizing: border-box; width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; border: 0; border-radius: 0; background: #071326; }
-.chart-section:fullscreen::backdrop { background: #071326; }
-.chart-section:fullscreen .chart-heading { position: fixed; z-index: 6; top: 10px; right: 58px; left: 58px; margin: 0; padding: 0; pointer-events: none; }
-.chart-section:fullscreen .chart-title-block { gap: 3px; }
-.chart-section:fullscreen .chart-heading h2 { font-size: clamp(25px, 4vw, 44px); text-shadow: 0 2px 12px #071326, 0 0 24px #071326; }
-.chart-section:fullscreen .chart-meta { text-shadow: 0 2px 8px #071326, 0 0 16px #071326; }
-.chart-section:fullscreen .chart-heading-actions, .chart-section:fullscreen .chart-view-menu { pointer-events: auto; }
-.chart-section:fullscreen .chart-view-settings-toggle { display: none; }
-.chart-section:fullscreen .chart-view-frame { position: fixed; inset: 0; width: 100%; height: 100%; }
-.chart-section:fullscreen .chart-scroll { width: 100%; height: 100%; padding: 0; border-radius: 0; }
-.chart-section:fullscreen .view-fullscreen-enter { display: none; }
-.chart-section:fullscreen .fullscreen-view-settings-toggle { position: fixed; top: 10px; left: 10px; display: grid; }
-.chart-section:fullscreen .view-fullscreen-exit { position: fixed; top: 10px; right: 10px; display: grid; border-radius: 50%; font-size: 26px; }
-.chart-section:fullscreen .view-zoom-controls { position: fixed; top: 54px; right: auto; left: 10px; margin-left: 0; }
-.chart-section:fullscreen .chart-view-settings { position: fixed; z-index: 8; top: 54px; left: 116px; display: flex; max-width: calc(100vw - 136px); padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: #0d1d34; box-shadow: 0 18px 40px rgba(0,0,0,.4); }
-.chart-section:fullscreen .chart-view-settings[hidden] { display: none; }
+.fullscreen-view-settings-toggle, .fullscreen-tool, .fullscreen-help, .view-fullscreen-exit, .fullscreen-logo { display: none; }
+:fullscreen::backdrop { background: #071326; }
+body.view-fullscreen-active { overflow: hidden; background: #071326; }
+body.view-fullscreen-active main { width: 100%; height: 100%; margin: 0; padding: 0; }
+body.view-fullscreen-active main > .hero, body.view-fullscreen-active main > .controls, body.view-fullscreen-active main > .outputs, body.view-fullscreen-active main > footer { display: none; }
+body.view-fullscreen-active .chart-section { position: fixed; z-index: 4; inset: 0; box-sizing: border-box; width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; border: 0; border-radius: 0; background: #071326; }
+body.view-fullscreen-active .chart-heading { position: fixed; z-index: 6; top: 72px; right: 62px; left: 18px; margin: 0; padding: 0; pointer-events: none; }
+body.view-fullscreen-active .chart-title-block { gap: 3px; }
+body.view-fullscreen-active .chart-heading h2 { font-size: clamp(25px, 4vw, 44px); text-shadow: 0 2px 12px #071326, 0 0 24px #071326; }
+body.view-fullscreen-active .chart-meta { text-shadow: 0 2px 8px #071326, 0 0 16px #071326; }
+body.view-fullscreen-active .chart-heading-actions, body.view-fullscreen-active .chart-view-menu { pointer-events: auto; }
+body.view-fullscreen-active .chart-view-settings-toggle { display: none; }
+body.view-fullscreen-active .chart-view-frame { position: fixed; inset: 0; width: 100%; height: 100%; }
+body.view-fullscreen-active .chart-scroll { width: 100%; max-width: none; height: 100%; margin: 0; padding: 0; border-radius: 0; }
+body.view-fullscreen-active .view-fullscreen-enter { display: none; }
+body.view-fullscreen-active .fullscreen-view-settings-toggle { position: fixed; top: 12px; right: 12px; display: grid; }
+body.view-fullscreen-active .fullscreen-selection-toggle { position: fixed; top: 58px; right: 12px; display: grid; }
+body.view-fullscreen-active .fullscreen-output-toggle { position: fixed; top: 104px; right: 12px; display: grid; }
+body.view-fullscreen-active .view-fullscreen-exit { position: fixed; right: 12px; bottom: 12px; display: grid; border-radius: 50%; font-size: 28px; }
+body.view-fullscreen-active .fullscreen-help { position: fixed; bottom: 12px; left: 12px; display: grid; border-radius: 50%; font-weight: 900; }
+body.view-fullscreen-active .view-zoom-controls { position: fixed; top: 12px; right: auto; left: 12px; margin-left: 0; }
+body.view-fullscreen-active .chart-section .chart-view-settings { position: fixed; z-index: 9; top: 58px; right: 58px; display: grid; width: min(190px, calc(100vw - 130px)); max-height: calc(100vh - 70px); padding: 10px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: rgba(13,29,52,.72); box-shadow: 0 18px 40px rgba(0,0,0,.32); backdrop-filter: blur(8px); }
+body.view-fullscreen-active .chart-section .chart-view-settings[hidden] { display: none; }
+.fullscreen-logo { pointer-events: none; }
+body.view-fullscreen-active .fullscreen-logo { position: fixed; z-index: 5; top: 8px; left: 50%; display: block; color: #f4f8ff; text-align: center; transform: translateX(-50%); }
+body.view-fullscreen-active .fullscreen-logo strong { display: block; font-family: Georgia, serif; font-size: clamp(29px, 5vw, 58px); font-weight: 500; letter-spacing: -.055em; line-height: .9; text-shadow: 0 0 22px rgba(89,217,255,.16); }
+body.view-fullscreen-active .fullscreen-logo small { color: #7f95b2; font-size: 8px; letter-spacing: .05em; }
+body.view-fullscreen-active .fullscreen-logo b { color: #b9dff1; }
+body.view-fullscreen-active.fullscreen-selection-open main > .controls, body.view-fullscreen-active.fullscreen-output-open main > .outputs { position: fixed; z-index: 8; display: block; overflow: auto; border: 1px solid rgba(75,109,150,.72); background: rgba(7,19,38,.58); box-shadow: 0 22px 70px rgba(0,0,0,.28); backdrop-filter: blur(6px); }
+body.view-fullscreen-active.fullscreen-selection-open main > .controls { inset: 62px 62px 62px; margin: 0; border-radius: 18px; }
+body.view-fullscreen-active.fullscreen-output-open main > .outputs { right: 62px; bottom: 62px; left: 62px; max-height: calc(100vh - 124px); margin: 0; border-radius: 16px; }
+.fullscreen-report-tools { display: none; }
+body.view-fullscreen-active .fullscreen-report-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+body.view-fullscreen-active .fullscreen-report-tools .view-switch { justify-content: flex-start; }
+body.view-fullscreen-active .fullscreen-report-tools button { min-height: 34px; padding: 6px 12px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
+body.view-fullscreen-active .fullscreen-report-tools small { grid-column: 1 / -1; color: var(--muted); }
 .chart-scroll { position: relative; overflow-x: auto; overscroll-behavior-inline: contain; padding-bottom: 12px; border: 0; border-radius: 24px; background: radial-gradient(circle at 50% 18%, rgba(42,103,164,.28), transparent 42%), linear-gradient(160deg, #172744 0%, #081326 70%, #050d1b 100%); box-shadow: 0 0 42px rgba(6,16,32,.72), 0 24px 70px rgba(8,19,38,.18); }
 .view-zoom-controls { position: absolute; z-index: 4; top: 10px; right: 10px; display: grid; grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(3, 30px); width: 94px; gap: 2px; }
 .view-zoom-controls[hidden] { display: none; }
