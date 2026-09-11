@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-215">
+  <link rel="stylesheet" href="styles.css?v=report-book-216">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -235,6 +235,10 @@
       </section>
       <section id="report-app" class="report-app" hidden aria-labelledby="report-app-title">
         <div class="report-list-heading"><h2 id="report-app-title">App</h2></div>
+        <div id="helper-app-access-setting" class="helper-app-access-setting choice" hidden>
+          <input id="helper-app-access" type="checkbox">
+          <label for="helper-app-access">App-Reiter für Helper freischalten</label>
+        </div>
         <div class="report-app-row"><button id="android-app-download" type="button">Android</button><span>Version <strong id="android-app-version">wird geladen …</strong></span></div>
         <div class="report-app-row"><button id="mac-app-download" type="button">macOS</button><span>Version <strong id="mac-app-version">wird geladen …</strong></span></div>
         <div id="android-intro-update-row" class="report-app-row" hidden><button id="android-intro-update" type="button">Update Intro</button></div>
@@ -298,6 +302,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-215" defer></script>
+  <script src="app.js?v=report-book-216" defer></script>
 </body>
 </html>

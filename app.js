@@ -1522,10 +1522,14 @@ const developerFeatures = [
   ["lut", "LUT"], ["background", "Hintergrund"], ["viewSize", "Zoom"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
   ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
 ];
-const defaultDeveloperSettings = () => ({
-  mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "mobile" : !["export3d", "tabMode"].includes(key) }])),
-  desktop: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "desktop" : !["export3d", "tabMode"].includes(key) }]))
-});
+const defaultDeveloperSettings = () => {
+  const defaults = {
+    mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "mobile" : !["export3d", "tabMode"].includes(key) }])),
+    desktop: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "desktop" : !["export3d", "tabMode"].includes(key) }]))
+  };
+  ["mobile", "desktop"].forEach(platform => { defaults[platform].helperAppAccess = { visible: false, value: false }; });
+  return defaults;
+};
 let developerSettings = defaultDeveloperSettings();
 let publicDeveloperSettingsPromise;
 const completeDeveloperSettings = input => {
@@ -1533,6 +1537,9 @@ const completeDeveloperSettings = input => {
   ["mobile", "desktop"].forEach(platform => developerFeatures.forEach(([key]) => {
     if (input?.[platform]?.[key]) defaults[platform][key] = input[platform][key];
   }));
+  ["mobile", "desktop"].forEach(platform => {
+    if (input?.[platform]?.helperAppAccess) defaults[platform].helperAppAccess = input[platform].helperAppAccess;
+  });
   if (!input?.mobile?.tabMode || !input?.desktop?.tabMode) {
     try {
       const local = JSON.parse(localStorage.getItem("developer-tab-mode") || "null");
@@ -1545,8 +1552,16 @@ const completeDeveloperSettings = input => {
       if (local) ["mobile", "desktop"].forEach(platform => { if (typeof local[platform] === "boolean") defaults[platform].fullscreenDefault.value = local[platform]; });
     } catch (error) { /* Ungültige lokale Einstellung ignorieren. */ }
   }
+  if (!input?.mobile?.helperAppAccess || !input?.desktop?.helperAppAccess) {
+    try {
+      const local = JSON.parse(localStorage.getItem("helper-app-access") || "null");
+      if (typeof local === "boolean") ["mobile", "desktop"].forEach(platform => { defaults[platform].helperAppAccess.value = local; });
+    } catch (error) { /* Ungültige lokale Einstellung ignorieren. */ }
+  }
   return defaults;
 };
+
+const helperAppAccessEnabled = () => Boolean(developerSettings.mobile.helperAppAccess?.value || developerSettings.desktop.helperAppAccess?.value);
 
 async function fetchDeveloperSettings(force = false) {
   if (force) publicDeveloperSettingsPromise = null;
@@ -1712,12 +1727,15 @@ function saveDeveloperSettings() {
       const pending = structuredClone(developerSettings);
       localStorage.setItem("developer-tab-mode", JSON.stringify({ mobile: pending.mobile.tabMode.value, desktop: pending.desktop.tabMode.value }));
       localStorage.setItem("developer-fullscreen-default", JSON.stringify({ mobile: pending.mobile.fullscreenDefault.value, desktop: pending.desktop.fullscreenDefault.value }));
+      localStorage.setItem("helper-app-access", JSON.stringify(Boolean(pending.mobile.helperAppAccess.value || pending.desktop.helperAppAccess.value)));
       const payload = await reportRequest("/settings/developer", { method: "PATCH", body: JSON.stringify({ settings: developerSettings }) });
       developerSettings = completeDeveloperSettings(payload.settings);
       if (!payload.settings?.mobile?.tabMode) developerSettings.mobile.tabMode = pending.mobile.tabMode;
       if (!payload.settings?.desktop?.tabMode) developerSettings.desktop.tabMode = pending.desktop.tabMode;
       if (!payload.settings?.mobile?.fullscreenDefault) developerSettings.mobile.fullscreenDefault = pending.mobile.fullscreenDefault;
       if (!payload.settings?.desktop?.fullscreenDefault) developerSettings.desktop.fullscreenDefault = pending.desktop.fullscreenDefault;
+      if (!payload.settings?.mobile?.helperAppAccess) developerSettings.mobile.helperAppAccess = pending.mobile.helperAppAccess;
+      if (!payload.settings?.desktop?.helperAppAccess) developerSettings.desktop.helperAppAccess = pending.desktop.helperAppAccess;
       publicDeveloperSettingsPromise = Promise.resolve(developerSettings);
       message.textContent = "Einstellungen gespeichert.";
     } catch (error) { message.textContent = error.message; }
@@ -2424,7 +2442,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-login").hidden = true;
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
-        document.querySelector("#report-app-open").hidden = currentReportRole !== "Admin";
+        document.querySelector("#report-app-open").hidden = currentReportRole !== "Admin" && !helperAppAccessEnabled();
+        const helperAppAccessSetting = document.querySelector("#helper-app-access-setting");
+        const helperAppAccessToggle = document.querySelector("#helper-app-access");
+        helperAppAccessSetting.hidden = currentReportRole !== "Admin";
+        helperAppAccessToggle.checked = helperAppAccessEnabled();
         const developerTab = document.querySelector("#report-developer-open");
         developerTab.innerHTML = `${currentReportRole === "Admin" ? "Master" : "View Master"} <span class="report-tab-gear" aria-hidden="true">⚙</span>`;
         document.querySelector("#report-logout").hidden = false;
@@ -2470,6 +2492,13 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#report-app-open").addEventListener("click", () => {
       if (!toggleReportTab(document.querySelector("#report-app-open"))) return;
       loadAppRelease();
+    });
+    document.querySelector("#helper-app-access").addEventListener("change", event => {
+      if (currentReportRole !== "Admin") return;
+      const enabled = event.currentTarget.checked;
+      ["mobile", "desktop"].forEach(platform => { developerSettings[platform].helperAppAccess = { visible: false, value: enabled }; });
+      localStorage.setItem("helper-app-access", JSON.stringify(enabled));
+      saveDeveloperSettings();
     });
     document.querySelector("#report-book-open").addEventListener("click", () => toggleReportTab(document.querySelector("#report-book-open")));
     document.querySelector("#report-account-form").addEventListener("submit", async event => {
