@@ -1,6 +1,6 @@
 {
-  "version": "1.0.16",
+  "version": "1.0.17",
   "downloadUrl": "https://github.com/charavision/SonntagsfrageView/raw/main/Sonntagsfragen-Android.apk",
-  "macVersion": "1.0.16",
-  "macDownloadUrl": "https://github.com/charavision/SonntagsfrageView/raw/main/Sonntagsfragen-macOS.dmg"
+  "macVersion": "1.0.17",
+  "macDownloadUrl": "https://github.com/charavision/SonntagsfrageView/raw/main/Sonntagsfragen-macOS.zip"
 }

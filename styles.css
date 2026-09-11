@@ -117,6 +117,10 @@ body.intro-running main { opacity: 0; animation: none; }
 .simple-intro .intro-brand::before { display: none; }
 .simple-intro .intro-brand strong { opacity: 1; animation: none; }
 .simple-intro .intro-brand strong span { display: inline-block; transform-style: preserve-3d; }
+.simple-intro .intro-brand-target { color: #f4f8ff; text-align: center; }
+.simple-intro .intro-brand-target strong { font-family: Georgia, serif; font-size: clamp(30.5px, 5.25vw, 61px); font-weight: 500; letter-spacing: -.055em; line-height: .9; text-shadow: 0 0 22px rgba(89,217,255,.16); }
+.simple-intro .intro-brand-target small { position: static; display: block; margin-top: 1px; color: #7f95b2; font-size: 8px; letter-spacing: .05em; line-height: 1; text-align: center; transform: none; }
+.simple-intro .intro-brand-target b { color: #b9dff1; }
 .simple-intro.intro-waiting, .simple-intro.intro-waiting::after, .simple-intro.intro-waiting .intro-fog, .simple-intro.intro-waiting .intro-fog::before, .simple-intro.intro-waiting .intro-fog::after { animation-play-state: paused !important; }
 @keyframes simple-fog-clears { 0% { opacity: 1; transform: scale(.88) translate3d(-3%,2%,0); } 42% { opacity: .72; } 78% { opacity: .18; transform: scale(1.14) translate3d(4%,-3%,0); } 100% { opacity: 0; transform: scale(1.28) translate3d(7%,-5%,0); } }
 @keyframes simple-nebula { 0% { opacity: 1; transform: scale(.9); } 62% { opacity: .72; } 100% { opacity: 0; transform: scale(1.2); } }
@@ -275,10 +279,10 @@ body.view-fullscreen-active { overflow: hidden; background: #071326; }
 body.view-fullscreen-active main { width: 100%; height: 100%; margin: 0; padding: 0; }
 body.view-fullscreen-active main > .hero, body.view-fullscreen-active main > .controls, body.view-fullscreen-active main > .outputs, body.view-fullscreen-active main > footer { display: none; }
 body.view-fullscreen-active .chart-section { position: fixed; z-index: 4; inset: 0; box-sizing: border-box; width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; border: 0; border-radius: 0; background: #071326; }
-body.view-fullscreen-active .chart-heading { position: fixed; z-index: 6; top: 76px; right: 90px; left: 90px; justify-content: center; margin: 0; padding: 0; text-align: center; pointer-events: none; }
-body.view-fullscreen-active .chart-title-block { gap: 3px; }
-body.view-fullscreen-active .chart-heading h2 { font-size: clamp(17px, 2vw, 25px); text-shadow: 0 2px 12px #071326, 0 0 24px #071326; }
-body.view-fullscreen-active .chart-meta { font-size: clamp(10px, 1.1vw, 13px); text-align: center; text-shadow: 0 2px 8px #071326, 0 0 16px #071326; }
+body.view-fullscreen-active .chart-heading { position: fixed; z-index: 6; top: 14px; right: auto; left: 16px; justify-content: flex-start; width: clamp(110px, 16vw, 180px); margin: 0; padding: 0; opacity: .58; text-align: left; pointer-events: none; }
+body.view-fullscreen-active .chart-title-block { width: 100%; gap: 3px; }
+body.view-fullscreen-active .chart-heading h2 { font-size: clamp(14px, 1.5vw, 20px); line-height: 1.05; text-shadow: 0 2px 12px #071326, 0 0 24px #071326; }
+body.view-fullscreen-active .chart-meta { max-width: 100%; font-size: clamp(10px, 1.1vw, 13px); line-height: 1.25; text-align: left; overflow-wrap: anywhere; text-shadow: 0 2px 8px #071326, 0 0 16px #071326; }
 body.view-fullscreen-active .chart-heading-actions, body.view-fullscreen-active .chart-view-menu { pointer-events: auto; }
 body.view-fullscreen-active .chart-view-settings-toggle { display: none; }
 body.view-fullscreen-active .chart-view-frame { position: fixed; inset: 0; width: 100%; height: 100%; }
@@ -287,14 +291,14 @@ body.view-fullscreen-active .view-fullscreen-enter { display: none; }
 body.view-fullscreen-active .fullscreen-view-settings-toggle { position: fixed; top: 12px; right: 12px; display: grid; }
 body.view-fullscreen-active .fullscreen-selection-toggle { position: fixed; top: 58px; right: 12px; display: grid; }
 body.view-fullscreen-active .fullscreen-output-toggle { position: fixed; top: 104px; right: 12px; display: grid; }
-body.view-fullscreen-active .view-fullscreen-exit { position: fixed; right: 12px; bottom: 12px; display: grid; border-radius: 50%; font-size: 28px; }
-body.view-fullscreen-active .fullscreen-help { position: fixed; bottom: 12px; left: 12px; display: grid; border-radius: 50%; font-weight: 900; }
-body.view-fullscreen-active .view-zoom-controls { position: fixed; top: 12px; right: auto; left: 12px; margin-left: 0; }
+body.view-fullscreen-active .view-fullscreen-exit { position: fixed; top: 12px; right: 12px; bottom: auto; display: grid; border-radius: 50%; font-size: 28px; }
+body.view-fullscreen-active .fullscreen-help { position: fixed; top: calc(50% + 75px); right: 12px; bottom: auto; left: auto; display: grid; border-radius: 50%; font-weight: 900; }
+body.view-fullscreen-active .view-zoom-controls { position: fixed; top: calc(50% - 175px); right: 0; left: auto; margin-left: 0; }
 body.view-fullscreen-active .chart-section .chart-view-settings { position: fixed; z-index: 9; top: 58px; right: 58px; display: grid; width: min(190px, calc(100vw - 130px)); max-height: calc(100vh - 70px); padding: 10px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: rgba(13,29,52,.72); box-shadow: 0 18px 40px rgba(0,0,0,.32); backdrop-filter: blur(8px); }
 body.view-fullscreen-active .chart-section .chart-view-settings[hidden] { display: none; }
 .fullscreen-logo { pointer-events: none; }
-body.view-fullscreen-active .fullscreen-logo { position: fixed; z-index: 5; top: 8px; left: 50%; display: block; color: #f4f8ff; text-align: center; transform: translateX(-50%); }
-body.view-fullscreen-active .fullscreen-logo strong { display: block; font-family: Georgia, serif; font-size: clamp(29px, 5vw, 58px); font-weight: 500; letter-spacing: -.055em; line-height: .9; text-shadow: 0 0 22px rgba(89,217,255,.16); }
+body.view-fullscreen-active .fullscreen-logo { position: fixed; z-index: 5; top: 12px; left: 50%; display: block; color: #f4f8ff; text-align: center; transform: translateX(-50%); }
+body.view-fullscreen-active .fullscreen-logo strong { display: block; font-family: Georgia, serif; font-size: clamp(30.5px, 5.25vw, 61px); font-weight: 500; letter-spacing: -.055em; line-height: .9; text-shadow: 0 0 22px rgba(89,217,255,.16); }
 body.view-fullscreen-active .fullscreen-logo small { color: #7f95b2; font-size: 8px; letter-spacing: .05em; }
 body.view-fullscreen-active .fullscreen-logo b { color: #b9dff1; }
 body.view-fullscreen-active.fullscreen-selection-open main > .controls, body.view-fullscreen-active.fullscreen-output-open main > .outputs { position: fixed; z-index: 8; display: block; overflow: auto; border: 1px solid rgba(75,109,150,.72); background: rgba(7,19,38,.58); box-shadow: 0 22px 70px rgba(0,0,0,.28); backdrop-filter: blur(6px); }

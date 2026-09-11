@@ -19,14 +19,43 @@ const REGION_CODES = {
 };
 
 const startsMobile = window.matchMedia("(max-width: 900px)").matches;
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+let storedViewScales = { mobile: { x: 1, y: 1 }, desktop: { x: 1, y: 1 } };
+try {
+  const saved = JSON.parse(localStorage.getItem("view-scales") || "{}");
+  ["mobile", "desktop"].forEach(platform => {
+    const value = saved[platform];
+    if (typeof value === "number") storedViewScales[platform] = { x: value, y: value };
+    else if (value && typeof value === "object") storedViewScales[platform] = { x: Number(value.x) || 1, y: Number(value.y) || 1 };
+  });
+} catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+let fullscreenPreviousTabMode = null;
+function setFullscreenView(active) {
+  const wasActive = document.body.classList.contains("view-fullscreen-active");
+  document.body.classList.toggle("view-fullscreen-active", active);
+  const panel = document.querySelector("#chart-view-settings");
+  if (panel) panel.hidden = active || state.mobileView;
+  if (els?.fullscreenSettings) els.fullscreenSettings.setAttribute("aria-expanded", "false");
+  if (active) {
+    if (!wasActive) fullscreenPreviousTabMode = state.tabMode;
+    state.tabMode = true;
+  } else if (!active && wasActive && fullscreenPreviousTabMode !== null) {
+    state.tabMode = fullscreenPreviousTabMode;
+    fullscreenPreviousTabMode = null;
+    document.body.classList.remove("fullscreen-selection-open", "fullscreen-output-open");
+    els?.fullscreenSelection?.setAttribute("aria-expanded", "false");
+    els?.fullscreenOutput?.setAttribute("aria-expanded", "false");
+  }
+  updateSelectionTabMode();
+  if (state.data) requestAnimationFrame(() => render(false));
+}
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataStand: document.querySelector("#report-data-stand"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
@@ -311,6 +340,22 @@ function growBar(element, center, baseline, opacity, enabled, delay) {
   );
 }
 
+function currentViewScale(axis = "y") {
+  const value = Number(state.viewScales[state.mobileView ? "mobile" : "desktop"]?.[axis]);
+  const minimum = axis === "x" ? .4 : .6;
+  const maximum = axis === "x" ? 3 : 1.8;
+  return state.viewSizeEnabled && state.viewZoomEnabled && Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : 1;
+}
+
+function setViewScale(axis, next) {
+  const platform = state.mobileView ? "mobile" : "desktop";
+  const minimum = axis === "x" ? .4 : .6;
+  const maximum = axis === "x" ? 3 : 1.8;
+  state.viewScales[platform][axis] = Math.max(minimum, Math.min(maximum, Math.round(next * 10) / 10));
+  localStorage.setItem("view-scales", JSON.stringify(state.viewScales));
+  render(false);
+}
+
 function render(animate = true) {
   applyViewMode();
   els.chartSection.classList.toggle("mobile-view", state.mobileView);
@@ -362,10 +407,13 @@ function render(animate = true) {
   const availableWidth = Math.max(desktopModeOnMobileDevice ? 1500 : 320, els.scroll.clientWidth - 2);
   const visibleBarLimit = compact ? 9 : 20;
   const visiblePlotWidth = availableWidth - margin.left - margin.right;
-  const width = totalBarCount <= visibleBarLimit
+  const baseWidth = totalBarCount <= visibleBarLimit
     ? availableWidth
     : Math.max(availableWidth, margin.left + margin.right + visiblePlotWidth * (totalBarCount / visibleBarLimit));
-  const height = compact ? 520 : 590;
+  const horizontalScale = currentViewScale("x");
+  const width = Math.max(availableWidth, margin.left + margin.right + (baseWidth - margin.left - margin.right) * horizontalScale);
+  const fullscreenHeight = document.body.classList.contains("view-fullscreen-active") ? window.innerHeight : 0;
+  const height = Math.max(compact ? 520 : 590, fullscreenHeight);
   const innerH = height - margin.top - margin.bottom;
   const baselineY = margin.top + innerH;
   const floorBackY = baselineY - (compact ? 18 : 44);
@@ -378,9 +426,10 @@ function render(animate = true) {
     : parties.map(party => ({ key: `party:${party}`, bars: series.map(item => ({ party, item })) }));
   const groupWidth = chartW / groupedBars.length;
   const maxValue = Math.max(50, ...series.flatMap(item => parties.map(party => item.poll.values[party] || 0)));
-  const yMax = Math.ceil(maxValue / 10) * 10;
+  const verticalScale = currentViewScale("y");
+  const yMax = Math.ceil(maxValue / 10) * 10 / verticalScale;
   els.chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  els.chart.setAttribute("width", width);
+  els.chart.setAttribute("width", Math.round(width));
   els.chart.setAttribute("height", height);
 
   const defs = svgEl("defs");
@@ -490,7 +539,7 @@ function render(animate = true) {
   const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12) - maxBlockBreaks * blockGap) / maxBarsPerGroup;
   const barGap = maxBarsPerGroup === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
   const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : availablePerBar - barGap;
-  const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth, availablePerBar - barGap));
+  const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth * horizontalScale, availablePerBar - barGap));
   const displayedBars = [];
   const perspectiveBars = [];
   groupedBars.forEach((group, groupIndex) => {
@@ -1382,11 +1431,11 @@ async function loadAppRelease() {
     macButton.onclick = () => {
       message.textContent = runsInMacApp ? "Mac-App-Update wird geladen …" : "Download wird gestartet …";
       if (runsInMacApp) window.MacApp.installUpdate(release.macDownloadUrl);
-      else if (window.AndroidApp?.downloadFile) window.AndroidApp.downloadFile(release.macDownloadUrl, `Sonntagsfragen-macOS-v${release.macVersion}.dmg`);
+      else if (window.AndroidApp?.downloadFile) window.AndroidApp.downloadFile(release.macDownloadUrl, `Sonntagsfragen-macOS-v${release.macVersion}.zip`);
       else {
         const link = document.createElement("a");
         link.href = release.macDownloadUrl;
-        link.download = `Sonntagsfragen-macOS-v${release.macVersion}.dmg`;
+        link.download = `Sonntagsfragen-macOS-v${release.macVersion}.zip`;
         link.click();
       }
     };
@@ -1470,7 +1519,7 @@ const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
   ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"], ["brackets", "Klammern"],
   ["labels", "Beschriftungen"], ["barColors", "Balkenfarbe"], ["percentValues", "Prozentwerte"],
-  ["lut", "LUT"], ["background", "Hintergrund"], ["preview", "Vorschau"],
+  ["lut", "LUT"], ["background", "Hintergrund"], ["viewSize", "Zoom"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
   ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
 ];
 const defaultDeveloperSettings = () => ({
@@ -1489,6 +1538,12 @@ const completeDeveloperSettings = input => {
       const local = JSON.parse(localStorage.getItem("developer-tab-mode") || "null");
       if (local) ["mobile", "desktop"].forEach(platform => { if (typeof local[platform] === "boolean") defaults[platform].tabMode.value = local[platform]; });
     } catch (error) { /* Ungültige alte lokale Einstellung ignorieren. */ }
+  }
+  if (!input?.mobile?.fullscreenDefault || !input?.desktop?.fullscreenDefault) {
+    try {
+      const local = JSON.parse(localStorage.getItem("developer-fullscreen-default") || "null");
+      if (local) ["mobile", "desktop"].forEach(platform => { if (typeof local[platform] === "boolean") defaults[platform].fullscreenDefault.value = local[platform]; });
+    } catch (error) { /* Ungültige lokale Einstellung ignorieren. */ }
   }
   return defaults;
 };
@@ -1536,6 +1591,12 @@ function applyDeveloperSettings() {
   state.showPercentValues = Boolean(settings.percentValues.value);
   state.showLut = Boolean(settings.lut.value);
   state.showBackground = Boolean(settings.background.value);
+  state.viewSizeEnabled = Boolean(settings.viewSize.value);
+  state.viewZoomEnabled = state.viewSizeEnabled;
+  els.viewZoomEnabled.checked = state.viewZoomEnabled;
+  state.fullscreenEnabled = Boolean(settings.fullscreen.value);
+  els.fullscreenEnabled.checked = state.fullscreenEnabled;
+  state.fullscreenDefault = Boolean(settings.fullscreenDefault.value);
   state.a4Mode = Boolean(settings.a4Output.value);
   state.export3d = Boolean(settings.export3d.value);
   state.tabMode = Boolean(settings.tabMode?.value);
@@ -1551,12 +1612,22 @@ function applyDeveloperSettings() {
   setVisible(".percent-values-choice", settings.percentValues.visible);
   setVisible(".lut-choice", settings.lut.visible);
   setVisible(".background-choice", settings.background.visible);
+  setVisible(".view-zoom-choice", settings.viewSize.visible);
+  els.viewZoomControls.hidden = !settings.viewSize.visible || !state.viewZoomEnabled;
+  setVisible(".fullscreen-choice", settings.fullscreen.visible);
+  els.fullscreenEnter.hidden = !settings.fullscreen.visible || !state.fullscreenEnabled;
   setVisible("#preview-export", settings.preview.visible);
   const a4Choice = document.querySelector('input[name="output-shape"][value="a4"]')?.closest("label");
   if (a4Choice) a4Choice.hidden = !settings.a4Output.visible;
   const export3dChoice = document.querySelector("#export-3d")?.closest("label");
   if (export3dChoice) export3dChoice.hidden = !settings.export3d.visible;
   els.updateData.disabled = !settings.dataUpdate.value;
+  els.viewSizeDown.disabled = !state.viewSizeEnabled;
+  els.viewSizeUp.disabled = !state.viewSizeEnabled;
+  els.viewWidthDown.disabled = !state.viewSizeEnabled;
+  els.viewWidthUp.disabled = !state.viewSizeEnabled;
+  els.fullscreenEnter.disabled = !state.fullscreenEnabled;
+  setFullscreenView(state.fullscreenEnabled && state.fullscreenDefault);
   applyViewMode();
 }
 
@@ -1640,10 +1711,13 @@ function saveDeveloperSettings() {
     try {
       const pending = structuredClone(developerSettings);
       localStorage.setItem("developer-tab-mode", JSON.stringify({ mobile: pending.mobile.tabMode.value, desktop: pending.desktop.tabMode.value }));
+      localStorage.setItem("developer-fullscreen-default", JSON.stringify({ mobile: pending.mobile.fullscreenDefault.value, desktop: pending.desktop.fullscreenDefault.value }));
       const payload = await reportRequest("/settings/developer", { method: "PATCH", body: JSON.stringify({ settings: developerSettings }) });
       developerSettings = completeDeveloperSettings(payload.settings);
       if (!payload.settings?.mobile?.tabMode) developerSettings.mobile.tabMode = pending.mobile.tabMode;
       if (!payload.settings?.desktop?.tabMode) developerSettings.desktop.tabMode = pending.desktop.tabMode;
+      if (!payload.settings?.mobile?.fullscreenDefault) developerSettings.mobile.fullscreenDefault = pending.mobile.fullscreenDefault;
+      if (!payload.settings?.desktop?.fullscreenDefault) developerSettings.desktop.fullscreenDefault = pending.desktop.fullscreenDefault;
       publicDeveloperSettingsPromise = Promise.resolve(developerSettings);
       message.textContent = "Einstellungen gespeichert.";
     } catch (error) { message.textContent = error.message; }
@@ -1986,8 +2060,7 @@ async function startSimpleAppIntro() {
   const intro = document.querySelector("#app-intro");
   const brand = document.querySelector("#intro-brand");
   const targetBrand = document.querySelector("#intro-brand-target");
-  const target = document.querySelector(".title-lockup h1");
-  if (!intro || !brand || !targetBrand || !target) return;
+  if (!intro || !brand || !targetBrand) return;
   try {
     const settings = await fetchDeveloperSettings();
     const introSetting = settings[startsMobile ? "mobile" : "desktop"].intro;
@@ -2002,23 +2075,20 @@ async function startSimpleAppIntro() {
   await waitForVisibleAppSurface();
   intro.classList.remove("intro-waiting");
   intro.classList.add("simple-intro");
-  const box = target.getBoundingClientRect();
-  const style = getComputedStyle(target);
-  brand.style.left = `${box.left}px`;
-  brand.style.top = `${box.top}px`;
-  brand.style.width = `${box.width}px`;
-  brand.style.height = `${box.height}px`;
-  targetBrand.style.left = `${box.left}px`;
-  targetBrand.style.top = `${box.top}px`;
-  targetBrand.style.width = `${box.width}px`;
-  targetBrand.style.height = `${box.height}px`;
-  const shiftX = window.innerWidth / 2 - (box.left + box.width / 2);
-  const shiftY = window.innerHeight * .55 - (box.top + box.height / 2);
-  brand.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+  brand.style.left = "50%";
+  brand.style.top = "55%";
+  brand.style.width = "max-content";
+  brand.style.height = "auto";
+  brand.style.transform = "translate(-50%, -50%)";
+  targetBrand.style.left = "50%";
+  targetBrand.style.top = "12px";
+  targetBrand.style.width = "max-content";
+  targetBrand.style.height = "auto";
+  targetBrand.style.transform = "translateX(-50%)";
   targetBrand.style.opacity = "1";
-  const makeLetters = container => {
+  const makeLetters = (container, fontSize) => {
     const word = container.querySelector("strong");
-    word.style.fontSize = style.fontSize;
+    word.style.fontSize = fontSize;
     const letters = [...word.textContent];
     word.replaceChildren(...letters.map(character => {
       const span = document.createElement("span");
@@ -2027,8 +2097,8 @@ async function startSimpleAppIntro() {
     }));
     return [...word.children];
   };
-  const centerLetters = makeLetters(brand);
-  const destinationLetters = makeLetters(targetBrand);
+  const centerLetters = makeLetters(brand, "clamp(48px, 8vw, 104px)");
+  const destinationLetters = makeLetters(targetBrand, "clamp(30.5px, 5.25vw, 61px)");
   const irregularDelays = [170, 20, 310, 95, 250, 5, 205, 355, 65, 280, 125, 335, 45, 225, 145];
   const letterAnimations = centerLetters.flatMap((letter, index) => {
     const retreats = [true, false, true, true, false, true, false, false, true, false, true, false, false, true, false][index];
@@ -2176,6 +2246,21 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       state.showBackground = event.currentTarget.checked;
       render(false);
     });
+    els.viewZoomEnabled.addEventListener("change", event => {
+      state.viewZoomEnabled = event.currentTarget.checked;
+      els.viewZoomControls.hidden = !state.viewZoomEnabled;
+      render(false);
+    });
+    els.fullscreenEnabled.addEventListener("change", async event => {
+      state.fullscreenEnabled = event.currentTarget.checked;
+      els.fullscreenEnter.hidden = !state.fullscreenEnabled;
+      if (!state.fullscreenEnabled && document.fullscreenElement) await document.exitFullscreen();
+      else if (!state.fullscreenEnabled) setFullscreenView(false);
+    });
+    els.viewSizeDown.addEventListener("click", () => setViewScale("y", currentViewScale("y") - .1));
+    els.viewSizeUp.addEventListener("click", () => setViewScale("y", currentViewScale("y") + .1));
+    els.viewWidthDown.addEventListener("click", () => setViewScale("x", currentViewScale("x") - .2));
+    els.viewWidthUp.addEventListener("click", () => setViewScale("x", currentViewScale("x") + .2));
     document.querySelectorAll(".cluster-mode-button").forEach(button => button.addEventListener("click", event => {
       state.groupBy = event.currentTarget.dataset.group;
       render();
@@ -2201,6 +2286,47 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     togglePanel(document.querySelector("#settings-toggle"), document.querySelector("#chart-settings"));
     togglePanel(document.querySelector("#chart-view-settings-toggle"), document.querySelector("#chart-view-settings"));
+    togglePanel(els.fullscreenSettings, document.querySelector("#chart-view-settings"));
+    els.fullscreenEnter.addEventListener("click", async () => {
+      if (!state.fullscreenEnabled) return;
+      setFullscreenView(true);
+      if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen().catch(() => {});
+    });
+    els.fullscreenExit.addEventListener("click", async () => {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else setFullscreenView(false);
+    });
+    const closeFullscreenOverlays = () => {
+      document.body.classList.remove("fullscreen-selection-open", "fullscreen-output-open");
+      els.fullscreenSelection.setAttribute("aria-expanded", "false");
+      els.fullscreenOutput.setAttribute("aria-expanded", "false");
+    };
+    els.fullscreenSelection.addEventListener("click", () => {
+      const open = !document.body.classList.contains("fullscreen-selection-open");
+      closeFullscreenOverlays();
+      document.body.classList.toggle("fullscreen-selection-open", open);
+      els.fullscreenSelection.setAttribute("aria-expanded", String(open));
+    });
+    els.fullscreenOutput.addEventListener("click", () => {
+      const open = !document.body.classList.contains("fullscreen-output-open");
+      closeFullscreenOverlays();
+      document.body.classList.toggle("fullscreen-output-open", open);
+      els.fullscreenOutput.setAttribute("aria-expanded", String(open));
+    });
+    els.fullscreenHelp.addEventListener("click", () => {
+      els.reportMobileView.checked = state.mobileView;
+      els.reportDataStand.textContent = `Stand: ${els.updated.textContent}${els.updatedTime.textContent ? ` · ${els.updatedTime.textContent}` : ""}`;
+      document.querySelector("#report-open").click();
+    });
+    els.reportMobileView.addEventListener("change", event => {
+      els.mobileView.checked = event.currentTarget.checked;
+      els.mobileView.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    els.reportUpdateData.addEventListener("click", () => els.updateData.click());
+    document.addEventListener("fullscreenchange", () => {
+      const active = Boolean(document.fullscreenElement);
+      setFullscreenView(active);
+    });
     document.addEventListener("pointerdown", event => {
       const mainPanel = document.querySelector("#chart-settings");
       const mainButton = document.querySelector("#settings-toggle");
@@ -2211,9 +2337,18 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       const menu = document.querySelector(".chart-view-menu");
       const panel = document.querySelector("#chart-view-settings");
       const button = document.querySelector("#chart-view-settings-toggle");
-      if (!panel.hidden && !menu.contains(event.target)) {
+      if (!panel.hidden && !menu.contains(event.target) && !els.fullscreenSettings.contains(event.target)) {
         panel.hidden = true;
         button.setAttribute("aria-expanded", "false");
+        els.fullscreenSettings.setAttribute("aria-expanded", "false");
+      }
+      if (document.body.classList.contains("fullscreen-selection-open")) {
+        const selectionPanel = document.querySelector("main > .controls");
+        if (!selectionPanel.contains(event.target) && !els.fullscreenSelection.contains(event.target)) closeFullscreenOverlays();
+      }
+      if (document.body.classList.contains("fullscreen-output-open")) {
+        const outputPanel = document.querySelector("main > .outputs");
+        if (!outputPanel.contains(event.target) && !els.fullscreenOutput.contains(event.target)) closeFullscreenOverlays();
       }
     });
     togglePanel(document.querySelector("#export-settings-toggle"), document.querySelector("#export-settings"));

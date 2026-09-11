@@ -28,8 +28,27 @@ try {
     else if (value && typeof value === "object") storedViewScales[platform] = { x: Number(value.x) || 1, y: Number(value.y) || 1 };
   });
 } catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
 let fullscreenPreviousTabMode = null;
+function setFullscreenView(active) {
+  const wasActive = document.body.classList.contains("view-fullscreen-active");
+  document.body.classList.toggle("view-fullscreen-active", active);
+  const panel = document.querySelector("#chart-view-settings");
+  if (panel) panel.hidden = active || state.mobileView;
+  if (els?.fullscreenSettings) els.fullscreenSettings.setAttribute("aria-expanded", "false");
+  if (active) {
+    if (!wasActive) fullscreenPreviousTabMode = state.tabMode;
+    state.tabMode = true;
+  } else if (!active && wasActive && fullscreenPreviousTabMode !== null) {
+    state.tabMode = fullscreenPreviousTabMode;
+    fullscreenPreviousTabMode = null;
+    document.body.classList.remove("fullscreen-selection-open", "fullscreen-output-open");
+    els?.fullscreenSelection?.setAttribute("aria-expanded", "false");
+    els?.fullscreenOutput?.setAttribute("aria-expanded", "false");
+  }
+  updateSelectionTabMode();
+  if (state.data) requestAnimationFrame(() => render(false));
+}
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
@@ -393,7 +412,7 @@ function render(animate = true) {
     : Math.max(availableWidth, margin.left + margin.right + visiblePlotWidth * (totalBarCount / visibleBarLimit));
   const horizontalScale = currentViewScale("x");
   const width = Math.max(availableWidth, margin.left + margin.right + (baseWidth - margin.left - margin.right) * horizontalScale);
-  const fullscreenHeight = document.fullscreenElement ? window.innerHeight : 0;
+  const fullscreenHeight = document.body.classList.contains("view-fullscreen-active") ? window.innerHeight : 0;
   const height = Math.max(compact ? 520 : 590, fullscreenHeight);
   const innerH = height - margin.top - margin.bottom;
   const baselineY = margin.top + innerH;
@@ -1412,11 +1431,11 @@ async function loadAppRelease() {
     macButton.onclick = () => {
       message.textContent = runsInMacApp ? "Mac-App-Update wird geladen …" : "Download wird gestartet …";
       if (runsInMacApp) window.MacApp.installUpdate(release.macDownloadUrl);
-      else if (window.AndroidApp?.downloadFile) window.AndroidApp.downloadFile(release.macDownloadUrl, `Sonntagsfragen-macOS-v${release.macVersion}.dmg`);
+      else if (window.AndroidApp?.downloadFile) window.AndroidApp.downloadFile(release.macDownloadUrl, `Sonntagsfragen-macOS-v${release.macVersion}.zip`);
       else {
         const link = document.createElement("a");
         link.href = release.macDownloadUrl;
-        link.download = `Sonntagsfragen-macOS-v${release.macVersion}.dmg`;
+        link.download = `Sonntagsfragen-macOS-v${release.macVersion}.zip`;
         link.click();
       }
     };
@@ -1500,7 +1519,7 @@ const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
   ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"], ["brackets", "Klammern"],
   ["labels", "Beschriftungen"], ["barColors", "Balkenfarbe"], ["percentValues", "Prozentwerte"],
-  ["lut", "LUT"], ["background", "Hintergrund"], ["viewSize", "Zoom"], ["fullscreen", "Vollbild"], ["preview", "Vorschau"],
+  ["lut", "LUT"], ["background", "Hintergrund"], ["viewSize", "Zoom"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
   ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
 ];
 const defaultDeveloperSettings = () => ({
@@ -1519,6 +1538,12 @@ const completeDeveloperSettings = input => {
       const local = JSON.parse(localStorage.getItem("developer-tab-mode") || "null");
       if (local) ["mobile", "desktop"].forEach(platform => { if (typeof local[platform] === "boolean") defaults[platform].tabMode.value = local[platform]; });
     } catch (error) { /* Ungültige alte lokale Einstellung ignorieren. */ }
+  }
+  if (!input?.mobile?.fullscreenDefault || !input?.desktop?.fullscreenDefault) {
+    try {
+      const local = JSON.parse(localStorage.getItem("developer-fullscreen-default") || "null");
+      if (local) ["mobile", "desktop"].forEach(platform => { if (typeof local[platform] === "boolean") defaults[platform].fullscreenDefault.value = local[platform]; });
+    } catch (error) { /* Ungültige lokale Einstellung ignorieren. */ }
   }
   return defaults;
 };
@@ -1571,6 +1596,7 @@ function applyDeveloperSettings() {
   els.viewZoomEnabled.checked = state.viewZoomEnabled;
   state.fullscreenEnabled = Boolean(settings.fullscreen.value);
   els.fullscreenEnabled.checked = state.fullscreenEnabled;
+  state.fullscreenDefault = Boolean(settings.fullscreenDefault.value);
   state.a4Mode = Boolean(settings.a4Output.value);
   state.export3d = Boolean(settings.export3d.value);
   state.tabMode = Boolean(settings.tabMode?.value);
@@ -1601,6 +1627,7 @@ function applyDeveloperSettings() {
   els.viewWidthDown.disabled = !state.viewSizeEnabled;
   els.viewWidthUp.disabled = !state.viewSizeEnabled;
   els.fullscreenEnter.disabled = !state.fullscreenEnabled;
+  setFullscreenView(state.fullscreenEnabled && state.fullscreenDefault);
   applyViewMode();
 }
 
@@ -1684,10 +1711,13 @@ function saveDeveloperSettings() {
     try {
       const pending = structuredClone(developerSettings);
       localStorage.setItem("developer-tab-mode", JSON.stringify({ mobile: pending.mobile.tabMode.value, desktop: pending.desktop.tabMode.value }));
+      localStorage.setItem("developer-fullscreen-default", JSON.stringify({ mobile: pending.mobile.fullscreenDefault.value, desktop: pending.desktop.fullscreenDefault.value }));
       const payload = await reportRequest("/settings/developer", { method: "PATCH", body: JSON.stringify({ settings: developerSettings }) });
       developerSettings = completeDeveloperSettings(payload.settings);
       if (!payload.settings?.mobile?.tabMode) developerSettings.mobile.tabMode = pending.mobile.tabMode;
       if (!payload.settings?.desktop?.tabMode) developerSettings.desktop.tabMode = pending.desktop.tabMode;
+      if (!payload.settings?.mobile?.fullscreenDefault) developerSettings.mobile.fullscreenDefault = pending.mobile.fullscreenDefault;
+      if (!payload.settings?.desktop?.fullscreenDefault) developerSettings.desktop.fullscreenDefault = pending.desktop.fullscreenDefault;
       publicDeveloperSettingsPromise = Promise.resolve(developerSettings);
       message.textContent = "Einstellungen gespeichert.";
     } catch (error) { message.textContent = error.message; }
@@ -2030,8 +2060,7 @@ async function startSimpleAppIntro() {
   const intro = document.querySelector("#app-intro");
   const brand = document.querySelector("#intro-brand");
   const targetBrand = document.querySelector("#intro-brand-target");
-  const target = document.querySelector(".title-lockup h1");
-  if (!intro || !brand || !targetBrand || !target) return;
+  if (!intro || !brand || !targetBrand) return;
   try {
     const settings = await fetchDeveloperSettings();
     const introSetting = settings[startsMobile ? "mobile" : "desktop"].intro;
@@ -2046,23 +2075,20 @@ async function startSimpleAppIntro() {
   await waitForVisibleAppSurface();
   intro.classList.remove("intro-waiting");
   intro.classList.add("simple-intro");
-  const box = target.getBoundingClientRect();
-  const style = getComputedStyle(target);
-  brand.style.left = `${box.left}px`;
-  brand.style.top = `${box.top}px`;
-  brand.style.width = `${box.width}px`;
-  brand.style.height = `${box.height}px`;
-  targetBrand.style.left = `${box.left}px`;
-  targetBrand.style.top = `${box.top}px`;
-  targetBrand.style.width = `${box.width}px`;
-  targetBrand.style.height = `${box.height}px`;
-  const shiftX = window.innerWidth / 2 - (box.left + box.width / 2);
-  const shiftY = window.innerHeight * .55 - (box.top + box.height / 2);
-  brand.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+  brand.style.left = "50%";
+  brand.style.top = "55%";
+  brand.style.width = "max-content";
+  brand.style.height = "auto";
+  brand.style.transform = "translate(-50%, -50%)";
+  targetBrand.style.left = "50%";
+  targetBrand.style.top = "12px";
+  targetBrand.style.width = "max-content";
+  targetBrand.style.height = "auto";
+  targetBrand.style.transform = "translateX(-50%)";
   targetBrand.style.opacity = "1";
-  const makeLetters = container => {
+  const makeLetters = (container, fontSize) => {
     const word = container.querySelector("strong");
-    word.style.fontSize = style.fontSize;
+    word.style.fontSize = fontSize;
     const letters = [...word.textContent];
     word.replaceChildren(...letters.map(character => {
       const span = document.createElement("span");
@@ -2071,8 +2097,8 @@ async function startSimpleAppIntro() {
     }));
     return [...word.children];
   };
-  const centerLetters = makeLetters(brand);
-  const destinationLetters = makeLetters(targetBrand);
+  const centerLetters = makeLetters(brand, "clamp(48px, 8vw, 104px)");
+  const destinationLetters = makeLetters(targetBrand, "clamp(30.5px, 5.25vw, 61px)");
   const irregularDelays = [170, 20, 310, 95, 250, 5, 205, 355, 65, 280, 125, 335, 45, 225, 145];
   const letterAnimations = centerLetters.flatMap((letter, index) => {
     const retreats = [true, false, true, true, false, true, false, false, true, false, true, false, false, true, false][index];
@@ -2229,6 +2255,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       state.fullscreenEnabled = event.currentTarget.checked;
       els.fullscreenEnter.hidden = !state.fullscreenEnabled;
       if (!state.fullscreenEnabled && document.fullscreenElement) await document.exitFullscreen();
+      else if (!state.fullscreenEnabled) setFullscreenView(false);
     });
     els.viewSizeDown.addEventListener("click", () => setViewScale("y", currentViewScale("y") - .1));
     els.viewSizeUp.addEventListener("click", () => setViewScale("y", currentViewScale("y") + .1));
@@ -2261,10 +2288,13 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     togglePanel(document.querySelector("#chart-view-settings-toggle"), document.querySelector("#chart-view-settings"));
     togglePanel(els.fullscreenSettings, document.querySelector("#chart-view-settings"));
     els.fullscreenEnter.addEventListener("click", async () => {
-      if (state.fullscreenEnabled && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+      if (!state.fullscreenEnabled) return;
+      setFullscreenView(true);
+      if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen().catch(() => {});
     });
     els.fullscreenExit.addEventListener("click", async () => {
       if (document.fullscreenElement) await document.exitFullscreen();
+      else setFullscreenView(false);
     });
     const closeFullscreenOverlays = () => {
       document.body.classList.remove("fullscreen-selection-open", "fullscreen-output-open");
@@ -2295,20 +2325,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     els.reportUpdateData.addEventListener("click", () => els.updateData.click());
     document.addEventListener("fullscreenchange", () => {
       const active = Boolean(document.fullscreenElement);
-      document.body.classList.toggle("view-fullscreen-active", active);
-      const panel = document.querySelector("#chart-view-settings");
-      panel.hidden = active || state.mobileView;
-      els.fullscreenSettings.setAttribute("aria-expanded", "false");
-      if (active) {
-        fullscreenPreviousTabMode = state.tabMode;
-        state.tabMode = true;
-      } else if (fullscreenPreviousTabMode !== null) {
-        state.tabMode = fullscreenPreviousTabMode;
-        fullscreenPreviousTabMode = null;
-        closeFullscreenOverlays();
-      }
-      updateSelectionTabMode();
-      requestAnimationFrame(() => render(false));
+      setFullscreenView(active);
     });
     document.addEventListener("pointerdown", event => {
       const mainPanel = document.querySelector("#chart-settings");
