@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-201">
+  <link rel="stylesheet" href="styles.css?v=report-book-211">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -83,18 +83,18 @@
         </div>
       </div>
       <div id="tab-grouping" class="tab-grouping" hidden>
-        <div class="tab-grouping-control"><strong>Gruppierung</strong><div><span>Parlamente</span><label class="switch"><input id="tab-grouping-switch" type="checkbox" aria-label="Zwischen Gruppierung nach Parlamenten und Parteien wechseln"><span></span></label><span>Parteien</span></div></div>
-        <div class="tab-average-control"><strong>Durchschnitt</strong><label class="switch"><input id="tab-average-switch" type="checkbox" aria-label="Durchschnittswerte der Umfragen anzeigen"><span></span></label></div>
+        <div class="tab-grouping-control"><strong>Gruppierung der Balken</strong><div><span>Parlamente</span><label class="switch"><input id="tab-grouping-switch" type="checkbox" aria-label="Zwischen Gruppierung nach Parlamenten und Parteien wechseln"><span></span></label><span>Parteien</span></div></div>
+        <div class="tab-average-control"><strong>Durchschnitt der Umfragen</strong><label class="switch"><input id="tab-average-switch" type="checkbox" aria-label="Durchschnittswerte der Umfragen anzeigen"><span></span></label></div>
       </div>
     </section>
 
     <section class="chart-section" aria-labelledby="chart-title">
       <div class="chart-heading">
-        <div>
+        <div class="chart-title-block">
           <h2 id="chart-title">Umfrageverlauf</h2>
+          <p id="chart-meta" class="chart-meta"></p>
         </div>
         <div class="chart-heading-actions">
-          <p id="chart-meta" class="chart-meta"></p>
           <div class="chart-view-menu">
             <button id="chart-view-settings-toggle" class="chart-view-settings-toggle" type="button" aria-label="Ansicht einstellen" aria-expanded="false" aria-controls="chart-view-settings">⚙</button>
             <div id="chart-view-settings" class="chart-view-settings">
@@ -130,12 +130,31 @@
                 <input id="show-background" type="checkbox" checked>
                 <label for="show-background">Hintergrund</label>
               </div>
+              <div class="view-zoom-choice choice">
+                <input id="view-zoom-enabled" type="checkbox" checked>
+                <label for="view-zoom-enabled">Zoom</label>
+              </div>
+              <div class="fullscreen-choice choice">
+                <input id="fullscreen-enabled" type="checkbox" checked>
+                <label for="fullscreen-enabled">Vollbild</label>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <div id="chart-scroll" class="chart-scroll">
-        <svg id="chart" role="img" aria-labelledby="chart-title chart-description"></svg>
+      <div class="chart-view-frame">
+        <button id="view-fullscreen-enter" class="view-fullscreen-enter" type="button" aria-label="Vollbild öffnen">⛶</button>
+        <button id="fullscreen-view-settings-toggle" class="fullscreen-view-settings-toggle" type="button" aria-label="View-Einstellungen anzeigen" aria-expanded="false">⚙</button>
+        <button id="view-fullscreen-exit" class="view-fullscreen-exit" type="button" aria-label="Vollbild schließen">×</button>
+        <div id="chart-scroll" class="chart-scroll">
+          <svg id="chart" role="img" aria-labelledby="chart-title chart-description"></svg>
+        </div>
+        <div id="view-zoom-controls" class="view-zoom-controls" aria-label="Zoom des Views">
+          <button id="view-size-up" class="zoom-up" type="button" aria-label="View höher darstellen">+</button>
+          <button id="view-width-down" class="zoom-left" type="button" aria-label="View schmaler darstellen">−</button>
+          <button id="view-width-up" class="zoom-right" type="button" aria-label="View breiter darstellen">+</button>
+          <button id="view-size-down" class="zoom-down" type="button" aria-label="View niedriger darstellen">−</button>
+        </div>
       </div>
       <p id="chart-description" class="sr-only"></p>
       <div id="empty-state" class="empty-state" hidden>Für diese Auswahl sind noch keine Daten verfügbar.</div>
@@ -268,6 +287,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-201" defer></script>
+  <script src="app.js?v=report-book-211" defer></script>
 </body>
 </html>

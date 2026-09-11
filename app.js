@@ -19,14 +19,23 @@ const REGION_CODES = {
 };
 
 const startsMobile = window.matchMedia("(max-width: 900px)").matches;
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+let storedViewScales = { mobile: { x: 1, y: 1 }, desktop: { x: 1, y: 1 } };
+try {
+  const saved = JSON.parse(localStorage.getItem("view-scales") || "{}");
+  ["mobile", "desktop"].forEach(platform => {
+    const value = saved[platform];
+    if (typeof value === "number") storedViewScales[platform] = { x: value, y: value };
+    else if (value && typeof value === "object") storedViewScales[platform] = { x: Number(value.x) || 1, y: Number(value.y) || 1 };
+  });
+} catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
 const els = {
   updated: document.querySelector("#updated"), regions: document.querySelector("#region-options"),
   parties: document.querySelector("#party-options"), polls: document.querySelector("#poll-options"), chart: document.querySelector("#chart"),
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), showSinceElection: document.querySelector("#show-since-election"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
@@ -311,6 +320,22 @@ function growBar(element, center, baseline, opacity, enabled, delay) {
   );
 }
 
+function currentViewScale(axis = "y") {
+  const value = Number(state.viewScales[state.mobileView ? "mobile" : "desktop"]?.[axis]);
+  const minimum = axis === "x" ? .4 : .6;
+  const maximum = axis === "x" ? 3 : 1.8;
+  return state.viewSizeEnabled && state.viewZoomEnabled && Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : 1;
+}
+
+function setViewScale(axis, next) {
+  const platform = state.mobileView ? "mobile" : "desktop";
+  const minimum = axis === "x" ? .4 : .6;
+  const maximum = axis === "x" ? 3 : 1.8;
+  state.viewScales[platform][axis] = Math.max(minimum, Math.min(maximum, Math.round(next * 10) / 10));
+  localStorage.setItem("view-scales", JSON.stringify(state.viewScales));
+  render(false);
+}
+
 function render(animate = true) {
   applyViewMode();
   els.chartSection.classList.toggle("mobile-view", state.mobileView);
@@ -362,10 +387,13 @@ function render(animate = true) {
   const availableWidth = Math.max(desktopModeOnMobileDevice ? 1500 : 320, els.scroll.clientWidth - 2);
   const visibleBarLimit = compact ? 9 : 20;
   const visiblePlotWidth = availableWidth - margin.left - margin.right;
-  const width = totalBarCount <= visibleBarLimit
+  const baseWidth = totalBarCount <= visibleBarLimit
     ? availableWidth
     : Math.max(availableWidth, margin.left + margin.right + visiblePlotWidth * (totalBarCount / visibleBarLimit));
-  const height = compact ? 520 : 590;
+  const horizontalScale = currentViewScale("x");
+  const width = Math.max(availableWidth, margin.left + margin.right + (baseWidth - margin.left - margin.right) * horizontalScale);
+  const fullscreenHeight = document.fullscreenElement === els.chartSection ? els.chartSection.clientHeight - 82 : 0;
+  const height = Math.max(compact ? 520 : 590, fullscreenHeight);
   const innerH = height - margin.top - margin.bottom;
   const baselineY = margin.top + innerH;
   const floorBackY = baselineY - (compact ? 18 : 44);
@@ -378,9 +406,10 @@ function render(animate = true) {
     : parties.map(party => ({ key: `party:${party}`, bars: series.map(item => ({ party, item })) }));
   const groupWidth = chartW / groupedBars.length;
   const maxValue = Math.max(50, ...series.flatMap(item => parties.map(party => item.poll.values[party] || 0)));
-  const yMax = Math.ceil(maxValue / 10) * 10;
+  const verticalScale = currentViewScale("y");
+  const yMax = Math.ceil(maxValue / 10) * 10 / verticalScale;
   els.chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  els.chart.setAttribute("width", width);
+  els.chart.setAttribute("width", Math.round(width));
   els.chart.setAttribute("height", height);
 
   const defs = svgEl("defs");
@@ -490,7 +519,7 @@ function render(animate = true) {
   const availablePerBar = (groupWidth - Math.min(30, groupWidth * .12) - maxBlockBreaks * blockGap) / maxBarsPerGroup;
   const barGap = maxBarsPerGroup === 1 ? 0 : Math.max(5, Math.min(20, 23 - totalBarCount * 1.35));
   const maxBarWidth = totalBarCount === 1 ? 280 : totalBarCount <= 3 ? 150 : totalBarCount <= 6 ? 92 : totalBarCount <= 10 ? 58 : totalBarCount <= 20 ? 38 : availablePerBar - barGap;
-  const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth, availablePerBar - barGap));
+  const barWidth = Math.max(totalBarCount <= 10 ? 10 : 4, Math.min(maxBarWidth * horizontalScale, availablePerBar - barGap));
   const displayedBars = [];
   const perspectiveBars = [];
   groupedBars.forEach((group, groupIndex) => {
@@ -1470,7 +1499,7 @@ const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
   ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"], ["brackets", "Klammern"],
   ["labels", "Beschriftungen"], ["barColors", "Balkenfarbe"], ["percentValues", "Prozentwerte"],
-  ["lut", "LUT"], ["background", "Hintergrund"], ["preview", "Vorschau"],
+  ["lut", "LUT"], ["background", "Hintergrund"], ["viewSize", "Zoom"], ["fullscreen", "Vollbild"], ["preview", "Vorschau"],
   ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
 ];
 const defaultDeveloperSettings = () => ({
@@ -1536,6 +1565,11 @@ function applyDeveloperSettings() {
   state.showPercentValues = Boolean(settings.percentValues.value);
   state.showLut = Boolean(settings.lut.value);
   state.showBackground = Boolean(settings.background.value);
+  state.viewSizeEnabled = Boolean(settings.viewSize.value);
+  state.viewZoomEnabled = state.viewSizeEnabled;
+  els.viewZoomEnabled.checked = state.viewZoomEnabled;
+  state.fullscreenEnabled = Boolean(settings.fullscreen.value);
+  els.fullscreenEnabled.checked = state.fullscreenEnabled;
   state.a4Mode = Boolean(settings.a4Output.value);
   state.export3d = Boolean(settings.export3d.value);
   state.tabMode = Boolean(settings.tabMode?.value);
@@ -1551,12 +1585,21 @@ function applyDeveloperSettings() {
   setVisible(".percent-values-choice", settings.percentValues.visible);
   setVisible(".lut-choice", settings.lut.visible);
   setVisible(".background-choice", settings.background.visible);
+  setVisible(".view-zoom-choice", settings.viewSize.visible);
+  els.viewZoomControls.hidden = !settings.viewSize.visible || !state.viewZoomEnabled;
+  setVisible(".fullscreen-choice", settings.fullscreen.visible);
+  els.fullscreenEnter.hidden = !settings.fullscreen.visible || !state.fullscreenEnabled;
   setVisible("#preview-export", settings.preview.visible);
   const a4Choice = document.querySelector('input[name="output-shape"][value="a4"]')?.closest("label");
   if (a4Choice) a4Choice.hidden = !settings.a4Output.visible;
   const export3dChoice = document.querySelector("#export-3d")?.closest("label");
   if (export3dChoice) export3dChoice.hidden = !settings.export3d.visible;
   els.updateData.disabled = !settings.dataUpdate.value;
+  els.viewSizeDown.disabled = !state.viewSizeEnabled;
+  els.viewSizeUp.disabled = !state.viewSizeEnabled;
+  els.viewWidthDown.disabled = !state.viewSizeEnabled;
+  els.viewWidthUp.disabled = !state.viewSizeEnabled;
+  els.fullscreenEnter.disabled = !state.fullscreenEnabled;
   applyViewMode();
 }
 
@@ -2176,6 +2219,20 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       state.showBackground = event.currentTarget.checked;
       render(false);
     });
+    els.viewZoomEnabled.addEventListener("change", event => {
+      state.viewZoomEnabled = event.currentTarget.checked;
+      els.viewZoomControls.hidden = !state.viewZoomEnabled;
+      render(false);
+    });
+    els.fullscreenEnabled.addEventListener("change", async event => {
+      state.fullscreenEnabled = event.currentTarget.checked;
+      els.fullscreenEnter.hidden = !state.fullscreenEnabled;
+      if (!state.fullscreenEnabled && document.fullscreenElement === els.chartSection) await document.exitFullscreen();
+    });
+    els.viewSizeDown.addEventListener("click", () => setViewScale("y", currentViewScale("y") - .1));
+    els.viewSizeUp.addEventListener("click", () => setViewScale("y", currentViewScale("y") + .1));
+    els.viewWidthDown.addEventListener("click", () => setViewScale("x", currentViewScale("x") - .2));
+    els.viewWidthUp.addEventListener("click", () => setViewScale("x", currentViewScale("x") + .2));
     document.querySelectorAll(".cluster-mode-button").forEach(button => button.addEventListener("click", event => {
       state.groupBy = event.currentTarget.dataset.group;
       render();
@@ -2201,6 +2258,20 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     togglePanel(document.querySelector("#settings-toggle"), document.querySelector("#chart-settings"));
     togglePanel(document.querySelector("#chart-view-settings-toggle"), document.querySelector("#chart-view-settings"));
+    togglePanel(els.fullscreenSettings, document.querySelector("#chart-view-settings"));
+    els.fullscreenEnter.addEventListener("click", async () => {
+      if (state.fullscreenEnabled && els.chartSection.requestFullscreen) await els.chartSection.requestFullscreen();
+    });
+    els.fullscreenExit.addEventListener("click", async () => {
+      if (document.fullscreenElement) await document.exitFullscreen();
+    });
+    document.addEventListener("fullscreenchange", () => {
+      const active = document.fullscreenElement === els.chartSection;
+      const panel = document.querySelector("#chart-view-settings");
+      panel.hidden = active || state.mobileView;
+      els.fullscreenSettings.setAttribute("aria-expanded", "false");
+      render(false);
+    });
     document.addEventListener("pointerdown", event => {
       const mainPanel = document.querySelector("#chart-settings");
       const mainButton = document.querySelector("#settings-toggle");
@@ -2211,7 +2282,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       const menu = document.querySelector(".chart-view-menu");
       const panel = document.querySelector("#chart-view-settings");
       const button = document.querySelector("#chart-view-settings-toggle");
-      if (!panel.hidden && !menu.contains(event.target)) {
+      if (!panel.hidden && !menu.contains(event.target) && !els.fullscreenSettings.contains(event.target)) {
         panel.hidden = true;
         button.setAttribute("aria-expanded", "false");
       }
