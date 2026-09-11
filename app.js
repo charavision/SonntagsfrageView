@@ -392,7 +392,7 @@ function render(animate = true) {
     : Math.max(availableWidth, margin.left + margin.right + visiblePlotWidth * (totalBarCount / visibleBarLimit));
   const horizontalScale = currentViewScale("x");
   const width = Math.max(availableWidth, margin.left + margin.right + (baseWidth - margin.left - margin.right) * horizontalScale);
-  const fullscreenHeight = document.fullscreenElement === els.chartSection ? els.chartSection.clientHeight - 82 : 0;
+  const fullscreenHeight = document.fullscreenElement === els.chartSection ? els.chartSection.clientHeight : 0;
   const height = Math.max(compact ? 520 : 590, fullscreenHeight);
   const innerH = height - margin.top - margin.bottom;
   const baselineY = margin.top + innerH;
