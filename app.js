@@ -1346,11 +1346,15 @@ async function loadAppRelease() {
   const reportVersion = document.querySelector("#report-current-version");
   const message = document.querySelector("#android-app-message");
   const appButton = document.querySelector("#android-app-download");
+  const macButton = document.querySelector("#mac-app-download");
+  const macVersion = document.querySelector("#mac-app-version");
   const introUpdateRow = document.querySelector("#android-intro-update-row");
   const introUpdateButton = document.querySelector("#android-intro-update");
   const runsInAndroidApp = Boolean(window.AndroidApp?.installUpdate);
+  const runsInMacApp = Boolean(window.MacApp?.installUpdate);
   const introUpdater = window.AndroidApp?.refreshIntro ? window.AndroidApp : window.MacApp?.refreshIntro ? window.MacApp : null;
   appButton.textContent = runsInAndroidApp ? "Update App" : "Android";
+  macButton.textContent = runsInMacApp ? "Update-App" : "macOS";
   introUpdateRow.hidden = !introUpdater;
   if (!introUpdateRow.hidden) {
     introUpdateButton.onclick = () => {
@@ -1361,9 +1365,10 @@ async function loadAppRelease() {
   try {
     const response = await fetch(`app-version.json?update=${Date.now()}`, { cache: "no-store" });
     const release = await response.json();
-    if (!response.ok || !release.version || !release.downloadUrl) throw new Error("Versionsinformation nicht verfügbar.");
+    if (!response.ok || !release.version || !release.downloadUrl || !release.macVersion || !release.macDownloadUrl) throw new Error("Versionsinformation nicht verfügbar.");
     version.textContent = release.version;
-    reportVersion.textContent = release.version;
+    macVersion.textContent = release.macVersion;
+    reportVersion.textContent = runsInMacApp ? release.macVersion : release.version;
     appButton.onclick = () => {
       message.textContent = window.AndroidApp ? "Update wird geöffnet …" : "Download wird gestartet …";
       if (window.AndroidApp?.installUpdate) window.AndroidApp.installUpdate(release.downloadUrl);
@@ -1374,8 +1379,19 @@ async function loadAppRelease() {
         link.click();
       }
     };
+    macButton.onclick = () => {
+      message.textContent = runsInMacApp ? "Mac-App-Update wird geladen …" : "Download wird gestartet …";
+      if (runsInMacApp) window.MacApp.installUpdate(release.macDownloadUrl);
+      else {
+        const link = document.createElement("a");
+        link.href = release.macDownloadUrl;
+        link.download = `Sonntagsfragen-macOS-v${release.macVersion}.dmg`;
+        link.click();
+      }
+    };
   } catch (error) {
     version.textContent = "nicht verfügbar";
+    macVersion.textContent = "nicht verfügbar";
     reportVersion.textContent = "nicht verfügbar";
     message.textContent = error.message;
   }

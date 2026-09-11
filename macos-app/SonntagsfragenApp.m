@@ -1,7 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
-static NSString * const AppVersion = @"1.0.15";
+static NSString * const AppVersion = @"1.0.16";
 static NSString * const WebsiteURL = @"https://charavision.github.io/SonntagsfrageView/";
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKUIDelegate, WKScriptMessageHandler>
@@ -15,7 +15,8 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
     WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
     configuration.websiteDataStore = WKWebsiteDataStore.defaultDataStore;
     [configuration.userContentController addScriptMessageHandler:self name:@"refreshIntro"];
-    NSString *bridge = @"window.MacApp={isSurfaceReady:function(){return true},refreshIntro:function(){window.webkit.messageHandlers.refreshIntro.postMessage(null)}};";
+    [configuration.userContentController addScriptMessageHandler:self name:@"installUpdate"];
+    NSString *bridge = @"window.MacApp={isSurfaceReady:function(){return true},refreshIntro:function(){window.webkit.messageHandlers.refreshIntro.postMessage(null)},installUpdate:function(url){window.webkit.messageHandlers.installUpdate.postMessage(url)}};";
     [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:bridge injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 
     self.webView = [[WKWebView alloc] initWithFrame:NSZeroRect configuration:configuration];
@@ -40,7 +41,12 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { return YES; }
 
 - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
-    if ([message.name isEqualToString:@"refreshIntro"]) [self refreshWebContent];
+    if ([message.name isEqualToString:@"refreshIntro"]) {
+        [self refreshWebContent];
+    } else if ([message.name isEqualToString:@"installUpdate"] && [message.body isKindOfClass:NSString.class]) {
+        NSString *address = (NSString *)message.body;
+        if ([address hasPrefix:@"https://github.com/charavision/SonntagsfrageView/"]) [NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:address]];
+    }
 }
 
 - (nullable WKWebView *)webView:(WKWebView *)webView createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration forNavigationAction:(WKNavigationAction *)navigationAction windowFeatures:(WKWindowFeatures *)windowFeatures {
