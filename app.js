@@ -2260,7 +2260,8 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-app-open").hidden = currentReportRole !== "Admin";
-        document.querySelector("#report-developer-open").textContent = currentReportRole === "Admin" ? "Entwicklereinstellungen" : "Entwicklereinstellungen ansehen";
+        const developerTab = document.querySelector("#report-developer-open");
+        developerTab.innerHTML = `${currentReportRole === "Admin" ? "Master" : "View Master"} <span class="report-tab-gear" aria-hidden="true">⚙</span>`;
         document.querySelector("#report-logout").hidden = false;
         document.querySelector("#report-book").hidden = false;
         document.querySelector("#report-book-open").classList.add("active");

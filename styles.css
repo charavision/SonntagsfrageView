@@ -155,6 +155,12 @@ h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(48px, 8vw, 104px);
 .selection-tabs button { margin-bottom: 0; padding: 10px 18px; border: 1px solid transparent; border-bottom: 0; border-radius: 10px 10px 0 0; background: transparent; color: var(--muted); cursor: pointer; font-weight: 850; }
 .selection-tabs button.active { border-color: var(--line); border-bottom: 0; background: #0d1d35; color: #fff; text-shadow: 0 0 7px rgba(255,255,255,.72), 0 0 17px rgba(220,235,255,.34); }
 .selection-tabs button.grouped:not(.active) { color: var(--muted); text-shadow: none; }
+body.selection-tab-mode .controls { padding-top: 0; overflow: hidden; }
+body.selection-tab-mode .selection-tabs { width: auto; margin: 0 calc(clamp(18px, 3vw, 34px) * -1) 22px; }
+body.selection-tab-mode .selection-tabs button { flex: 1 1 0; min-width: 0; padding-block: 18px 15px; border: 0; border-radius: 0 0 15px 15px; background: linear-gradient(180deg, rgba(35,68,108,.78), rgba(25,51,86,.66)); color: #b8c9de; box-shadow: inset 0 2px 0 rgba(158,198,238,.2), 0 10px 24px -20px rgba(93,190,255,.55); transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
+body.selection-tab-mode .selection-tabs button.active { border: 0; border-radius: 0; background: transparent; color: #fff; box-shadow: none; text-shadow: 0 0 7px rgba(255,255,255,.82), 0 0 19px rgba(220,235,255,.42); }
+body.selection-tab-mode .selection-tabs button:first-child { border-top-left-radius: 21px; }
+body.selection-tab-mode .selection-tabs button:last-child { border-top-right-radius: 21px; }
 .tab-grouping { display: flex; align-items: stretch; justify-content: center; gap: 28px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .tab-grouping-control, .tab-average-control { display: grid; align-content: start; justify-items: center; gap: 9px; }
 .tab-average-control { padding-left: 28px; border-left: 1px solid rgba(75,109,150,.65); }
@@ -227,6 +233,7 @@ body.physical-mobile:not(.mobile-mode) .next-election { font-size: 8px; }
 .settings-popover { position: absolute; z-index: 5; right: 16px; bottom: 72px; min-width: 190px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #0d1d34; box-shadow: 0 18px 40px rgba(0,0,0,.4); }
 .settings-popover strong { display: block; margin-bottom: 10px; }
 .settings-popover label { display: flex; align-items: center; gap: 8px; padding: 7px 0; color: #dce8f7; font-size: 13px; }
+.settings-popover [hidden] { display: none !important; }
 .settings-popover label:has(input:disabled) { color: #65748a; cursor: not-allowed; opacity: .6; }
 .view-switch { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #dce8f7; font-size: 12px; }
 .settings-popover .switch { padding: 4px 0; }
@@ -345,9 +352,10 @@ footer a { color: inherit; }
 .report-session-user { display: grid; gap: 2px; text-align: center; }
 .report-session-user strong { color: #fff; font-size: 21px; text-shadow: 0 0 7px rgba(255,255,255,.75), 0 0 20px rgba(89,217,255,.5); }
 .report-session-user span { color: var(--accent); font-size: 12px; font-weight: 850; letter-spacing: .12em; text-shadow: 0 0 7px rgba(89,217,255,.9), 0 0 20px rgba(89,217,255,.65), 0 0 34px rgba(194,82,255,.35); }
-.report-session-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 2px; margin-top: 16px; border-bottom: 1px solid var(--line); }
-.report-session-actions .report-tab { min-height: 38px; margin-bottom: -1px; padding: 8px 14px; border: 1px solid transparent; border-bottom-color: var(--line); border-radius: 9px 9px 0 0; background: transparent; color: var(--muted); cursor: pointer; font-weight: 800; }
-.report-session-actions .report-tab.active { border-color: var(--line); border-bottom-color: #071326; background: #071326; color: var(--accent); }
+.report-session-actions { display: flex; width: calc(100% + 40px); margin: 16px -20px 0; justify-content: stretch; flex-wrap: nowrap; gap: 0; overflow: hidden; border-bottom: 0; }
+.report-session-actions .report-tab { flex: 1 1 0; min-width: 0; min-height: 48px; margin: 0; padding: 9px 8px; overflow: hidden; border: 0; border-radius: 0 0 14px 14px; background: linear-gradient(180deg, rgba(35,68,108,.78), rgba(25,51,86,.66)); box-shadow: inset 0 2px 0 rgba(158,198,238,.2), 0 10px 24px -20px rgba(93,190,255,.55); color: #b8c9de; cursor: pointer; font-size: clamp(11px, 2.3vw, 15px); font-weight: 800; text-overflow: ellipsis; white-space: nowrap; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
+.report-session-actions .report-tab.active { border: 0; border-radius: 0; background: transparent; box-shadow: none; color: #fff; text-shadow: 0 0 7px rgba(255,255,255,.82), 0 0 19px rgba(220,235,255,.42); }
+.report-tab-gear { display: inline-block; margin-left: 2px; font-size: 1.38em; line-height: .7; vertical-align: -.08em; text-shadow: 0 1px 0 rgba(255,255,255,.4), 0 -1px 1px rgba(0,0,0,.8), 0 0 7px rgba(89,217,255,.3); }
 .report-account-form button { min-height: 36px; padding: 7px 12px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
 .report-accounts { margin-bottom: 24px; padding: 18px 0 0; border: 0; background: transparent; }
 .report-account-list { display: grid; gap: 8px; margin: 14px 0 20px; }
