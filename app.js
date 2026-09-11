@@ -29,6 +29,22 @@ try {
   });
 } catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
 const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, showBrackets: true, showLabels: true, barColors: true, showPercentValues: true, showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+function currentPlatformLabel() {
+  if (window.AndroidApp) return "Android";
+  if (window.MacApp) return "macOS";
+  return state.mobileView ? "Web (Mobil)" : "Web (Desktop)";
+}
+function currentOutputPlatformLabel() {
+  const target = document.querySelector("#report-current-version");
+  const version = window.MacApp ? target?.dataset.macVersion : target?.dataset.androidVersion;
+  return version ? `Version ${version} · ${currentPlatformLabel()}` : currentPlatformLabel();
+}
+function updateReportVersionLabel() {
+  const target = document.querySelector("#report-current-version");
+  if (!target?.dataset.androidVersion) return;
+  const version = window.MacApp ? target.dataset.macVersion : target.dataset.androidVersion;
+  target.textContent = `${version} · ${currentPlatformLabel()}`;
+}
 let fullscreenPreviousTabMode = null;
 function setFullscreenView(active) {
   const wasActive = document.body.classList.contains("view-fullscreen-active");
@@ -73,6 +89,7 @@ function applyViewMode() {
     els.electionDates.checked = false;
   }
   els.electionDates.disabled = state.mobileView;
+  updateReportVersionLabel();
 }
 
 function updateComparisonButtons() {
@@ -907,8 +924,7 @@ async function exportChartImage(format = "jpeg") {
 
   const footerCenter = documentWidth / 2;
   const footerY = headerHeight + viewBox.height + 8;
-  const footerDevice = state.mobileView ? "mobil" : "desktop";
-  addText(`${configurationCode()} · ${footerDevice} · ${secondStamp}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
+  addText(`${configurationCode()} · ${currentOutputPlatformLabel()} · ${secondStamp}`, { x: footerCenter, y: footerY, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 9 });
   addText(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
   addText("© 2026 charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
 
@@ -1266,8 +1282,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     });
   }
   const footerStamp = formatTimestamp(now);
-  const footerDevice = state.mobileView ? "mobil" : "desktop";
-  text(`${configurationCode()} · ${footerDevice} · ${footerStamp}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
+  text(`${configurationCode()} · ${currentOutputPlatformLabel()} · ${footerStamp}`, { x: width / 2, y: height - 62, "text-anchor": "middle", fill: "#a8bfd9", "font-size": 10 });
   text(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
   text("© 2026 charavision", { x: width / 2, y: height - 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 9, "font-weight": 700 });
   text(`Seite ${pageNumber} / ${pageCount}`, { x: width - 42, y: height - 30, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
@@ -1417,7 +1432,9 @@ async function loadAppRelease() {
     if (!response.ok || !release.version || !release.downloadUrl || !release.macVersion || !release.macDownloadUrl) throw new Error("Versionsinformation nicht verfügbar.");
     version.textContent = release.version;
     macVersion.textContent = release.macVersion;
-    reportVersion.textContent = runsInMacApp ? release.macVersion : release.version;
+    reportVersion.dataset.androidVersion = release.version;
+    reportVersion.dataset.macVersion = release.macVersion;
+    updateReportVersionLabel();
     appButton.onclick = () => {
       message.textContent = window.AndroidApp ? "Update wird geöffnet …" : "Download wird gestartet …";
       if (window.AndroidApp?.installUpdate) window.AndroidApp.installUpdate(release.downloadUrl);
@@ -1442,10 +1459,12 @@ async function loadAppRelease() {
   } catch (error) {
     version.textContent = "nicht verfügbar";
     macVersion.textContent = "nicht verfügbar";
-    reportVersion.textContent = "nicht verfügbar";
+    reportVersion.textContent = `nicht verfügbar · ${currentPlatformLabel()}`;
     message.textContent = error.message;
   }
 }
+
+loadAppRelease();
 
 function showExportPreview() {
   els.previewPages.replaceChildren();
