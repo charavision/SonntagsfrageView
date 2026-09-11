@@ -1349,12 +1349,13 @@ async function loadAppRelease() {
   const introUpdateRow = document.querySelector("#android-intro-update-row");
   const introUpdateButton = document.querySelector("#android-intro-update");
   const runsInAndroidApp = Boolean(window.AndroidApp?.installUpdate);
+  const introUpdater = window.AndroidApp?.refreshIntro ? window.AndroidApp : window.MacApp?.refreshIntro ? window.MacApp : null;
   appButton.textContent = runsInAndroidApp ? "Update App" : "Android";
-  introUpdateRow.hidden = !runsInAndroidApp || !window.AndroidApp?.refreshIntro;
+  introUpdateRow.hidden = !introUpdater;
   if (!introUpdateRow.hidden) {
     introUpdateButton.onclick = () => {
       message.textContent = "Intro und Weboberfläche werden aktualisiert …";
-      window.AndroidApp.refreshIntro();
+      introUpdater.refreshIntro();
     };
   }
   try {
@@ -1955,9 +1956,10 @@ async function startAppIntro() {
 }
 
 async function waitForVisibleAppSurface() {
-  if (!window.AndroidApp?.isSurfaceReady) return;
+  const nativeApp = window.AndroidApp?.isSurfaceReady ? window.AndroidApp : window.MacApp?.isSurfaceReady ? window.MacApp : null;
+  if (!nativeApp) return;
   const timeoutAt = Date.now() + 5000;
-  while (!window.AndroidApp.isSurfaceReady() && Date.now() < timeoutAt) {
+  while (!nativeApp.isSurfaceReady() && Date.now() < timeoutAt) {
     await new Promise(resolve => setTimeout(resolve, 50));
   }
   await new Promise(resolve => setTimeout(resolve, 400));
