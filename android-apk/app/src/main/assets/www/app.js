@@ -1954,6 +1954,15 @@ async function startAppIntro() {
   document.addEventListener("keydown", event => { if (event.key === "Escape" || event.key === "Enter" || event.key === " ") finish(); }, { once: true });
 }
 
+async function waitForVisibleAppSurface() {
+  if (!window.AndroidApp?.isSurfaceReady) return;
+  const timeoutAt = Date.now() + 5000;
+  while (!window.AndroidApp.isSurfaceReady() && Date.now() < timeoutAt) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  await new Promise(resolve => setTimeout(resolve, 400));
+}
+
 async function startSimpleAppIntro() {
   const intro = document.querySelector("#app-intro");
   const brand = document.querySelector("#intro-brand");
@@ -1971,6 +1980,8 @@ async function startSimpleAppIntro() {
   } catch (error) {
     // Bei einem kurzen Netzausfall darf das lokale Intro weiterhin starten.
   }
+  await waitForVisibleAppSurface();
+  intro.classList.remove("intro-waiting");
   intro.classList.add("simple-intro");
   const box = target.getBoundingClientRect();
   const style = getComputedStyle(target);

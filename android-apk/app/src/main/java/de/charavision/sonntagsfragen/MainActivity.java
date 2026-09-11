@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.os.Build;
 import android.os.Environment;
 import android.graphics.Insets;
+import android.graphics.Bitmap;
 import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
@@ -23,9 +24,10 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "1.0.14";
+    private static final String APP_VERSION = "1.0.15";
     private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
     private WebView webView;
+    private volatile boolean webSurfaceReady = false;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -54,6 +56,18 @@ public class MainActivity extends Activity {
         }
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                webSurfaceReady = false;
+                super.onPageStarted(view, url, favicon);
+            }
+
+            @Override
+            public void onPageCommitVisible(WebView view, String url) {
+                webSurfaceReady = true;
+                super.onPageCommitVisible(view, url);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return false;
@@ -91,9 +105,15 @@ public class MainActivity extends Activity {
                 loadCurrentWebApp("intro");
             });
         }
+
+        @JavascriptInterface
+        public boolean isSurfaceReady() {
+            return webSurfaceReady;
+        }
     }
 
     private void loadCurrentWebApp(String reason) {
+        webSurfaceReady = false;
         webView.loadUrl(WEB_URL + "?appVersion=" + APP_VERSION + "&refresh=" + reason + "-" + System.currentTimeMillis());
     }
 
