@@ -3,10 +3,7 @@ package de.charavision.sonntagsfragen;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.IntentFilter;
-import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
@@ -24,7 +21,7 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "1.0.18";
+    private static final String APP_VERSION = "1.0.19";
     private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
     private WebView webView;
     private volatile boolean webSurfaceReady = false;
@@ -93,7 +90,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void installUpdate(String url) {
             if (url == null || !url.startsWith("https://github.com/charavision/SonntagsfrageView/")) return;
-            runOnUiThread(() -> downloadAndInstall(url));
+            runOnUiThread(() -> downloadUpdate(url));
         }
 
         @JavascriptInterface
@@ -132,33 +129,16 @@ public class MainActivity extends Activity {
         webView.loadUrl(WEB_URL + "?appVersion=" + APP_VERSION + "&refresh=" + reason + "-" + System.currentTimeMillis());
     }
 
-    private void downloadAndInstall(String url) {
+    private void downloadUpdate(String url) {
         DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
         request.setTitle("Sonntagsfragen-Update");
-        request.setDescription("Die neue App-Version wird heruntergeladen.");
+        request.setDescription("Nach dem Download bitte über Eigene Dateien installieren.");
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
         request.setMimeType("application/vnd.android.package-archive");
-        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "Sonntagsfragen-Update.apk");
-        final long downloadId = manager.enqueue(request);
-        BroadcastReceiver receiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) != downloadId) return;
-                unregisterReceiver(this);
-                Uri apk = manager.getUriForDownloadedFile(downloadId);
-                if (apk == null) return;
-                Intent install = new Intent(Intent.ACTION_VIEW);
-                install.setDataAndType(apk, "application/vnd.android.package-archive");
-                install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(install);
-            }
-        };
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
-        }
+        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Sonntagsfragen-Update.apk");
+        manager.enqueue(request);
+        android.widget.Toast.makeText(this, "Update wird in Downloads gespeichert.", android.widget.Toast.LENGTH_LONG).show();
     }
 
     @Override
