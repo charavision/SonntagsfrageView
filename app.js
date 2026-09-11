@@ -1345,13 +1345,25 @@ async function loadAppRelease() {
   const version = document.querySelector("#android-app-version");
   const reportVersion = document.querySelector("#report-current-version");
   const message = document.querySelector("#android-app-message");
+  const appButton = document.querySelector("#android-app-download");
+  const introUpdateRow = document.querySelector("#android-intro-update-row");
+  const introUpdateButton = document.querySelector("#android-intro-update");
+  const runsInAndroidApp = Boolean(window.AndroidApp?.installUpdate);
+  appButton.textContent = runsInAndroidApp ? "Update App" : "Android";
+  introUpdateRow.hidden = !runsInAndroidApp || !window.AndroidApp?.refreshIntro;
+  if (!introUpdateRow.hidden) {
+    introUpdateButton.onclick = () => {
+      message.textContent = "Intro und Weboberfläche werden aktualisiert …";
+      window.AndroidApp.refreshIntro();
+    };
+  }
   try {
     const response = await fetch(`app-version.json?update=${Date.now()}`, { cache: "no-store" });
     const release = await response.json();
     if (!response.ok || !release.version || !release.downloadUrl) throw new Error("Versionsinformation nicht verfügbar.");
     version.textContent = release.version;
     reportVersion.textContent = release.version;
-    document.querySelector("#android-app-download").onclick = () => {
+    appButton.onclick = () => {
       message.textContent = window.AndroidApp ? "Update wird geöffnet …" : "Download wird gestartet …";
       if (window.AndroidApp?.installUpdate) window.AndroidApp.installUpdate(release.downloadUrl);
       else {

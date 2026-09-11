@@ -59,6 +59,7 @@ body.intro-running.intro-reveal main { opacity: 1; transition: opacity .9s ease;
 .report-app-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 2px; }
 .report-app-row button { min-height: 36px; padding: 7px 18px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
 .report-app-row span, #android-app-message { color: var(--muted); font-size: 12px; }
+#android-intro-update-row { justify-content: flex-start; padding-top: 0; }
 .edda-thanks { position: fixed; width: 100vw; max-width: none; height: 100vh; max-height: none; margin: 0; padding: 0; border: 0; inset: 0; place-content: center; justify-items: center; overflow: hidden; pointer-events: none; background: radial-gradient(circle, rgba(12,40,75,.58), rgba(2,8,20,.2) 48%, transparent 72%); color: var(--ink); }
 .edda-thanks[open] { display: grid; }
 .edda-thanks::backdrop { background: rgba(1,7,15,.2); backdrop-filter: blur(2px); }

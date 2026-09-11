@@ -17,11 +17,14 @@ import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 public class MainActivity extends Activity {
+    private static final String APP_VERSION = "1.0.14";
+    private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
     private WebView webView;
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -57,17 +60,19 @@ public class MainActivity extends Activity {
             }
         });
         webView.getSettings().setJavaScriptEnabled(true);
-        webView.getSettings().setUserAgentString(webView.getSettings().getUserAgentString() + " SonntagsfragenApp/1.0.13");
+        webView.getSettings().setUserAgentString(webView.getSettings().getUserAgentString() + " SonntagsfragenApp/" + APP_VERSION);
         webView.addJavascriptInterface(new AppBridge(), "AndroidApp");
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
         webView.getSettings().setBuiltInZoomControls(false);
         webView.getSettings().setDisplayZoomControls(false);
+        webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+        webView.clearCache(true);
         webView.setBackgroundColor(android.graphics.Color.rgb(6, 16, 32));
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
-        webView.loadUrl("https://charavision.github.io/SonntagsfrageView/");
+        loadCurrentWebApp("startup");
     }
 
     public class AppBridge {
@@ -76,6 +81,20 @@ public class MainActivity extends Activity {
             if (url == null || !url.startsWith("https://github.com/charavision/SonntagsfrageView/")) return;
             runOnUiThread(() -> downloadAndInstall(url));
         }
+
+        @JavascriptInterface
+        public void refreshIntro() {
+            runOnUiThread(() -> {
+                webView.stopLoading();
+                webView.clearCache(true);
+                webView.clearHistory();
+                loadCurrentWebApp("intro");
+            });
+        }
+    }
+
+    private void loadCurrentWebApp(String reason) {
+        webView.loadUrl(WEB_URL + "?appVersion=" + APP_VERSION + "&refresh=" + reason + "-" + System.currentTimeMillis());
     }
 
     private void downloadAndInstall(String url) {
