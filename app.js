@@ -7,7 +7,13 @@ const PARTY_META = {
   "AfD": { color: "var(--afd)", glow: "#58b5ff", label: "AfD" },
   "BSW": { color: "var(--bsw)", glow: "#e05282", label: "BSW" },
   "FW": { color: "var(--fw)", glow: "#ffb25e", label: "FW" },
-  "Sonstige": { color: "var(--sonstige)", glow: "#d9e0e8", label: "Sonstige" }
+  "Sonstige": { color: "var(--sonstige)", glow: "#d9e0e8", label: "Sonstiges" }
+};
+const OTHER_PARTIES = {
+  "Piraten": { color: "#e76f00", label: "Piraten" },
+  "NPD": { color: "#7a3e2e", label: "NPD" },
+  "Die PARTEI": { color: "#e30613", label: "Die PARTEI" },
+  "Volt": { color: "#502379", label: "Volt" }
 };
 const MATTE_PARTY_COLORS = {
   "CDU/CSU": { dark: "#20252b", base: "#353c44", light: "#626c76" },
@@ -39,7 +45,7 @@ try {
     else if (value && typeof value === "object") storedViewScales[platform] = { x: Number(value.x) || 1, y: Number(value.y) || 1 };
   });
 } catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, barColorMode: "party", barNeon: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), otherParties: new Set(), selectedPollRanks: new Set([0]), pollDateMode: false, pollRankOverrides: [0, 1, 2], pollDateLabels: [null, null, null], averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, barColorMode: "party", barNeon: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
 let savedProjectConfiguration = null;
 function currentPlatformLabel() {
   if (window.AndroidApp) return "Android";
@@ -215,12 +221,12 @@ function updateConfigurationCode() {
   return code;
 }
 
-function makeChoice(container, group, value, checked, color, code, nextElection) {
+function makeChoice(container, group, value, checked, color, code, nextElection, displayLabel) {
   const wrap = document.createElement("div");
-  wrap.className = `choice ${group === "party" ? "party-choice" : ""} ${group === "region" ? "region-choice" : ""}`;
+  wrap.className = `choice ${group.includes("party") ? "party-choice" : ""} ${group === "region" ? "region-choice" : ""}`;
   if (color) wrap.style.setProperty("--party-color", color);
   const id = `${group}-${value.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  const label = code ? `<span class="region-name"><span class="region-title">${value}</span><strong class="region-code">${code}</strong></span><small class="next-election"><span aria-hidden="true">📅</span> ${nextElection || "noch offen"}</small>` : value;
+  const label = code ? `<span class="region-name"><span class="region-title">${value}</span><strong class="region-code">${code}</strong></span><small class="next-election"><span aria-hidden="true">📅</span> ${nextElection || "noch offen"}</small>` : (displayLabel || value);
   wrap.innerHTML = `<input id="${id}" type="checkbox" name="${group}" value="${value}" ${checked ? "checked" : ""}><label for="${id}">${label}</label>`;
   container.append(wrap);
   return wrap.querySelector("input");
@@ -235,21 +241,42 @@ function buildControls() {
         state.regions.add(region);
         input.checked = true;
       }
-      updatePollOptions(false);
+      updatePollOptions(true);
       render();
     });
   });
   Object.entries(PARTY_META).forEach(([party, meta]) => {
-    const input = makeChoice(els.parties, "party", party, true, meta.color);
+    const input = makeChoice(els.parties, "party", party, true, meta.color, null, null, meta.label);
     input.addEventListener("change", () => {
       input.checked ? state.parties.add(party) : state.parties.delete(party);
+      if (party === "Sonstige") document.querySelector("#other-party-popover")?.removeAttribute("hidden");
       render();
     });
+    if (party === "Sonstige") {
+      const choice = input.closest(".choice");
+      choice.classList.add("other-party-trigger");
+      const panel = document.createElement("div");
+      panel.id = "other-party-popover";
+      panel.className = "other-party-popover";
+      panel.hidden = true;
+      Object.entries(OTHER_PARTIES).forEach(([extraParty, extraMeta]) => {
+        const extraInput = makeChoice(panel, "other-party", extraParty, state.otherParties.has(extraParty), extraMeta.color, null, null, extraMeta.label);
+        extraInput.addEventListener("change", () => {
+          extraInput.checked ? state.otherParties.add(extraParty) : state.otherParties.delete(extraParty);
+          render();
+        });
+      });
+      choice.append(panel);
+      choice.querySelector("label").setAttribute("aria-haspopup", "true");
+    }
+  });
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".other-party-trigger")) document.querySelector("#other-party-popover")?.setAttribute("hidden", "");
   });
   document.querySelector("#party-toggle").addEventListener("click", event => {
     const select = state.parties.size !== Object.keys(PARTY_META).length;
     state.parties = new Set(select ? Object.keys(PARTY_META) : []);
-    els.parties.querySelectorAll("input").forEach(input => input.checked = select);
+    els.parties.querySelectorAll('input[name="party"]').forEach(input => input.checked = select);
     event.currentTarget.textContent = select ? "Alle abwählen" : "Alle auswählen";
     render();
   });
@@ -259,26 +286,33 @@ function buildControls() {
     state.regions = new Set(selectAll ? state.data.regions : ["Bundestag"]);
     inputs.forEach(input => input.checked = state.regions.has(input.value));
     event.currentTarget.textContent = selectAll ? "Nur Bundestag" : "Alle auswählen";
-    updatePollOptions(false);
+    updatePollOptions(true);
     render();
   });
 }
 
 function updatePollOptions(reset = false) {
+  if (reset) {
+    state.pollRankOverrides = [0, 1, 2];
+    state.pollDateLabels = [null, null, null];
+  }
   if (reset || !state.selectedPollRanks.size) state.selectedPollRanks = new Set([0]);
   els.polls.replaceChildren();
   const singleRegion = state.regions.size === 1 ? [...state.regions][0] : null;
-  const recent = singleRegion ? (state.data.polls[singleRegion] || []).slice(0, 3) : [];
+  const regionPolls = singleRegion ? (state.data.polls[singleRegion] || []) : [];
   [0, 1, 2].forEach(index => {
-    const poll = recent[index];
+    const rank = state.pollDateMode ? (state.pollRankOverrides[index] ?? index) : index;
+    const poll = regionPolls[rank];
     const wrap = document.createElement("div");
-    wrap.className = "choice poll-choice";
+    wrap.className = "poll-option-row";
     wrap.style.setProperty("--poll-opacity", [1, .62, .34][index]);
     const id = `poll-${index}`;
     const detail = poll ? `${poll.institute} · ${formatDate(poll.date)}` : `für jedes ausgewählte Parlament`;
     const expandedDetail = poll ? [poll.client, poll.institute, formatDate(poll.date)].filter(Boolean).join(" · ") : detail;
-    wrap.innerHTML = `<input id="${id}" type="checkbox" value="${index}" ${state.selectedPollRanks.has(index) ? "checked" : ""}><label for="${id}"><span><strong>${index === 0 ? "Neueste" : `${index + 1}. jüngste`}</strong><small class="poll-basic-detail">${detail}</small><small class="poll-tab-detail">${expandedDetail}</small></span></label>`;
-    const input = wrap.querySelector("input");
+    const heading = state.pollDateMode && poll ? formatDate(state.pollDateLabels[index] || poll.date) : index === 0 ? "Neueste" : `${index + 1}. jüngste`;
+    const calendarValue = state.pollDateLabels[index] || poll?.date || "";
+    wrap.innerHTML = `<div class="poll-calendar-wrap"><button class="poll-calendar-button" type="button" aria-label="Datum für ${index === 0 ? "neueste" : `${index + 1}. jüngste`} Umfrage wählen" ${singleRegion && state.pollDateMode ? "" : "disabled"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4.5 9h15M6 5h12a2 2 0 0 1 2 2v12H4V7a2 2 0 0 1 2-2Z"/></svg></button><div class="poll-calendar-popover" hidden><input class="poll-date-input" type="date" min="1996-01-01" max="${regionPolls[0]?.date || ""}" value="${calendarValue}">${index === 0 ? `<button class="poll-from-here" type="button">Ab hier</button>` : ""}</div></div><div class="choice poll-choice"><input id="${id}" type="checkbox" value="${index}" ${state.selectedPollRanks.has(index) ? "checked" : ""}><label for="${id}"><span><strong>${heading}</strong><small class="poll-basic-detail">${detail}</small><small class="poll-tab-detail">${expandedDetail}</small></span></label></div>`;
+    const input = wrap.querySelector(".poll-choice > input");
     input.addEventListener("change", () => {
       if (input.checked) state.selectedPollRanks.add(index); else state.selectedPollRanks.delete(index);
       if (!state.selectedPollRanks.size) {
@@ -287,9 +321,63 @@ function updatePollOptions(reset = false) {
       }
       render();
     });
+    const calendarButton = wrap.querySelector(".poll-calendar-button");
+    const popover = wrap.querySelector(".poll-calendar-popover");
+    calendarButton.addEventListener("click", event => {
+      event.stopPropagation();
+      document.querySelectorAll(".poll-calendar-popover").forEach(panel => { if (panel !== popover) panel.hidden = true; });
+      popover.hidden = !popover.hidden;
+      calendarButton.setAttribute("aria-expanded", String(!popover.hidden));
+    });
+    popover.addEventListener("click", event => event.stopPropagation());
+    const dateInput = wrap.querySelector(".poll-date-input");
+    dateInput.addEventListener("change", event => {
+      const chosen = event.currentTarget.value;
+      const matchingRank = regionPolls.findIndex(item => item.date <= chosen);
+      const nextRank = matchingRank < 0 ? regionPolls.length - 1 : matchingRank;
+      if (nextRank < 0) return;
+      state.pollRankOverrides[index] = nextRank;
+      state.pollDateLabels[index] = chosen;
+      updatePollOptions(false);
+      render();
+      if (index === 0) {
+        const firstPopover = els.polls.querySelector(".poll-calendar-popover");
+        const firstButton = els.polls.querySelector(".poll-calendar-button");
+        if (firstPopover) firstPopover.hidden = false;
+        firstButton?.setAttribute("aria-expanded", "true");
+      }
+    });
+    wrap.querySelector(".poll-from-here")?.addEventListener("click", () => {
+      const chosen = dateInput.value;
+      const matchingRank = regionPolls.findIndex(item => item.date <= chosen);
+      const nextRank = matchingRank < 0 ? regionPolls.length - 1 : matchingRank;
+      if (nextRank < 0) return;
+      state.pollRankOverrides = [nextRank, nextRank + 1, nextRank + 2];
+      state.pollDateLabels = [chosen, regionPolls[nextRank + 1]?.date || null, regionPolls[nextRank + 2]?.date || null];
+      state.selectedPollRanks = new Set([0, 1, 2].filter(slot => state.pollRankOverrides[slot] < regionPolls.length));
+      updatePollOptions(false);
+      render();
+    });
     els.polls.append(wrap);
   });
 }
+
+function selectedPollEntries() {
+  return [...state.selectedPollRanks].sort().map(slot => ({ slot, rank: state.pollDateMode ? (state.pollRankOverrides[slot] ?? slot) : slot }));
+}
+
+document.addEventListener("click", () => {
+  document.querySelectorAll(".poll-calendar-popover").forEach(panel => { panel.hidden = true; });
+});
+
+document.querySelector("#poll-date-mode").addEventListener("change", event => {
+  state.pollDateMode = event.currentTarget.checked;
+  document.querySelector(".poll-picker")?.classList.toggle("date-mode", state.pollDateMode);
+  if (state.data) {
+    updatePollOptions(false);
+    render();
+  }
+});
 
 function svgEl(name, attrs = {}) {
   const el = document.createElementNS("http://www.w3.org/2000/svg", name);
@@ -530,14 +618,14 @@ function render(animate = true) {
   updateComparisonButtons();
   updateElectionVisibility();
   const selectedRegions = [...state.regions];
-  const rawSeries = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+  const rawSeries = selectedRegions.flatMap(region => selectedPollEntries().map(({ slot, rank }) => {
     const poll = (state.data.polls[region] || [])[rank];
-    return poll ? { region, rank, poll } : null;
+    return poll ? { region, rank: slot, sourceRank: rank, poll } : null;
   }).filter(Boolean));
   const series = state.averageMode ? selectedRegions.map(region => {
     const items = rawSeries.filter(item => item.region === region);
     if (!items.length) return null;
-    const values = Object.fromEntries(Object.keys(PARTY_META).map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
+    const values = Object.fromEntries(state.data.parties.map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
     return { region, rank: 0, average: true, poll: { institute: `Ø ${items.length} Umfragen`, date: items[0].poll.date, client: "", values, sourcePolls: items.map(item => item.poll) } };
   }).filter(Boolean) : rawSeries;
   const parties = [...state.parties];
@@ -723,6 +811,8 @@ function render(animate = true) {
     const groupBlockBreaks = blockBreakCount(group.bars);
     const totalBars = group.bars.length * barWidth + (group.bars.length - 1) * barGap + groupBlockBreaks * blockGap;
     const startX = center - totalBars / 2;
+    const sonstigeBars = group.bars.filter(entry => entry.party === "Sonstige");
+    const sonstigeTop = sonstigeBars.length ? Math.min(...sonstigeBars.map(entry => margin.top + innerH - (Number(entry.item.poll.values.Sonstige || 0) / yMax) * innerH)) : 0;
     let passedBlockBreaks = 0;
     group.bars.forEach(({ party, item }, barIndex) => {
       const partyIndex = parties.indexOf(party);
@@ -791,6 +881,38 @@ function render(animate = true) {
         growBar(glowOutline, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
         faces.forEach(face => growBar(face, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay));
         growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
+      }
+      if (party === "Sonstige" && state.otherParties.size) {
+        const extraValues = [...state.otherParties]
+          .map(extraParty => ({ party: extraParty, value: Number(item.poll.values[extraParty] || 0) }))
+          .filter(entry => entry.value > 0)
+          .sort((a, b) => b.value - a.value || a.party.localeCompare(b.party, "de"));
+        if (extraValues.length) {
+          const lineHeight = compact ? 11 : 13;
+          const boxWidth = compact ? 92 : 112;
+          const boxHeight = 8 + extraValues.length * lineHeight;
+          const annotationIndex = group.bars.slice(0, barIndex).filter(entry => entry.party === "Sonstige").length;
+          const slotHeight = 8 + state.otherParties.size * lineHeight + 5;
+          const stackHeight = sonstigeBars.length * slotHeight;
+          const staggerX = (annotationIndex - (sonstigeBars.length - 1) / 2) * (compact ? 9 : 14);
+          const boxX = Math.max(axisX + 3, Math.min(width - margin.right - boxWidth - 3, center - boxWidth / 2 + staggerX));
+          const boxY = Math.max(5, sonstigeTop - stackHeight - (state.showPercentValues ? 24 : 10) + annotationIndex * slotHeight);
+          const detailGroup = svgEl("g", { class: "other-party-values" });
+          detailGroup.append(svgEl("path", {
+            d: `M ${boxX + boxWidth / 2} ${boxY + boxHeight} L ${x + barWidth / 2} ${Math.max(boxY + boxHeight + 2, y - 3)}`,
+            class: "other-party-value-link"
+          }));
+          detailGroup.append(svgEl("rect", { x: boxX, y: boxY, width: boxWidth, height: boxHeight, rx: 5, class: "other-party-values-bg" }));
+          extraValues.forEach((entry, extraIndex) => {
+            const lineY = boxY + 7 + extraIndex * lineHeight + lineHeight / 2;
+            detailGroup.append(svgEl("circle", { cx: boxX + 8, cy: lineY - 1, r: compact ? 2 : 2.4, fill: OTHER_PARTIES[entry.party].color }));
+            const text = svgEl("text", { x: boxX + 14, y: lineY + 2, class: "other-party-value-text" });
+            text.textContent = `${OTHER_PARTIES[entry.party].label} ${formatPercent(entry.value, false, compact)}`;
+            detailGroup.append(text);
+          });
+          els.chart.append(detailGroup);
+          old ? animateX(detailGroup, old.center, x + barWidth / 2, motionEnabled) : fadeIn(detailGroup, motionEnabled, newLabelDelay);
+        }
       }
       if (state.showPercentValues) {
         const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
@@ -943,9 +1065,11 @@ async function loadProjects() {
     empty.className = "report-empty";
     empty.textContent = "Noch keine gespeicherten Projekte.";
     list.append(empty);
-    return;
+    return projects;
   }
   projects.forEach(project => {
+    const row = document.createElement("div");
+    row.className = "report-project-row";
     const button = document.createElement("button");
     button.type = "button";
     button.className = "report-project-button";
@@ -962,8 +1086,27 @@ async function loadProjects() {
       document.querySelector("#report-dialog").classList.remove("project-picker-dialog", "startup-project-dialog");
       document.querySelector("#report-dialog").close();
     });
-    list.append(button);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "report-project-delete";
+    remove.setAttribute("aria-label", `Projekt ${project.title} löschen`);
+    remove.setAttribute("title", "Projekt löschen");
+    remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5"/></svg>';
+    remove.addEventListener("click", async () => {
+      if (!await confirmProjectDeletion()) return;
+      remove.disabled = true;
+      try {
+        await reportRequest(`/projects/${encodeURIComponent(project.id)}`, { method: "DELETE" });
+        await loadProjects();
+      } catch (error) {
+        remove.disabled = false;
+        document.querySelector("#project-code-message").textContent = error.message;
+      }
+    });
+    row.append(button, remove);
+    list.append(row);
   });
+  return projects;
 }
 
 async function saveCurrentProject(projectName = "") {
@@ -973,8 +1116,71 @@ async function saveCurrentProject(projectName = "") {
     title: projectName.trim().slice(0, 100) || "Unbenannt",
     detail: document.querySelector("#chart-meta")?.textContent?.trim() || "Aktuelle Konfiguration"
   };
-  await reportRequest("/projects", { method: "POST", body: JSON.stringify(payload) });
+  const { projects } = await reportRequest("/projects");
+  const existing = projects.find(project => project.configuration === payload.configuration);
+  if (projects.length >= 5 && !existing) {
+    const replaceId = await chooseProjectToOverwrite(projects);
+    if (!replaceId) return null;
+    await reportRequest(`/projects/${encodeURIComponent(replaceId)}`, { method: "PATCH", body: JSON.stringify(payload) });
+  } else {
+    await reportRequest("/projects", { method: "POST", body: JSON.stringify(payload) });
+  }
   return payload.configuration;
+}
+
+function openProjectActionDialog({ title, message, choices = [], danger = false }) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-action-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+  form.append(heading);
+  if (message) {
+    const copy = document.createElement("p");
+    copy.textContent = message;
+    form.append(copy);
+  }
+  const options = document.createElement("div");
+  options.className = "project-action-options";
+  choices.forEach(choice => {
+    const button = document.createElement("button");
+    button.type = "submit";
+    button.value = choice.value;
+    button.textContent = choice.label;
+    if (choice.danger || danger) button.classList.add("danger");
+    options.append(button);
+  });
+  const cancel = document.createElement("button");
+  cancel.type = "submit";
+  cancel.value = "";
+  cancel.textContent = "Abbrechen";
+  cancel.className = "project-action-cancel";
+  options.append(cancel);
+  form.append(options);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+  return new Promise(resolve => dialog.addEventListener("close", () => {
+    const result = dialog.returnValue;
+    dialog.remove();
+    resolve(result);
+  }, { once: true }));
+}
+
+function chooseProjectToOverwrite(projects) {
+  return openProjectActionDialog({
+    title: "Projekt überschreiben",
+    message: "Es bestehen bereits fünf Projekte. Welches bestehende Projekt soll überschrieben werden?",
+    choices: projects.map(project => ({ value: project.id, label: project.title }))
+  });
+}
+
+function confirmProjectDeletion() {
+  return openProjectActionDialog({
+    title: "Dieses Projekt Löschen?",
+    choices: [{ value: "delete", label: "Löschen", danger: true }]
+  }).then(result => result === "delete");
 }
 
 function askProjectName() {
@@ -1030,6 +1236,11 @@ function applyConfigurationCode(text) {
   state.regions = new Set(unrankOrdered(regionRank, state.data.regions));
   state.parties = new Set(unrankOrdered(partyRank, partyUniverse));
   state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
+  state.pollDateMode = false;
+  state.pollRankOverrides = [0, 1, 2];
+  state.pollDateLabels = [null, null, null];
+  document.querySelector("#poll-date-mode").checked = false;
+  document.querySelector(".poll-picker")?.classList.remove("date-mode");
   document.querySelector("#average-mode").checked = state.averageMode;
   els.mobileView.checked = state.mobileView;
   els.fullRegionNames.checked = !state.fullRegionNames;
@@ -1057,7 +1268,7 @@ function applyConfigurationCode(text) {
   document.querySelector("#a4-orientation-settings").hidden = !state.a4Mode;
   document.querySelector(`input[name="a4-orientation"][value="${state.a4Orientation}"]`).checked = true;
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
-  els.parties.querySelectorAll("input").forEach(input => input.checked = state.parties.has(input.value));
+  els.parties.querySelectorAll('input[name="party"]').forEach(input => input.checked = state.parties.has(input.value));
   updatePollOptions(false);
   render(false);
 }
@@ -1080,9 +1291,9 @@ async function exportChartImage(format = "jpeg") {
   const viewBox = els.chart.viewBox.baseVal;
   const selectedRegions = [...state.regions];
   const selectedParties = [...state.parties];
-  const selectedPolls = selectedRegions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+  const selectedPolls = selectedRegions.flatMap(region => selectedPollEntries().map(({ slot, rank }) => {
     const poll = (state.data.polls[region] || [])[rank];
-    return poll ? `${state.fullRegionNames ? region : REGION_CODES[region]} · ${rank === 0 ? "Neueste" : `${rank + 1}. jüngste`} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
+    return poll ? `${state.fullRegionNames ? region : REGION_CODES[region]} · ${slot === 0 ? "Neueste" : `${slot + 1}. jüngste`} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
   }).filter(Boolean));
   const partyColumns = selectedParties.length > 5 ? 2 : 1;
   const regionColumns = selectedRegions.length > 8 ? 2 : 1;
@@ -1200,14 +1411,14 @@ async function exportChartImage(format = "jpeg") {
 function a4ExportClusters() {
   const regions = [...state.regions];
   const parties = [...state.parties];
-  const raw = regions.flatMap(region => [...state.selectedPollRanks].sort().map(rank => {
+  const raw = regions.flatMap(region => selectedPollEntries().map(({ slot, rank }) => {
     const poll = (state.data.polls[region] || [])[rank];
-    return poll ? { region, rank, poll } : null;
+    return poll ? { region, rank: slot, sourceRank: rank, poll } : null;
   }).filter(Boolean));
   const series = state.averageMode ? regions.map(region => {
     const items = raw.filter(item => item.region === region);
     if (!items.length) return null;
-    const values = Object.fromEntries(Object.keys(PARTY_META).map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
+    const values = Object.fromEntries(state.data.parties.map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
     return { region, rank: 0, average: true, poll: { values } };
   }).filter(Boolean) : raw;
   if (state.groupBy === "region") return regions.map(region => ({
@@ -1334,14 +1545,14 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     const clusterRegions = [...new Set(legendBars.map(({ item }) => item.region))];
     const pollLegendGroups = state.averageMode ? [{
       label: "Verwendete Umfragen", noSwatch: true,
-      items: [...state.selectedPollRanks].sort().flatMap(rank => clusterRegions.map(region => {
+      items: selectedPollEntries().flatMap(({ rank }) => clusterRegions.map(region => {
         const poll = (state.data.polls[region] || [])[rank];
         return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
       }).filter(Boolean))
-    }] : [...state.selectedPollRanks].sort().map(rank => ({
-      rank,
-      label: rank === 0 ? "Neueste Umfragen" : `${rank + 1}. jüngste Umfragen`,
-      fill: [.68, .34, .14][rank], stroke: [1, .7, .4][rank],
+    }] : selectedPollEntries().map(({ slot, rank }) => ({
+      rank: slot,
+      label: slot === 0 ? "Neueste Umfragen" : `${slot + 1}. jüngste Umfragen`,
+      fill: [.68, .34, .14][slot], stroke: [1, .7, .4][slot],
       items: clusterRegions.map(region => {
         const poll = (state.data.polls[region] || [])[rank];
         return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
@@ -1521,10 +1732,10 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     const legendY = top + tileHeight + gapY + 28;
     const legendWidth = tileWidth - 32;
     const pageRegions = [...new Set(clusters.flatMap(cluster => cluster.bars.map(({ item }) => item.region)))];
-    const sharedGroups = [...state.selectedPollRanks].sort().map(rank => ({
-      rank,
-      label: rank === 0 ? "Neueste Umfragen" : `${rank + 1}. jüngste Umfragen`,
-      fill: [.68, .34, .14][rank], stroke: [1, .7, .4][rank],
+    const sharedGroups = selectedPollEntries().map(({ slot, rank }) => ({
+      rank: slot,
+      label: slot === 0 ? "Neueste Umfragen" : `${slot + 1}. jüngste Umfragen`,
+      fill: [.68, .34, .14][slot], stroke: [1, .7, .4][slot],
       items: pageRegions.map(region => {
         const poll = (state.data.polls[region] || [])[rank];
         return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
@@ -1795,6 +2006,7 @@ async function reportRequest(path, options = {}) {
 
 const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
+  ["pollDateSelection", "Umfragen: Zeitpunkt wählen"],
   ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"],
   ["labels", "Beschriftungen"], ["regionLabelMode", "Beschriftung: Parlamente"], ["partyLabelMode", "Beschriftung: Parteien"], ["percentLabelMode", "Beschriftung: Prozentwerte"], ["sinceElectionMode", "Beschriftung: Seit Wahl"],
   ["barColors", "Balken"], ["barColorMode", "Balken: Farbe"], ["barNeon", "Balken: Neon"], ["percentValues", "Prozentwerte"],
@@ -1812,7 +2024,7 @@ const developerFeatureOptions = {
 const developerDefaultValue = (key, platform) => ({
   deviceForce: platform === "mobile" ? "mobile" : "desktop", regionLabelMode: "auto", partyLabelMode: "auto",
   percentLabelMode: "without", sinceElectionMode: "color", barColorMode: "party", yAxisMode: "static"
-}[key] ?? !["export3d", "tabMode"].includes(key));
+}[key] ?? !["export3d", "tabMode", "pollDateSelection"].includes(key));
 const defaultDeveloperSettings = () => {
   const defaults = {
     mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: developerDefaultValue(key, "mobile") }])),
@@ -1903,6 +2115,9 @@ function applyDeveloperSettings() {
   state.barNeon = Boolean(settings.barNeon.value);
   state.showPercentValues = Boolean(settings.percentValues.value);
   state.showPercentValues = state.showPercentValues && state.percentLabelMode !== "off";
+  state.pollDateMode = Boolean(settings.pollDateSelection.value);
+  document.querySelector("#poll-date-mode").checked = state.pollDateMode;
+  document.querySelector(".poll-picker")?.classList.toggle("date-mode", state.pollDateMode);
   state.showLut = Boolean(settings.lut.value);
   yAxisMode = settings.yAxisMode.value;
   setCycleButton(document.querySelector("#y-axis-mode"), yAxisMode, [["static", "Statisch"], ["dynamic", "Dynamisch"], ["off", "Aus"]]);
@@ -1920,6 +2135,7 @@ function applyDeveloperSettings() {
   updateSelectionTabMode();
   setVisible("#chart-settings .view-switch", settings.deviceForce.visible);
   setVisible("#update-data", settings.dataUpdate.visible);
+  setVisible(".poll-time-switch", settings.pollDateSelection.visible);
   setVisible("#abbreviation-mode", settings.abbreviations.visible);
   setVisible("#brackets-mode", settings.brackets.visible);
   setVisible(".labels-choice", settings.labels.visible);
@@ -3090,7 +3306,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       button.disabled = true;
       const projectName = await askProjectName();
       if (projectName === null) { button.disabled = false; return; }
-      try { savedProjectConfiguration = await saveCurrentProject(projectName); message.textContent = "Projekt zentral gespeichert."; await loadProjects(); }
+      try {
+        const saved = await saveCurrentProject(projectName);
+        if (saved) { savedProjectConfiguration = saved; message.textContent = "Projekt zentral gespeichert."; await loadProjects(); }
+        else message.textContent = "Speichern abgebrochen.";
+      }
       catch (error) { message.textContent = error.message; }
       finally { button.disabled = false; }
     });
@@ -3106,7 +3326,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       button.disabled = true;
       const projectName = await askProjectName();
       if (projectName === null) { button.disabled = false; return; }
-      try { savedProjectConfiguration = await saveCurrentProject(projectName); els.exportMessage.textContent = "Projekt zentral gespeichert."; }
+      try {
+        const saved = await saveCurrentProject(projectName);
+        if (saved) { savedProjectConfiguration = saved; els.exportMessage.textContent = "Projekt zentral gespeichert."; }
+        else els.exportMessage.textContent = "Speichern abgebrochen.";
+      }
       catch (error) { els.exportMessage.textContent = error.message; }
       finally { button.disabled = false; }
     });

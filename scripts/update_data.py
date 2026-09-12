@@ -8,7 +8,7 @@ import sys
 import time
 from datetime import date, datetime
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 import requests
@@ -18,11 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "data" / "polls.json"
 BASE = "https://www.wahlrecht.de/umfragen/"
 LAND_INDEX = urljoin(BASE, "landtage/")
-PARTIES = ["CDU/CSU", "SPD", "GRÜNE", "FDP", "LINKE", "AfD", "BSW", "FW", "Sonstige"]
+MIN_POLL_DATE = "1996-01-01"
+PARTIES = ["CDU/CSU", "SPD", "GRÜNE", "FDP", "LINKE", "AfD", "BSW", "FW", "Sonstige", "Piraten", "NPD", "Die PARTEI", "Volt"]
 ALIASES = {
     "CDU": "CDU/CSU", "CSU": "CDU/CSU", "CDU/CSU": "CDU/CSU", "SPD": "SPD",
     "GRÜNE": "GRÜNE", "GRUENE": "GRÜNE", "FDP": "FDP", "LINKE": "LINKE",
-    "DIE LINKE": "LINKE", "AFD": "AfD", "BSW": "BSW", "FW": "FW",
+    "DIE LINKE": "LINKE", "PDS": "LINKE", "AFD": "AfD", "BSW": "BSW", "FW": "FW",
+    "PIR": "Piraten", "PIRATEN": "Piraten", "PIRATENPARTEI": "Piraten",
+    "NPD": "NPD", "DIE PARTEI": "Die PARTEI", "PARTEI": "Die PARTEI", "VOLT": "Volt",
     "FREIE WÄHLER": "FW", "SONSTIGE": "Sonstige"
 }
 HEADERS = {"User-Agent": "SonntagsfragenDashboard/1.0 (+GitHub Pages; data source attribution included)"}
@@ -90,45 +93,57 @@ def party_headers(table) -> list[str | None]:
 
 def extract_row_table(url: str) -> list[dict]:
     soup = fetch(url)
-    table = soup.select_one("table.wilko")
-    if not table:
-        return []
-    headers = party_headers(table)
     results = []
-    for row in table.select("tr"):
-        cells = row.find_all(["th", "td"], recursive=False)
-        if not cells or len(cells) != len(headers):
-            continue
-        texts = [clean(c.get_text(" ", strip=True)) for c in cells]
-        poll_date = next((iso_date(t) for t in texts[:5] if iso_date(t)), None)
-        if not poll_date or not any(normalize_party(c.get_text(" ", strip=True)) for c in table.select("thead th")):
-            continue
-        first_cell_is_date = iso_date(texts[0]) is not None
-        page_title = clean(soup.select_one("h1").get_text(" ", strip=True)) if soup.select_one("h1") else ""
-        institute = re.sub(r"^Umfragen\s+", "", page_title) if first_cell_is_date else texts[0]
-        if not institute or "wahl" in institute.lower() or institute.lower() in {"institut", "veröffentl."}:
-            continue
-        values = {party: 0.0 for party in PARTIES}
-        for idx, party in enumerate(headers):
-            if party and idx < len(texts):
-                values[party] = number(texts[idx])
-        other_index = next((i for i, p in enumerate(headers) if p == "Sonstige"), None)
-        if other_index is not None:
-            other_text = texts[other_index]
-            fw = re.search(r"(?:FW|Freie Wähler)\s*(\d+(?:[,.]\d+)?)", other_text, re.I)
-            bsw = re.search(r"BSW\s*(\d+(?:[,.]\d+)?)", other_text, re.I)
-            embedded_fw = 0.0
-            embedded_bsw = 0.0
-            if fw:
-                embedded_fw = float(fw.group(1).replace(",", "."))
-                values["FW"] = embedded_fw
-            if bsw:
-                embedded_bsw = float(bsw.group(1).replace(",", "."))
-                values["BSW"] = embedded_bsw
-            nums = [float(x.replace(",", ".")) for x in re.findall(r"\d+(?:[,.]\d+)?", other_text)]
-            values["Sonstige"] = max(0.0, sum(nums) - embedded_fw - embedded_bsw)
-        client = "" if first_cell_is_date else (texts[1] if len(texts) > 1 else "")
-        results.append({"date": poll_date, "institute": institute, "client": client, "values": values, "source": url})
+    page_title = clean(soup.select_one("h1").get_text(" ", strip=True)) if soup.select_one("h1") else ""
+    for table in soup.select("table.wilko"):
+        headers = party_headers(table)
+        for row in table.select("tr"):
+            cells = row.find_all(["th", "td"], recursive=False)
+            if not cells:
+                continue
+            row_headers = headers[:len(cells)]
+            if len(cells) > len(headers) or sum(party is not None for party in row_headers) < 5:
+                continue
+            texts = [clean(c.get_text(" ", strip=True)) for c in cells]
+            poll_date = next((iso_date(t) for t in texts[:5] if iso_date(t)), None)
+            if not poll_date:
+                continue
+            first_cell_is_date = iso_date(texts[0]) is not None
+            institute = re.sub(r"^Umfragen\s+", "", page_title) if first_cell_is_date else texts[0]
+            if not institute or (not first_cell_is_date and "wahl" in institute.lower()) or institute.lower() in {"institut", "veröffentl."}:
+                continue
+            values = {party: 0.0 for party in PARTIES}
+            for idx, party in enumerate(row_headers):
+                if party and idx < len(texts):
+                    values[party] = number(texts[idx])
+            other_index = next((i for i, p in enumerate(row_headers) if p == "Sonstige"), None)
+            if other_index is not None:
+                other_text = texts[other_index]
+                fw = re.search(r"(?:FW|Freie Wähler)\s*(\d+(?:[,.]\d+)?)", other_text, re.I)
+                bsw = re.search(r"BSW\s*(\d+(?:[,.]\d+)?)", other_text, re.I)
+                embedded_fw = 0.0
+                embedded_bsw = 0.0
+                if fw:
+                    embedded_fw = float(fw.group(1).replace(",", "."))
+                    values["FW"] = embedded_fw
+                if bsw:
+                    embedded_bsw = float(bsw.group(1).replace(",", "."))
+                    values["BSW"] = embedded_bsw
+                extra_patterns = {
+                    "Piraten": r"(?:Piraten(?:partei)?|PIR)\s*(\d+(?:[,.]\d+)?)",
+                    "NPD": r"NPD\s*(\d+(?:[,.]\d+)?)",
+                    "Die PARTEI": r"(?:Die\s+PARTEI|PARTEI)\s*(\d+(?:[,.]\d+)?)",
+                    "Volt": r"Volt\s*(\d+(?:[,.]\d+)?)",
+                }
+                for extra_party, pattern in extra_patterns.items():
+                    flags = 0 if extra_party == "Die PARTEI" else re.I
+                    match = re.search(pattern, other_text, flags)
+                    if match:
+                        values[extra_party] = float(match.group(1).replace(",", "."))
+                nums = [float(x.replace(",", ".")) for x in re.findall(r"\d+(?:[,.]\d+)?", other_text)]
+                values["Sonstige"] = max(0.0, sum(nums) - embedded_fw - embedded_bsw)
+            client = "" if first_cell_is_date else (texts[1] if len(texts) > 1 else "")
+            results.append({"date": poll_date, "institute": institute, "client": client, "values": values, "source": url})
     return results
 
 def extract_election_result(url: str) -> dict:
@@ -206,15 +221,26 @@ def extract_bundestag() -> list[dict]:
             links.append(href)
     rows = []
     for href in links:
+        institute_url = urljoin(BASE, href)
         try:
-            rows.extend(extract_row_table(urljoin(BASE, href)))
+            institute_soup = fetch(institute_url)
+            archive_prefix = f"/umfragen/{Path(urlparse(institute_url).path).stem}/"
+            source_urls = [institute_url]
+            for archive_link in institute_soup.select("a[href]"):
+                archive_url = urljoin(institute_url, archive_link.get("href", "")).split("#", 1)[0].split("?", 1)[0]
+                archive_path = urlparse(archive_url).path
+                if archive_path.startswith(archive_prefix) and archive_path.endswith(".htm") and "stimmung" not in archive_path:
+                    source_urls.append(archive_url)
+            for source_url in dict.fromkeys(source_urls):
+                rows.extend(extract_row_table(source_url))
         except Exception as exc:
             print(f"Warnung: {href}: {exc}", file=sys.stderr)
     unique = {}
     for row in rows:
         key = (row["date"], row["institute"], tuple(row["values"].values()))
-        unique[key] = row
-    return sorted(unique.values(), key=lambda r: r["date"], reverse=True)[:500]
+        if row["date"] >= MIN_POLL_DATE:
+            unique[key] = row
+    return sorted(unique.values(), key=lambda r: r["date"], reverse=True)
 
 def main() -> None:
     polls = {"Bundestag": extract_bundestag()}
@@ -224,7 +250,7 @@ def main() -> None:
     elections["Bundestag"] = extract_election_result(urljoin(BASE, "forsa.htm"))
     for state_name, url in state_urls.items():
         try:
-            polls[state_name] = extract_row_table(url)[:500]
+            polls[state_name] = [row for row in extract_row_table(url) if row["date"] >= MIN_POLL_DATE]
             elections[state_name] = extract_election_result(url)
         except Exception as exc:
             print(f"Warnung: {state_name}: {exc}", file=sys.stderr)

@@ -27,9 +27,9 @@ const reportUsers = [
   { id: "builtin-helper3", personName: "Felix", workName: "Helper3", role: "Helper", hash: "39e91335c32659ef778fb32fcaf617d01e9efd7543a4cde2a35217503c7e3721", system: true }
 ];
 
-const developerFeatureKeys = ["intro", "deviceForce", "tabMode", "dataUpdate", "abbreviations", "sinceElection", "brackets", "labels", "regionLabelMode", "partyLabelMode", "percentLabelMode", "sinceElectionMode", "barColors", "barColorMode", "barNeon", "percentValues", "lut", "yAxisMode", "background", "viewSize", "uiScale", "fullscreen", "fullscreenDefault", "helperAppAccess", "preview", "a4Output", "export3d"];
+const developerFeatureKeys = ["intro", "deviceForce", "tabMode", "dataUpdate", "pollDateSelection", "abbreviations", "sinceElection", "brackets", "labels", "regionLabelMode", "partyLabelMode", "percentLabelMode", "sinceElectionMode", "barColors", "barColorMode", "barNeon", "percentValues", "lut", "yAxisMode", "background", "viewSize", "uiScale", "fullscreen", "fullscreenDefault", "helperAppAccess", "preview", "a4Output", "export3d"];
 const developerOptions = { regionLabelMode: ["auto", "0", "90", "off"], partyLabelMode: ["auto", "0", "90", "off"], percentLabelMode: ["with", "without", "off"], sinceElectionMode: ["color", "gray", "off"], barColorMode: ["party", "lightblue", "gray"], yAxisMode: ["static", "dynamic", "off"] };
-const developerDefaultValue = (key, platform) => ({ deviceForce: platform, regionLabelMode: "auto", partyLabelMode: "auto", percentLabelMode: "without", sinceElectionMode: "color", barColorMode: "party", yAxisMode: "static" }[key] ?? !["export3d", "tabMode", "helperAppAccess"].includes(key));
+const developerDefaultValue = (key, platform) => ({ deviceForce: platform, regionLabelMode: "auto", partyLabelMode: "auto", percentLabelMode: "without", sinceElectionMode: "color", barColorMode: "party", yAxisMode: "static" }[key] ?? !["export3d", "tabMode", "helperAppAccess", "pollDateSelection"].includes(key));
 const developerDefaults = {
   mobile: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: key !== "helperAppAccess", value: developerDefaultValue(key, "mobile") }])),
   desktop: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: key !== "helperAppAccess", value: developerDefaultValue(key, "desktop") }]))
@@ -154,6 +154,30 @@ export default {
       const id = existing?.id || crypto.randomUUID();
       await env.REPORTS.prepare("INSERT INTO projects (id, user_id, configuration, title, detail) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, configuration) DO UPDATE SET title = excluded.title, detail = excluded.detail, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(id, reporter.id, configuration, title, detail).run();
       return json({ ok: true, id }, existing ? 200 : 201, origin);
+    }
+
+    const projectMatch = url.pathname.match(/^\/projects\/([^/]+)$/);
+    if (projectMatch && request.method === "PATCH") {
+      const payload = await request.json().catch(() => ({}));
+      const configuration = String(payload.configuration || "").trim();
+      const title = String(payload.title || "Unbenannt").trim().slice(0, 100) || "Unbenannt";
+      const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
+      if (!/^[0-9A-Za-z]{13,17}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
+      await ensureProjectsTable(env);
+      try {
+        const result = await env.REPORTS.prepare("UPDATE projects SET configuration = ?, title = ?, detail = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ?").bind(configuration, title, detail, decodeURIComponent(projectMatch[1]), reporter.id).run();
+        if (!result.meta?.changes) return json({ error: "Projekt nicht gefunden." }, 404, origin);
+        return json({ ok: true, id: decodeURIComponent(projectMatch[1]) }, 200, origin);
+      } catch (error) {
+        return json({ error: "Diese Konfiguration ist bereits als anderes Projekt gespeichert." }, 409, origin);
+      }
+    }
+
+    if (projectMatch && request.method === "DELETE") {
+      await ensureProjectsTable(env);
+      const result = await env.REPORTS.prepare("DELETE FROM projects WHERE id = ? AND user_id = ?").bind(decodeURIComponent(projectMatch[1]), reporter.id).run();
+      if (!result.meta?.changes) return json({ error: "Projekt nicht gefunden." }, 404, origin);
+      return json({ ok: true }, 200, origin);
     }
 
     if (url.pathname === "/accounts" && request.method === "GET") {

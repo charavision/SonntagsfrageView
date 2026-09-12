@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-240">
+  <link rel="stylesheet" href="styles.css?v=project-management-248">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -71,8 +71,13 @@
       <div class="control-group poll-picker" data-selection-panel="polls">
         <div class="control-heading">
           <h2>Umfragen vergleichen</h2>
-          <span class="desktop-poll-hint">maximal die letzten drei</span>
-          <span class="mobile-poll-hint">max. die letzten drei</span>
+          <span class="desktop-poll-hint">max. drei</span>
+          <span class="mobile-poll-hint">max. drei</span>
+        </div>
+        <div class="poll-time-switch" role="group" aria-label="Zeitraum der Umfragen">
+          <span class="poll-time-current">Aktuelle</span>
+          <label class="switch"><input id="poll-date-mode" type="checkbox"><span></span></label>
+          <span class="poll-time-custom">Zeitpunkt wählen</span>
         </div>
         <div class="poll-actions">
           <div id="poll-options" class="poll-options"></div>
@@ -337,6 +342,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-240" defer></script>
+  <script src="app.js?v=project-management-248" defer></script>
 </body>
 </html>
