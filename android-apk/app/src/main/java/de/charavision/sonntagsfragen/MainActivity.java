@@ -21,7 +21,7 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "1.0.19";
+    private static final String APP_VERSION = "1.0.21";
     private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
     private WebView webView;
     private volatile boolean webSurfaceReady = false;
