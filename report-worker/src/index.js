@@ -27,10 +27,12 @@ const reportUsers = [
   { id: "builtin-helper3", personName: "Felix", workName: "Helper3", role: "Helper", hash: "39e91335c32659ef778fb32fcaf617d01e9efd7543a4cde2a35217503c7e3721", system: true }
 ];
 
-const developerFeatureKeys = ["intro", "deviceForce", "tabMode", "dataUpdate", "abbreviations", "sinceElection", "brackets", "labels", "barColors", "percentValues", "lut", "yAxisStatic", "background", "viewSize", "uiScale", "fullscreen", "fullscreenDefault", "helperAppAccess", "preview", "a4Output", "export3d"];
+const developerFeatureKeys = ["intro", "deviceForce", "tabMode", "dataUpdate", "abbreviations", "sinceElection", "brackets", "labels", "regionLabelMode", "partyLabelMode", "percentLabelMode", "sinceElectionMode", "barColors", "barColorMode", "barNeon", "percentValues", "lut", "yAxisMode", "background", "viewSize", "uiScale", "fullscreen", "fullscreenDefault", "helperAppAccess", "preview", "a4Output", "export3d"];
+const developerOptions = { regionLabelMode: ["auto", "0", "90", "off"], partyLabelMode: ["auto", "0", "90", "off"], percentLabelMode: ["with", "without", "off"], sinceElectionMode: ["color", "gray", "off"], barColorMode: ["party", "lightblue", "gray"], yAxisMode: ["static", "dynamic", "off"] };
+const developerDefaultValue = (key, platform) => ({ deviceForce: platform, regionLabelMode: "auto", partyLabelMode: "auto", percentLabelMode: "without", sinceElectionMode: "color", barColorMode: "party", yAxisMode: "static" }[key] ?? !["export3d", "tabMode", "helperAppAccess"].includes(key));
 const developerDefaults = {
-  mobile: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: key !== "helperAppAccess", value: key === "deviceForce" ? "mobile" : ["export3d", "tabMode", "helperAppAccess"].includes(key) ? false : true }])),
-  desktop: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: key !== "helperAppAccess", value: key === "deviceForce" ? "desktop" : ["export3d", "tabMode", "helperAppAccess"].includes(key) ? false : true }]))
+  mobile: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: key !== "helperAppAccess", value: developerDefaultValue(key, "mobile") }])),
+  desktop: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: key !== "helperAppAccess", value: developerDefaultValue(key, "desktop") }]))
 };
 const sanitizeDeveloperSettings = input => Object.fromEntries(["mobile", "desktop"].map(platform => [platform,
   Object.fromEntries(developerFeatureKeys.map(key => {
@@ -40,7 +42,9 @@ const sanitizeDeveloperSettings = input => Object.fromEntries(["mobile", "deskto
       visible: typeof candidate.visible === "boolean" ? candidate.visible : fallback.visible,
       value: key === "deviceForce"
         ? (["desktop", "mobile"].includes(candidate.value) ? candidate.value : fallback.value)
-        : (typeof candidate.value === "boolean" ? candidate.value : fallback.value)
+        : developerOptions[key]
+          ? (developerOptions[key].includes(candidate.value) ? candidate.value : fallback.value)
+          : (typeof candidate.value === "boolean" ? candidate.value : fallback.value)
     }];
   }))
 ]));
@@ -140,7 +144,7 @@ export default {
       const configuration = String(payload.configuration || "").trim();
       const title = String(payload.title || "Sonntagsfragen").trim().slice(0, 100) || "Sonntagsfragen";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
-      if (!/^[0-9A-Za-z]{13,15}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
+      if (!/^[0-9A-Za-z]{13,17}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       const existing = await env.REPORTS.prepare("SELECT id FROM projects WHERE user_id = ? AND configuration = ? LIMIT 1").bind(reporter.id, configuration).first();
       if (!existing) {

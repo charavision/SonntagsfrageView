@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=report-book-221">
+  <link rel="stylesheet" href="styles.css?v=report-book-240">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -98,6 +98,7 @@
         <div class="chart-heading-actions">
           <div class="chart-view-menu">
             <button id="chart-view-settings-toggle" class="chart-view-settings-toggle" type="button" aria-label="Ansicht einstellen" aria-expanded="false" aria-controls="chart-view-settings">⚙</button>
+            <div id="view-menu-dismiss" class="view-menu-dismiss" hidden></div>
             <div id="chart-view-settings" class="chart-view-settings">
               <div class="labels-choice choice">
                 <input id="show-labels" type="checkbox" checked hidden>
@@ -112,8 +113,12 @@
                 </div>
               </div>
               <div class="bar-colors-choice choice">
-                <input id="show-bar-colors" type="checkbox" checked>
-                <label for="show-bar-colors">Balkenfarben</label>
+                <input id="show-bar-colors" type="checkbox" checked hidden>
+                <button id="bar-menu-toggle" class="bar-menu-toggle" type="button" aria-expanded="false"><span class="bar-check" aria-label="Balken ein- oder ausschalten">✓</span><span>Balken</span></button>
+                <div class="bar-options" aria-label="Optionen für Balken">
+                  <button id="bar-color-mode" class="bar-option-row" type="button" data-value="party"><span>Farbe:</span><strong class="label-option-value">Parteifarben</strong></button>
+                  <button id="bar-neon-mode" class="bar-option-row" type="button" data-value="on"><span>Neon:</span><strong class="label-option-value">An</strong></button>
+                </div>
               </div>
               <input id="show-since-election" type="checkbox" checked hidden>
               <input id="show-percent-values" type="checkbox" checked hidden>
@@ -147,13 +152,14 @@
         <button id="fullscreen-selection-toggle" class="fullscreen-tool fullscreen-selection-toggle" type="button" aria-label="Parlamente, Parteien und Umfragen anzeigen" aria-expanded="false"><svg class="bar-chart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9H4Zm6 0V4h4v16h-4Zm6 0v-6h4v6h-4Z"/></svg></button>
         <button id="fullscreen-output-toggle" class="fullscreen-tool fullscreen-output-toggle" type="button" aria-label="Ausgabe und Download anzeigen" aria-expanded="false">⬇</button>
         <button id="fullscreen-help" class="fullscreen-help" type="button" aria-label="Info öffnen">i</button>
-        <button id="ui-scale-toggle" class="ui-scale-toggle" type="button" aria-label="Größe der Bedienelemente einstellen" aria-expanded="false">⌕</button>
+        <button id="ui-scale-toggle" class="ui-scale-toggle" type="button" aria-label="Größe der Bedienelemente einstellen" aria-expanded="false"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13.5" cy="13.5" r="8.5"/><path d="m20 20 7 7M10 13.5h7M13.5 10v7"/></svg></button>
         <div id="ui-scale-panel" class="ui-scale-panel" hidden><label for="ui-scale-range">Bedienelemente <strong id="ui-scale-value">100 %</strong></label><input id="ui-scale-range" type="range" min="50" max="300" step="10" value="100"></div>
         <button id="project-picker-toggle" class="project-picker-toggle" type="button" aria-label="Projekte öffnen" hidden>P</button>
         <button id="view-fullscreen-exit" class="view-fullscreen-exit" type="button" aria-label="Vollbild schließen">×</button>
         <div id="chart-scroll" class="chart-scroll">
           <svg id="chart" role="img" aria-labelledby="chart-title chart-description"></svg>
         </div>
+        <div id="static-y-axis" class="static-y-axis" aria-hidden="true" hidden></div>
         <div id="view-zoom-controls" class="view-zoom-controls" aria-label="Zoom des Views">
           <button id="view-size-up" class="zoom-up" type="button" aria-label="View höher darstellen">+</button>
           <button id="view-width-down" class="zoom-left" type="button" aria-label="View schmaler darstellen">−</button>
@@ -168,7 +174,7 @@
     <section class="outputs" aria-label="Ausgabe">
       <form id="code-input" class="code-box code-input output-input" novalidate hidden>
         <label class="sr-only" for="input-code">Input Configuration</label>
-        <input id="input-code" maxlength="15" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
+        <input id="input-code" maxlength="17" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
         <button type="submit">Anwenden</button>
         <small id="code-message" aria-live="polite"></small>
       </form>
@@ -204,7 +210,7 @@
         <fieldset class="report-pin-group">
           <legend>PIN</legend>
           <div id="report-pin" class="report-pin-fields" aria-label="Fünfstellige PIN">
-            <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 1" required>
+            <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 1" required autofocus>
             <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 2" required>
             <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 3" required>
             <input type="password" maxlength="1" autocomplete="off" aria-label="PIN-Zeichen 4" required>
@@ -221,11 +227,11 @@
           <span id="report-session-work"></span>
         </div>
         <div class="report-session-actions">
-          <button id="report-book-open" class="report-tab" type="button">Meldebuch</button>
+          <button id="report-book-open" class="report-tab report-icon-tab" type="button" aria-label="Meldebuch" title="Meldebuch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5A3.5 3.5 0 0 1 6.5 2H11v18H6.5A3.5 3.5 0 0 0 3 23V5.5Zm18 0A3.5 3.5 0 0 0 17.5 2H13v18h4.5A3.5 3.5 0 0 1 21 23V5.5Z"/></svg></button>
           <button id="report-info-open" class="report-tab report-info-tab" type="button" aria-label="Info" title="Info"><span class="report-tab-info-icon" aria-hidden="true">i</span></button>
-          <button id="report-projects-open" class="report-tab" type="button">Projekte</button>
-          <button id="report-accounts-open" class="report-tab" type="button" hidden>Accounts</button>
-          <button id="report-developer-open" class="report-tab" type="button">Master <span class="report-tab-gear" aria-hidden="true">⚙</span></button>
+          <button id="report-projects-open" class="report-tab" type="button" hidden>Projekte</button>
+          <button id="report-accounts-open" class="report-tab report-icon-tab" type="button" aria-label="Accounts" title="Accounts" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-5 3-7.5 7.5-7.5s6.9 2.5 7.5 7.5Z"/></svg></button>
+          <button id="report-developer-open" class="report-tab report-icon-tab report-master-tab" type="button" aria-label="Mastereinstellungen" title="Mastereinstellungen"><svg class="report-master-icon" viewBox="0 0 40 40" aria-hidden="true"><circle class="master-ring outer" cx="20" cy="20" r="18"/><circle class="master-ring inner" cx="20" cy="20" r="14"/><g class="master-gear"><path d="M18 8h4l1 4 3-2 3 3-2 3 4 1v4l-4 1 2 3-3 3-3-2-1 4h-4l-1-4-3 2-3-3 2-3-4-1v-4l4-1-2-3 3-3 3 2Z"/><circle cx="20" cy="20" r="4"/></g></svg></button>
           <button id="report-app-open" class="report-tab" type="button" hidden>App</button>
         </div>
       </section>
@@ -251,7 +257,7 @@
       <section id="report-projects" class="report-projects" hidden aria-labelledby="report-projects-title">
         <form id="project-code-input" class="project-code-input">
           <label class="sr-only" for="project-input-code">Input Configuration</label>
-          <input id="project-input-code" maxlength="15" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
+          <input id="project-input-code" maxlength="17" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
           <button type="submit">Anwenden</button>
           <small id="project-code-message" aria-live="polite"></small>
         </form>
@@ -259,7 +265,6 @@
         <div id="report-project-list" class="report-project-list"></div>
         <button id="project-new" class="project-new" type="button">Neu</button>
         <div id="project-picker-output" class="project-picker-output" hidden>
-          <span>Output Configuration</span>
           <output id="project-output-code"></output>
           <button id="project-copy" type="button">Copy Configuration</button>
           <button id="project-save" type="button" aria-label="Konfiguration als Projekt speichern">💾 Save Project</button>
@@ -304,6 +309,14 @@
     </div>
     <div class="report-version" aria-label="Aktuelle Version">Version <strong id="report-current-version">wird geladen …</strong></div>
   </dialog>
+  <dialog id="project-name-dialog" class="project-name-dialog" aria-labelledby="project-name-title">
+    <form method="dialog">
+      <strong id="project-name-title">Projekt speichern</strong>
+      <label for="project-name-input">Projektname</label>
+      <input id="project-name-input" maxlength="100" placeholder="Unbenannt" autocomplete="off">
+      <div><button value="cancel" type="submit">Abbrechen</button><button value="save" type="submit">Speichern</button></div>
+    </form>
+  </dialog>
   <dialog id="edda-thanks" class="edda-thanks" aria-live="polite">
     <div id="edda-fireworks" class="edda-fireworks" aria-hidden="true"></div>
     <img src="edda-thanks.png" alt="Edda">
@@ -324,6 +337,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=report-book-221" defer></script>
+  <script src="app.js?v=report-book-240" defer></script>
 </body>
 </html>

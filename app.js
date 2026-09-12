@@ -9,6 +9,17 @@ const PARTY_META = {
   "FW": { color: "var(--fw)", glow: "#ffb25e", label: "FW" },
   "Sonstige": { color: "var(--sonstige)", glow: "#d9e0e8", label: "Sonstige" }
 };
+const MATTE_PARTY_COLORS = {
+  "CDU/CSU": { dark: "#20252b", base: "#353c44", light: "#626c76" },
+  "SPD": { dark: "#5d2026", base: "#873139", light: "#bd5c63" },
+  "GRÜNE": { dark: "#214b31", base: "#346a45", light: "#67a777" },
+  "FDP": { dark: "#695d28", base: "#93843d", light: "#c6b968" },
+  "LINKE": { dark: "#492c59", base: "#68417b", light: "#9870a8" },
+  "AfD": { dark: "#244b6c", base: "#376b91", light: "#72a1c2" },
+  "BSW": { dark: "#4f2634", base: "#71384b", light: "#9f6979" },
+  "FW": { dark: "#674326", base: "#91613a", light: "#c18e61" },
+  "Sonstige": { dark: "#3f464e", base: "#59636d", light: "#89939d" }
+};
 
 const REGION_CODES = {
   "Bundestag": "BUND", "Baden-Württemberg": "BW", "Bayern": "BY", "Berlin": "BE",
@@ -28,7 +39,7 @@ try {
     else if (value && typeof value === "object") storedViewScales[platform] = { x: Number(value.x) || 1, y: Number(value.y) || 1 };
   });
 } catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), selectedPollRanks: new Set([0]), averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, barColorMode: "party", barNeon: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
 let savedProjectConfiguration = null;
 function currentPlatformLabel() {
   if (window.AndroidApp) return "Android";
@@ -72,7 +83,7 @@ const els = {
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), abbreviationMode: document.querySelector("#abbreviation-mode"), showSinceElection: document.querySelector("#show-since-election"), sinceElectionMode: document.querySelector("#since-election-mode"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), labelsMenuToggle: document.querySelector("#labels-menu-toggle"), regionLabelMode: document.querySelector("#region-label-mode"), partyLabelMode: document.querySelector("#party-label-mode"), showBarColors: document.querySelector("#show-bar-colors"), showPercentValues: document.querySelector("#show-percent-values"), percentLabelMode: document.querySelector("#percent-label-mode"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataStand: document.querySelector("#report-data-stand"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), abbreviationMode: document.querySelector("#abbreviation-mode"), showSinceElection: document.querySelector("#show-since-election"), sinceElectionMode: document.querySelector("#since-election-mode"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), labelsMenuToggle: document.querySelector("#labels-menu-toggle"), regionLabelMode: document.querySelector("#region-label-mode"), partyLabelMode: document.querySelector("#party-label-mode"), showBarColors: document.querySelector("#show-bar-colors"), barMenuToggle: document.querySelector("#bar-menu-toggle"), barColorMode: document.querySelector("#bar-color-mode"), barNeonMode: document.querySelector("#bar-neon-mode"), showPercentValues: document.querySelector("#show-percent-values"), percentLabelMode: document.querySelector("#percent-label-mode"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataStand: document.querySelector("#report-data-stand"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
@@ -124,6 +135,24 @@ function updateElectionVisibility() {
   document.body.classList.toggle("hide-election-dates", !state.electionDates);
 }
 
+function barVisual(party) {
+  if (!state.barNeon && (!state.barColors || state.barColorMode === "gray")) return { dark: "#343a42", base: "#555e68", light: "#8b949e", fill: "#555e68", stroke: "none" };
+  if (!state.barNeon && state.barColorMode === "lightblue") return { dark: "#31536a", base: "#527b96", light: "#91b3c8", fill: "#527b96", stroke: "none" };
+  if (!state.barNeon) {
+    const matte = MATTE_PARTY_COLORS[party] || MATTE_PARTY_COLORS.Sonstige;
+    return { ...matte, fill: matte.base, stroke: "none" };
+  }
+  if (!state.barColors || state.barColorMode === "gray") return { fill: "#7d8794", stroke: "#b8c2cf" };
+  if (state.barColorMode === "lightblue") return { fill: "#77bce8", stroke: "#bce8ff" };
+  return { fill: PARTY_META[party].color, stroke: PARTY_META[party].glow };
+}
+
+function mixHexColors(first, second, amount = .5) {
+  const channels = color => [1, 3, 5].map(index => Number.parseInt(color.slice(index, index + 2), 16));
+  const a = channels(first), b = channels(second);
+  return `#${a.map((value, index) => Math.round(value + (b[index] - value) * amount).toString(16).padStart(2, "0")).join("")}`;
+}
+
 const CODE_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 function permutations(n, k) { let result = 1n; for (let i = 0; i < k; i += 1) result *= BigInt(n - i); return result; }
 function orderedChoiceCount(n) { let total = 0n; for (let k = 1; k <= n; k += 1) total += permutations(n, k); return total; }
@@ -167,7 +196,9 @@ function configurationCode() {
   const percentLabelBits = BigInt({ without: 0, with: 1, off: 2 }[state.percentLabelMode] || 0) << 20n;
   const sinceElectionBits = BigInt({ color: 0, gray: 1, off: 2 }[state.sinceElectionMode] || 0) << 22n;
   const yAxisBits = BigInt({ dynamic: 0, static: 1, off: 2 }[yAxisMode] || 0) << 24n;
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits;
+  const barColorBits = BigInt({ party: 0, lightblue: 1, gray: 2 }[state.barColorMode] || 0) << 26n;
+  const barNeonBits = (state.barNeon ? 0n : 1n) << 28n;
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits;
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value);
 }
@@ -350,13 +381,56 @@ const labelModeOptions = {
 };
 let yAxisMode = "dynamic";
 function updateYAxisPosition() {
-  const offset = yAxisMode === "static" ? els.scroll.scrollLeft : 0;
-  els.chart.querySelectorAll(".axis-label, .axis-line").forEach(node => {
-    if (yAxisMode === "static") {
-      node.setAttribute("transform", `translate(${offset} 0)`);
-      els.chart.append(node);
-    } else node.removeAttribute("transform");
+  const layer = els.chart.querySelector(".y-axis-layer");
+  const overlay = document.querySelector("#static-y-axis");
+  if (!layer || !overlay) return;
+  const staticMode = yAxisMode === "static";
+  layer.style.visibility = staticMode ? "hidden" : "visible";
+  overlay.hidden = !staticMode;
+  if (!staticMode) {
+    overlay.replaceChildren();
+    return;
+  }
+  const chartHeight = Number(layer.dataset.chartHeight);
+  const visibleWidth = Math.max(1, els.scroll.clientWidth);
+  overlay.style.width = `${visibleWidth}px`;
+  overlay.style.height = `${chartHeight}px`;
+  const frameRect = overlay.parentElement.getBoundingClientRect();
+  const scrollRect = els.scroll.getBoundingClientRect();
+  overlay.style.left = `${scrollRect.left - frameRect.left}px`;
+  overlay.style.top = `${scrollRect.top - frameRect.top}px`;
+  const axisX = Number(layer.dataset.axisX);
+  const axisTop = Number(layer.dataset.axisTop);
+  const axisBottom = Number(layer.dataset.axisBottom);
+  const innerHeight = Number(layer.dataset.innerHeight);
+  const yMax = Number(layer.dataset.yMax);
+  const compact = layer.dataset.compact === "true";
+  overlay.classList.toggle("is-compact", compact);
+  overlay.style.setProperty("--axis-x", `${axisX}px`);
+  overlay.style.setProperty("--axis-label-x", `${compact ? axisX + 7 : axisX - 10}px`);
+  overlay.style.setProperty("--axis-top", `${axisTop}px`);
+  overlay.style.setProperty("--axis-bottom", `${Math.max(0, chartHeight - axisBottom)}px`);
+  overlay.style.setProperty("--axis-font-size", compact ? "10px" : "12px");
+  const line = document.createElement("span");
+  line.className = "static-y-axis-line";
+  const labels = [];
+  for (let tick = 0; tick <= yMax; tick += 10) {
+    const label = document.createElement("span");
+    label.className = "static-y-axis-label";
+    label.style.top = `${axisTop + innerHeight - (tick / yMax) * innerHeight}px`;
+    label.textContent = `${tick} %`;
+    labels.push(label);
+  }
+  const legends = [...layer.querySelectorAll(".chart-legend")].map(source => {
+    const legend = document.createElement("span");
+    legend.className = "static-y-axis-legend";
+    legend.style.left = `${Number(source.getAttribute("x"))}px`;
+    legend.style.top = `${Number(source.getAttribute("y"))}px`;
+    legend.style.transform = compact ? "translate(-50%, -50%)" : "translate(-100%, -50%)";
+    legend.textContent = source.textContent;
+    return legend;
   });
+  overlay.replaceChildren(line, ...labels, ...legends);
 }
 function setCycleButton(button, value, options) {
   const option = options.find(([key]) => key === value) || options[0];
@@ -402,6 +476,33 @@ function growBar(element, center, baseline, opacity, enabled, delay) {
     [{ transform: "scaleY(0)", opacity: 0 }, { transform: "scaleY(1)", opacity }],
     { duration: 820, delay, easing: "cubic-bezier(.16, 1, .3, 1)", fill: "both" }
   );
+}
+
+let barVisibilityAnimation = 0;
+function setBarsEnabled(enabled) {
+  if (state.barColors === enabled) return;
+  const animation = ++barVisibilityAnimation;
+  state.barColors = enabled;
+  els.showBarColors.checked = enabled;
+  if (enabled) {
+    state.chartLayout = new Map();
+    render(true);
+    return;
+  }
+  const shapes = [...els.chart.querySelectorAll(".bar, .bar-glow, .bar-side, .bar-top")];
+  if (!shapes.length || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    render(false);
+    return;
+  }
+  shapes.forEach(shape => {
+    shape.style.transformBox = "fill-box";
+    shape.style.transformOrigin = "center bottom";
+    shape.animate(
+      [{ transform: "scaleY(1)", opacity: 1 }, { transform: "scaleY(0)", opacity: 0 }],
+      { duration: 620, easing: "cubic-bezier(.55, 0, .84, .18)", fill: "forwards" }
+    );
+  });
+  window.setTimeout(() => { if (animation === barVisibilityAnimation && !state.barColors) render(false); }, 640);
 }
 
 function currentViewScale(axis = "y") {
@@ -508,7 +609,7 @@ function render(animate = true) {
     <filter id="floor-soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.25"/></filter>
     <filter id="star-soft" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="2.2"/></filter>
     <filter id="star-wide" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="4.8"/></filter>` + parties.map((party, index) => {
-    const glow = state.barColors ? PARTY_META[party].glow : "#aeb8c4";
+    const glow = barVisual(party).stroke;
     const union = party === "CDU/CSU";
     return `<filter id="bar-glow-${index}" x="-100%" y="-45%" width="300%" height="210%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="${union ? 6 : 9}" result="wide-blur"/>
@@ -519,6 +620,11 @@ function render(animate = true) {
       <feComposite in="close-color" in2="close-blur" operator="in" result="close-glow"/>
       <feMerge><feMergeNode in="wide-glow"/><feMergeNode in="close-glow"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`;
+  }).join("");
+  if (!state.barNeon) defs.innerHTML += parties.map((party, index) => {
+    const visual = barVisual(party);
+    const softLight = mixHexColors(visual.base, visual.light, .34);
+    return `<radialGradient id="matte-bar-${index}" cx="15%" cy="-8%" r="190%" fx="15%" fy="-8%"><stop offset="0" stop-color="${softLight}"/><stop offset=".58" stop-color="${visual.base}"/><stop offset=".82" stop-color="${visual.base}"/><stop offset="1" stop-color="${visual.dark}"/></radialGradient>`;
   }).join("");
   els.chart.append(defs);
 
@@ -585,15 +691,20 @@ function render(animate = true) {
     els.chart.append(floor);
   }
 
+  let yAxisLayer = null;
   if (state.showLut) {
+    yAxisLayer = svgEl("g", { class: "y-axis-layer", "data-axis-x": axisX, "data-axis-top": margin.top, "data-axis-bottom": height - 18, "data-inner-height": innerH, "data-y-max": yMax, "data-chart-height": height, "data-compact": compact });
     for (let tick = 0; tick <= yMax; tick += 10) {
       const y = margin.top + innerH - (tick / yMax) * innerH;
       els.chart.append(svgEl("line", { x1: axisX, x2: width - margin.right, y1: y, y2: y, class: "grid-line" }));
       const label = svgEl("text", { x: compact ? axisX + 7 : axisX - 10, y: y + 4, "text-anchor": compact ? "start" : "end", class: "axis-label" });
       label.textContent = `${tick} %`;
-      if (yAxisMode !== "off") els.chart.append(label);
+      if (yAxisMode !== "off") yAxisLayer.append(label);
     }
-    if (yAxisMode !== "off") els.chart.append(svgEl("line", { x1: axisX, x2: axisX, y1: margin.top, y2: height - 18, class: "axis-line" }));
+    if (yAxisMode !== "off") {
+      yAxisLayer.append(svgEl("line", { x1: axisX, x2: axisX, y1: margin.top, y2: height - 18, class: "axis-line" }));
+      els.chart.append(yAxisLayer);
+    }
   }
 
   const maxBarsPerGroup = Math.max(...groupedBars.map(group => group.bars.length));
@@ -622,18 +733,20 @@ function render(animate = true) {
       const baseline = Number(election?.values?.[party] || 0);
       const delta = value - baseline;
       const isNew = !election?.represented?.includes(party) && value >= 5 && party !== "Sonstige";
-      const h = (value / yMax) * innerH;
+      const h = state.barColors ? (value / yMax) * innerH : 0;
       if (barIndex > 0 && secondaryBlockKey(group.bars[barIndex]) !== secondaryBlockKey(group.bars[barIndex - 1])) passedBlockBreaks += 1;
       const x = startX + barIndex * (barWidth + barGap) + passedBlockBreaks * blockGap;
       const y = margin.top + innerH - h;
-      const fillOpacity = item.average ? .68 : [.68, .34, .16][item.rank];
+      const fillOpacity = item.average ? (state.barNeon ? .68 : 1) : (state.barNeon ? [.68, .34, .16][item.rank] : [1, .46, .24][item.rank]);
       const strokeOpacity = item.average ? 1 : [1, .78, .56][item.rank];
+      const visual = barVisual(party);
+      const frontFill = state.barNeon ? visual.fill : `url(#matte-bar-${partyIndex})`;
       const glowOutline = svgEl("rect", {
         x, y, width: barWidth, height: h,
         fill: "none",
-        stroke: PARTY_META[party].glow,
-        "stroke-opacity": strokeOpacity,
-        filter: `url(#bar-glow-${partyIndex})`,
+        stroke: state.barNeon ? visual.stroke : "none",
+        "stroke-opacity": state.barNeon ? strokeOpacity : 0,
+        ...(state.barNeon ? { filter: `url(#bar-glow-${partyIndex})` } : {}),
         class: "bar-glow", rx: 3
       });
       const depthX = Math.min(8, Math.max(4, barWidth * .16));
@@ -641,15 +754,15 @@ function render(animate = true) {
       const faces = h <= 0 || !state.export3d ? [] : [
         svgEl("polygon", {
           points: `${x + barWidth},${y} ${x + barWidth + depthX},${y - depthY} ${x + barWidth + depthX},${margin.top + innerH - depthY} ${x + barWidth},${margin.top + innerH}`,
-          fill: state.barColors ? PARTY_META[party].color : "#7d8794", stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4",
-          "fill-opacity": fillOpacity * .42, "stroke-opacity": strokeOpacity * .72,
-          "stroke-width": 1.1, class: "bar-side"
+          fill: state.barNeon ? visual.fill : visual.dark, stroke: state.barNeon ? visual.stroke : "#f4f7fb",
+          "fill-opacity": state.barNeon ? fillOpacity * .42 : 1, "stroke-opacity": state.barNeon ? strokeOpacity * .72 : .16,
+          "stroke-width": state.barNeon ? 1.1 : .01, class: "bar-side"
         }),
         svgEl("polygon", {
           points: `${x},${y} ${x + depthX},${y - depthY} ${x + barWidth + depthX},${y - depthY} ${x + barWidth},${y}`,
-          fill: state.barColors ? PARTY_META[party].glow : "#9aa5b2", stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4",
-          "fill-opacity": fillOpacity * .62, "stroke-opacity": strokeOpacity * .86,
-          "stroke-width": 1.1, class: "bar-top",
+          fill: state.barNeon ? visual.stroke : visual.light, stroke: state.barNeon ? visual.stroke : "#f4f7fb",
+          "fill-opacity": state.barNeon ? fillOpacity * .62 : 1, "stroke-opacity": state.barNeon ? strokeOpacity * .86 : .16,
+          "stroke-width": state.barNeon ? 1.1 : .01, class: "bar-top",
           "data-bar-x": x, "data-bar-y": y, "data-bar-width": barWidth,
           "data-baseline": margin.top + innerH, "data-value": value, "data-cluster-center": center
         })
@@ -660,11 +773,12 @@ function render(animate = true) {
       if (faces.length) perspectiveBars.push({ top: faces[1], side: faces[0], x, y, width: barWidth, baseline: margin.top + innerH, maxDepth: depthX, value });
       const bar = svgEl("rect", {
         x, y, width: barWidth, height: h,
-        fill: state.barColors ? PARTY_META[party].color : "#7d8794",
-        stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4",
+        fill: frontFill,
+        stroke: state.barNeon ? visual.stroke : "#f4f7fb",
         "fill-opacity": fillOpacity,
-        "stroke-opacity": strokeOpacity,
-        class: "bar", rx: 3
+        "stroke-opacity": state.barNeon ? strokeOpacity : .16,
+        "stroke-width": state.barNeon ? 1 : .025,
+        class: `bar${state.barNeon ? "" : " matte-bar"}`, rx: state.barNeon ? 3 : 0
       });
       bar.addEventListener("pointermove", event => showTooltip(event, item.region, item.poll, partyDisplayLabel(party, item.region), value));
       bar.addEventListener("pointerleave", hideTooltip);
@@ -774,9 +888,10 @@ function render(animate = true) {
     ...(state.showSinceElection ? [["Seit Wahl*", margin.top + innerH + 20]] : []),
     ...(state.showLabels ? [[regionFirst ? "Parlament" : "Partei", regionLabelY], [regionFirst ? "Partei" : "Parlament", partyLabelY]] : [])
   ].forEach(([text, y]) => {
+    if (!yAxisLayer || yAxisMode === "off") return;
     const legend = svgEl("text", { x: legendX, y, "text-anchor": compact ? "middle" : "end", class: "chart-legend" });
     legend.textContent = text;
-    els.chart.append(legend);
+    yAxisLayer.append(legend);
   });
   if (state.showLut) {
     const unitLabel = svgEl("text", { x: (axisX + width - margin.right) / 2, y: height - 6, "text-anchor": "middle", class: "chart-unit-label" });
@@ -851,26 +966,37 @@ async function loadProjects() {
   });
 }
 
-async function saveCurrentProject() {
+async function saveCurrentProject(projectName = "") {
   if (!currentReportRole || !state.data) throw new Error("Bitte zuerst anmelden.");
   const payload = {
     configuration: configurationCode(),
-    title: document.querySelector("#chart-title")?.textContent?.trim() || "Sonntagsfragen",
+    title: projectName.trim().slice(0, 100) || "Unbenannt",
     detail: document.querySelector("#chart-meta")?.textContent?.trim() || "Aktuelle Konfiguration"
   };
   await reportRequest("/projects", { method: "POST", body: JSON.stringify(payload) });
   return payload.configuration;
 }
 
+function askProjectName() {
+  const dialog = document.querySelector("#project-name-dialog");
+  const input = document.querySelector("#project-name-input");
+  input.value = "";
+  dialog.showModal();
+  requestAnimationFrame(() => input.focus());
+  return new Promise(resolve => {
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "save" ? input.value : null), { once: true });
+  });
+}
+
 function applyConfigurationCode(text) {
-  if (!/^[0-9A-Za-z]{13,15}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
+  if (!/^[0-9A-Za-z]{13,17}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
   const partyUniverse = Object.keys(PARTY_META);
   const partyCount = orderedChoiceCount(partyUniverse.length);
   const regionCount = orderedChoiceCount(state.data.regions.length);
   let value = base62Decode(text);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 67108863) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 536870911) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
@@ -891,6 +1017,8 @@ function applyConfigurationCode(text) {
   state.percentLabelMode = ["without", "with", "off", "without"][(mode >> 20) & 3];
   state.sinceElectionMode = ["color", "gray", "off", "color"][(mode >> 22) & 3];
   yAxisMode = ["dynamic", "static", "off", "dynamic"][(mode >> 24) & 3];
+  state.barColorMode = ["party", "lightblue", "gray", "party"][(mode >> 26) & 3];
+  state.barNeon = !(mode & 268435456);
   if (state.mobileView) state.electionDates = false;
   document.querySelector("#chart-view-settings").hidden = state.mobileView;
   value %= legacySpace;
@@ -914,6 +1042,8 @@ function applyConfigurationCode(text) {
   setCycleButton(els.percentLabelMode, state.showPercentValues ? state.percentLabelMode : "off", labelModeOptions.percent);
   setCycleButton(els.sinceElectionMode, state.showSinceElection ? state.sinceElectionMode : "off", labelModeOptions.since);
   els.showBarColors.checked = state.barColors;
+  setCycleButton(els.barColorMode, state.barColorMode, [["party", "Parteifarben"], ["lightblue", "Hellblau"], ["gray", "Grau"]]);
+  setCycleButton(els.barNeonMode, state.barNeon ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
   els.showPercentValues.checked = state.showPercentValues;
   els.showLut.checked = state.showLut;
   els.showBackground.checked = state.showBackground;
@@ -1127,6 +1257,18 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const pageGlow = svgEl("radialGradient", { id: "page-glow", cx: "50%", cy: "28%", r: "68%" });
   pageGlow.append(svgEl("stop", { offset: "0", "stop-color": "#2a67a4", "stop-opacity": ".28" }), svgEl("stop", { offset: ".58", "stop-color": "#17385e", "stop-opacity": ".12" }), svgEl("stop", { offset: "1", "stop-color": "#081326", "stop-opacity": "0" }));
   defs.append(pageBase, pageGlow);
+  if (!state.barNeon) Object.keys(PARTY_META).forEach((party, index) => {
+    const visual = barVisual(party);
+    const softLight = mixHexColors(visual.base, visual.light, .34);
+    const gradient = svgEl("radialGradient", { id: `matte-export-${index}`, cx: "15%", cy: "-8%", r: "190%", fx: "15%", fy: "-8%" });
+    gradient.append(
+      svgEl("stop", { offset: "0", "stop-color": softLight }),
+      svgEl("stop", { offset: ".58", "stop-color": visual.base }),
+      svgEl("stop", { offset: ".82", "stop-color": visual.base }),
+      svgEl("stop", { offset: "1", "stop-color": visual.dark })
+    );
+    defs.append(gradient);
+  });
   page.append(defs);
   page.append(svgEl("rect", { width, height, fill: "url(#page-base)" }));
   page.append(svgEl("rect", { width, height, fill: "url(#page-glow)" }));
@@ -1275,12 +1417,17 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     let passedExportBreaks = 0;
     cluster.bars.forEach(({ party, item }, barIndex) => {
       const value = Number(item.poll.values[party] || 0);
-      const barHeight = value / yMax * (plot.bottom - plot.top);
+      const barHeight = state.barColors ? value / yMax * (plot.bottom - plot.top) : 0;
       if (barIndex > 0 && exportBlockKey(cluster.bars[barIndex]) !== exportBlockKey(cluster.bars[barIndex - 1])) passedExportBreaks += 1;
       const barX = plot.left + slot * barIndex + passedExportBreaks * exportBlockGap + (slot - barWidth) / 2;
       exportBarCenters.push(barX + barWidth / 2);
       const barY = plot.bottom - barHeight;
-      const color = state.barColors ? (rootStyle.getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || PARTY_META[party].glow) : "#7d8794";
+      const visual = barVisual(party);
+      const matteExportIndex = Object.keys(PARTY_META).indexOf(party);
+      const color = state.barColorMode === "party" && state.barColors
+        ? (rootStyle.getPropertyValue(PARTY_META[party].color.match(/--[\w-]+/)?.[0] || "").trim() || visual.stroke)
+        : visual.fill;
+      const frontColor = state.barNeon ? color : `url(#matte-export-${Math.max(0, matteExportIndex)})`;
       const fillOpacity = item.average ? .72 : [.68, .34, .14][item.rank] ?? .14;
       const strokeOpacity = item.average ? 1 : [1, .7, .4][item.rank] ?? .4;
       if (state.export3d && barHeight > 0) {
@@ -1293,16 +1440,16 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         const edgeX = dx >= 0 ? barX + barWidth : barX;
         page.append(svgEl("polygon", {
           points: `${edgeX},${barY} ${edgeX + dx},${barY + topDepthY} ${edgeX + dx},${rearBaselineY} ${edgeX},${plot.bottom}`,
-          fill: color, "fill-opacity": fillOpacity * .42,
-          stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4", "stroke-opacity": strokeOpacity * .72, "stroke-width": 1
+          fill: state.barNeon ? color : visual.dark, "fill-opacity": state.barNeon ? fillOpacity * .42 : 1,
+          stroke: state.barNeon ? visual.stroke : "#f4f7fb", "stroke-opacity": state.barNeon ? strokeOpacity * .72 : .12, "stroke-width": state.barNeon ? 1 : .01
         }));
         page.append(svgEl("polygon", {
           points: `${barX},${barY} ${barX + dx},${barY + topDepthY} ${barX + barWidth + dx},${barY + topDepthY} ${barX + barWidth},${barY}`,
-          fill: state.barColors ? PARTY_META[party].glow : "#9aa5b2", "fill-opacity": fillOpacity * .62,
-          stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4", "stroke-opacity": strokeOpacity * .86, "stroke-width": 1
+          fill: state.barNeon ? visual.stroke : visual.light, "fill-opacity": state.barNeon ? fillOpacity * .62 : 1,
+          stroke: state.barNeon ? visual.stroke : "#f4f7fb", "stroke-opacity": state.barNeon ? strokeOpacity * .86 : .12, "stroke-width": state.barNeon ? 1 : .01
         }));
       }
-      page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: 2, fill: color, "fill-opacity": fillOpacity, stroke: state.barColors ? PARTY_META[party].glow : "#aeb8c4", "stroke-opacity": strokeOpacity, "stroke-width": 1.5 }));
+      page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: state.barNeon ? 2 : 0, fill: frontColor, "fill-opacity": state.barNeon ? fillOpacity : (item.average || item.rank === 0 ? 1 : fillOpacity), stroke: state.barNeon ? visual.stroke : "#f4f7fb", "stroke-opacity": state.barNeon ? strokeOpacity : .12, "stroke-width": state.barNeon ? 1.5 : .01 }));
       if (state.showPercentValues) {
         const percentText = formatPercent(value, false, true);
         text(`${item.average ? "Ø " : ""}${state.percentLabelMode === "with" ? percentText : percentText.replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
@@ -1648,15 +1795,28 @@ async function reportRequest(path, options = {}) {
 
 const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
-  ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"], ["brackets", "Klammern"],
-  ["labels", "Beschriftungen"], ["barColors", "Balkenfarbe"], ["percentValues", "Prozentwerte"],
-  ["lut", "LUT"], ["yAxisStatic", "Y-Achse statisch"], ["background", "Hintergrund"], ["viewSize", "Zoom"], ["uiScale", "Bediengrößen-Regler"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
+  ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"],
+  ["labels", "Beschriftungen"], ["regionLabelMode", "Beschriftung: Parlamente"], ["partyLabelMode", "Beschriftung: Parteien"], ["percentLabelMode", "Beschriftung: Prozentwerte"], ["sinceElectionMode", "Beschriftung: Seit Wahl"],
+  ["barColors", "Balken"], ["barColorMode", "Balken: Farbe"], ["barNeon", "Balken: Neon"], ["percentValues", "Prozentwerte"],
+  ["lut", "LUT"], ["yAxisMode", "LUT: Y-Achse"], ["background", "LUT: Hintergrund"], ["brackets", "LUT: Klammern"], ["viewSize", "Zoom"], ["uiScale", "Bediengrößen-Regler"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
   ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
 ];
+const developerFeatureOptions = {
+  regionLabelMode: [["auto", "Auto"], ["0", "0°"], ["90", "90°"], ["off", "Aus"]],
+  partyLabelMode: [["auto", "Auto"], ["0", "0°"], ["90", "90°"], ["off", "Aus"]],
+  percentLabelMode: [["with", "Mit %"], ["without", "Ohne %"], ["off", "Aus"]],
+  sinceElectionMode: [["color", "Farbig"], ["gray", "Grau"], ["off", "Aus"]],
+  barColorMode: [["party", "Parteifarben"], ["lightblue", "Hellblau"], ["gray", "Grau"]],
+  yAxisMode: [["static", "Statisch"], ["dynamic", "Dynamisch"], ["off", "Aus"]]
+};
+const developerDefaultValue = (key, platform) => ({
+  deviceForce: platform === "mobile" ? "mobile" : "desktop", regionLabelMode: "auto", partyLabelMode: "auto",
+  percentLabelMode: "without", sinceElectionMode: "color", barColorMode: "party", yAxisMode: "static"
+}[key] ?? !["export3d", "tabMode"].includes(key));
 const defaultDeveloperSettings = () => {
   const defaults = {
-    mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "mobile" : !["export3d", "tabMode"].includes(key) }])),
-    desktop: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: key === "deviceForce" ? "desktop" : !["export3d", "tabMode"].includes(key) }]))
+    mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: developerDefaultValue(key, "mobile") }])),
+    desktop: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: developerDefaultValue(key, "desktop") }]))
   };
   ["mobile", "desktop"].forEach(platform => { defaults[platform].helperAppAccess = { visible: false, value: false }; });
   return defaults;
@@ -1733,10 +1893,19 @@ function applyDeveloperSettings() {
   state.showSinceElection = Boolean(settings.sinceElection.value);
   state.showBrackets = Boolean(settings.brackets.value);
   state.showLabels = Boolean(settings.labels.value);
+  state.regionLabelMode = settings.regionLabelMode.value;
+  state.partyLabelMode = settings.partyLabelMode.value;
+  state.percentLabelMode = settings.percentLabelMode.value;
+  state.sinceElectionMode = settings.sinceElectionMode.value;
+  state.showSinceElection = state.showSinceElection && state.sinceElectionMode !== "off";
   state.barColors = Boolean(settings.barColors.value);
+  state.barColorMode = settings.barColorMode.value;
+  state.barNeon = Boolean(settings.barNeon.value);
   state.showPercentValues = Boolean(settings.percentValues.value);
+  state.showPercentValues = state.showPercentValues && state.percentLabelMode !== "off";
   state.showLut = Boolean(settings.lut.value);
-  yAxisMode = settings.yAxisStatic.value ? "static" : "dynamic";
+  yAxisMode = settings.yAxisMode.value;
+  setCycleButton(document.querySelector("#y-axis-mode"), yAxisMode, [["static", "Statisch"], ["dynamic", "Dynamisch"], ["off", "Aus"]]);
   state.showBackground = Boolean(settings.background.value);
   state.viewSizeEnabled = Boolean(settings.viewSize.value);
   state.viewZoomEnabled = state.viewSizeEnabled;
@@ -1752,13 +1921,18 @@ function applyDeveloperSettings() {
   setVisible("#chart-settings .view-switch", settings.deviceForce.visible);
   setVisible("#update-data", settings.dataUpdate.visible);
   setVisible("#abbreviation-mode", settings.abbreviations.visible);
-  setVisible("#since-election-mode", settings.sinceElection.visible);
   setVisible("#brackets-mode", settings.brackets.visible);
   setVisible(".labels-choice", settings.labels.visible);
+  setVisible("#region-label-mode", settings.regionLabelMode.visible);
+  setVisible("#party-label-mode", settings.partyLabelMode.visible);
+  setVisible("#percent-label-mode", settings.percentLabelMode.visible && settings.percentValues.visible);
+  setVisible("#since-election-mode", settings.sinceElectionMode.visible && settings.sinceElection.visible);
   setVisible(".bar-colors-choice", settings.barColors.visible);
-  setVisible("#percent-label-mode", settings.percentValues.visible);
+  setVisible("#bar-color-mode", settings.barColorMode.visible);
+  setVisible("#bar-neon-mode", settings.barNeon.visible);
   setVisible(".lut-choice", settings.lut.visible);
   setVisible("#background-mode", settings.background.visible);
+  setVisible("#y-axis-mode", settings.yAxisMode.visible);
   setVisible("#ui-scale-toggle", settings.uiScale.visible);
   const uiScaleToggle = document.querySelector("#ui-scale-toggle");
   if (uiScaleToggle) uiScaleToggle.disabled = !settings.uiScale.value;
@@ -1780,6 +1954,8 @@ function applyDeveloperSettings() {
   els.viewWidthDown.disabled = !state.viewSizeEnabled;
   els.viewWidthUp.disabled = !state.viewSizeEnabled;
   els.fullscreenEnter.disabled = !state.fullscreenEnabled;
+  setCycleButton(els.barColorMode, state.barColorMode, [["party", "Parteifarben"], ["lightblue", "Hellblau"], ["gray", "Grau"]]);
+  setCycleButton(els.barNeonMode, state.barNeon ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
   setFullscreenView(true);
   applyViewMode();
 }
@@ -1800,6 +1976,7 @@ function renderDeveloperSettings(readOnly) {
     ["mobile", "desktop"].forEach(platform => {
       const cell = document.createElement("div");
       cell.className = "developer-platform";
+      cell.classList.toggle("is-hidden", !developerSettings[platform][key].visible);
       cell.dataset.label = platform === "mobile" ? "Mobil & App" : "Desktop";
       if (readOnly) {
         cell.classList.add("developer-platform-readonly");
@@ -1807,10 +1984,12 @@ function renderDeveloperSettings(readOnly) {
         visibility.className = `developer-readonly-state ${developerSettings[platform][key].visible ? "is-on" : "is-off"}`;
         visibility.textContent = developerSettings[platform][key].visible ? "Sichtbar" : "Verborgen";
         const value = document.createElement("span");
-        value.className = `developer-readonly-state ${key === "deviceForce" || developerSettings[platform][key].value ? "is-on" : "is-off"}`;
+        value.className = `developer-readonly-state ${key === "deviceForce" || developerFeatureOptions[key] || developerSettings[platform][key].value ? "is-on" : "is-off"}`;
         value.textContent = key === "deviceForce"
           ? (developerSettings[platform][key].value === "mobile" ? "Mobil" : "Desktop")
-          : (developerSettings[platform][key].value ? "Aktiv" : "Inaktiv");
+          : developerFeatureOptions[key]
+            ? (developerFeatureOptions[key].find(([option]) => option === developerSettings[platform][key].value)?.[1] || developerSettings[platform][key].value)
+            : (developerSettings[platform][key].value ? "Aktiv" : "Inaktiv");
         cell.append(visibility, value);
         row.append(cell);
         return;
@@ -1825,9 +2004,10 @@ function renderDeveloperSettings(readOnly) {
       const track = document.createElement("span");
       visibleLabel.append(visible, track);
       let value;
-      if (key === "deviceForce") {
+      if (key === "deviceForce" || developerFeatureOptions[key]) {
         value = document.createElement("select");
-        value.innerHTML = '<option value="desktop">Desktop</option><option value="mobile">Mobil</option>';
+        const options = key === "deviceForce" ? [["desktop", "Desktop"], ["mobile", "Mobil"]] : developerFeatureOptions[key];
+        options.forEach(([optionValue, optionLabel]) => value.add(new Option(optionLabel, optionValue)));
         value.value = developerSettings[platform][key].value;
       } else {
         const valueLabel = document.createElement("label");
@@ -1840,15 +2020,16 @@ function renderDeveloperSettings(readOnly) {
       value.disabled = readOnly;
       visible.addEventListener("change", () => {
         developerSettings[platform][key].visible = visible.checked;
+        cell.classList.toggle("is-hidden", !visible.checked);
         saveDeveloperSettings();
         if (platform === (startsMobile ? "mobile" : "desktop")) { applyDeveloperSettings(); if (state.data) render(false); }
       });
       value.addEventListener("change", () => {
-        developerSettings[platform][key].value = key === "deviceForce" ? value.value : value.checked;
+        developerSettings[platform][key].value = key === "deviceForce" || developerFeatureOptions[key] ? value.value : value.checked;
         saveDeveloperSettings();
         if (platform === (startsMobile ? "mobile" : "desktop")) { applyDeveloperSettings(); if (state.data) render(false); }
       });
-      if (key === "deviceForce") cell.append(visibleLabel, value);
+      if (key === "deviceForce" || developerFeatureOptions[key]) cell.append(visibleLabel, value);
       row.append(cell);
     });
     list.append(row);
@@ -2237,7 +2418,7 @@ async function startSimpleAppIntro() {
   brand.style.height = "auto";
   brand.style.transform = "translate(-50%, -50%)";
   targetBrand.style.left = "50%";
-  targetBrand.style.top = "12px";
+  targetBrand.style.top = "18px";
   targetBrand.style.width = "max-content";
   targetBrand.style.height = "auto";
   targetBrand.style.transform = "translateX(-50%)";
@@ -2434,7 +2615,29 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       render(false);
     });
     els.showBarColors.addEventListener("change", event => {
-      state.barColors = event.currentTarget.checked;
+      setBarsEnabled(event.currentTarget.checked);
+    });
+    els.barMenuToggle.addEventListener("click", event => {
+      const choice = event.currentTarget.closest(".bar-colors-choice");
+      if (!choice.classList.contains("is-open")) {
+        document.querySelector(".labels-choice")?.classList.remove("is-open");
+        document.querySelector(".lut-choice")?.classList.remove("is-open");
+        choice.classList.add("is-open");
+        event.currentTarget.setAttribute("aria-expanded", "true");
+        return;
+      }
+      if (event.target.closest(".bar-check")) {
+        setBarsEnabled(!state.barColors);
+      }
+    });
+    els.barColorMode.addEventListener("click", event => {
+      if (!state.barColors) return;
+      state.barColorMode = advanceCycleButton(event.currentTarget, [["party", "Parteifarben"], ["lightblue", "Hellblau"], ["gray", "Grau"]]);
+      render(false);
+    });
+    els.barNeonMode.addEventListener("click", event => {
+      if (!state.barColors) return;
+      state.barNeon = advanceCycleButton(event.currentTarget, [["on", "An"], ["off", "Aus"]]) === "on";
       render(false);
     });
     els.showPercentValues.addEventListener("change", event => {
@@ -2524,8 +2727,25 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       button.setAttribute("aria-expanded", String(!panel.hidden));
     });
     togglePanel(document.querySelector("#settings-toggle"), document.querySelector("#chart-settings"));
-    togglePanel(document.querySelector("#chart-view-settings-toggle"), document.querySelector("#chart-view-settings"));
-    togglePanel(els.fullscreenSettings, document.querySelector("#chart-view-settings"));
+    const viewPanel = document.querySelector("#chart-view-settings");
+    const viewDismiss = document.querySelector("#view-menu-dismiss");
+    const desktopViewButton = document.querySelector("#chart-view-settings-toggle");
+    const setViewMenuOpen = open => {
+      viewPanel.hidden = !open;
+      viewDismiss.hidden = !open;
+      desktopViewButton.setAttribute("aria-expanded", String(open));
+      els.fullscreenSettings.setAttribute("aria-expanded", String(open));
+      if (open) viewPanel.scrollTop = 0;
+      else {
+        document.querySelectorAll(".labels-choice, .lut-choice, .bar-colors-choice").forEach(choice => choice.classList.remove("is-open"));
+        els.labelsMenuToggle.setAttribute("aria-expanded", "false");
+        document.querySelector("#lut-menu-toggle").setAttribute("aria-expanded", "false");
+        els.barMenuToggle.setAttribute("aria-expanded", "false");
+      }
+    };
+    desktopViewButton.addEventListener("click", () => setViewMenuOpen(viewPanel.hidden));
+    els.fullscreenSettings.addEventListener("click", () => setViewMenuOpen(viewPanel.hidden));
+    viewDismiss.addEventListener("pointerdown", () => setViewMenuOpen(false));
     els.fullscreenEnter.addEventListener("click", async () => {
       if (!state.fullscreenEnabled) return;
       setFullscreenView(true);
@@ -2561,6 +2781,9 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     const uiScalePanel = document.querySelector("#ui-scale-panel");
     const uiScaleRange = document.querySelector("#ui-scale-range");
     const uiScaleValue = document.querySelector("#ui-scale-value");
+    // Keep the glass panel outside the chart's stacking context so headings can
+    // never be painted over its border or contents.
+    document.body.append(uiScalePanel);
     const applyUiScale = rawValue => {
       const percent = Math.max(50, Math.min(300, Math.round(Number(rawValue) / 10) * 10));
       document.documentElement.style.setProperty("--ui-scale", String(percent / 100));
@@ -2572,6 +2795,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     uiScaleToggle.addEventListener("click", event => {
       event.stopPropagation();
       uiScalePanel.hidden = !uiScalePanel.hidden;
+      document.body.classList.toggle("ui-scale-open", !uiScalePanel.hidden);
       uiScaleToggle.setAttribute("aria-expanded", String(!uiScalePanel.hidden));
     });
     uiScalePanel.addEventListener("pointerdown", event => event.stopPropagation());
@@ -2585,8 +2809,18 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       setFullscreenView(true);
     });
     document.addEventListener("pointerdown", event => {
+      const panel = document.querySelector("#chart-view-settings");
+      if (panel.hidden) return;
+      const path = event.composedPath();
+      const desktopButton = document.querySelector("#chart-view-settings-toggle");
+      const visibleControl = event.target.closest?.("#chart-view-settings .choice, #chart-view-settings button, #chart-view-settings input, #chart-view-settings label");
+      if (visibleControl || path.includes(desktopButton) || path.includes(els.fullscreenSettings)) return;
+      setViewMenuOpen(false);
+    }, { capture: true });
+    document.addEventListener("pointerdown", event => {
       if (!uiScalePanel.hidden && event.target !== uiScaleToggle) {
         uiScalePanel.hidden = true;
+        document.body.classList.remove("ui-scale-open");
         uiScaleToggle.setAttribute("aria-expanded", "false");
       }
       const labelsChoice = document.querySelector(".labels-choice");
@@ -2601,6 +2835,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         lutChoice.classList.remove("is-open");
         document.querySelector("#lut-menu-toggle").setAttribute("aria-expanded", "false");
       }
+      const barChoice = document.querySelector(".bar-colors-choice");
+      if (barChoice.classList.contains("is-open") && !barChoice.contains(event.target)) {
+        barChoice.classList.remove("is-open");
+        els.barMenuToggle.setAttribute("aria-expanded", "false");
+      }
       const mainPanel = document.querySelector("#chart-settings");
       const mainButton = document.querySelector("#settings-toggle");
       if (!mainPanel.hidden && !mainPanel.contains(event.target) && !mainButton.contains(event.target)) {
@@ -2610,7 +2849,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       const menu = document.querySelector(".chart-view-menu");
       const panel = document.querySelector("#chart-view-settings");
       const button = document.querySelector("#chart-view-settings-toggle");
-      if (!closedLabelsSubmenu && !closedLutSubmenu && !panel.hidden && !menu.contains(event.target) && !els.fullscreenSettings.contains(event.target)) {
+      if (!panel.hidden && !menu.contains(event.target) && !els.fullscreenSettings.contains(event.target)) {
         panel.hidden = true;
         button.setAttribute("aria-expanded", "false");
         els.fullscreenSettings.setAttribute("aria-expanded", "false");
@@ -2661,6 +2900,21 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       return willOpen;
     };
     const pinFields = [...document.querySelectorAll("#report-pin input")];
+    const focusFirstReportPin = () => {
+      const login = document.querySelector("#report-login");
+      if (!reportDialog.open || login.hidden) return;
+      const target = pinFields.find(field => !field.value) || pinFields[0];
+      const applyFocus = () => {
+        if (!reportDialog.open || login.hidden) return;
+        target.focus({ preventScroll: true });
+        target.select();
+      };
+      applyFocus();
+      requestAnimationFrame(applyFocus);
+      window.setTimeout(applyFocus, 80);
+    };
+    new MutationObserver(focusFirstReportPin).observe(reportDialog, { attributes: true, attributeFilter: ["open"] });
+    new MutationObserver(focusFirstReportPin).observe(document.querySelector("#report-login"), { attributes: true, attributeFilter: ["hidden"] });
     const readReportPin = () => pinFields.map(input => input.value).join("").toUpperCase();
     const openProjectPicker = async fromView => {
       const guest = !currentReportRole;
@@ -2707,6 +2961,9 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         });
         document.querySelector("#report-info").hidden = false;
         document.querySelector("#report-info-open").classList.add("active");
+      } else {
+        document.querySelector("#report-info").hidden = false;
+        focusFirstReportPin();
       }
     });
     document.querySelector("#report-close").addEventListener("click", () => { reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog"); reportDialog.close(); });
@@ -2734,7 +2991,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         helperAppAccessSetting.hidden = currentReportRole !== "Admin";
         helperAppAccessToggle.checked = helperAppAccessEnabled();
         const developerTab = document.querySelector("#report-developer-open");
-        developerTab.innerHTML = `${currentReportRole === "Admin" ? "Master" : "View Master"} <span class="report-tab-gear" aria-hidden="true">⚙</span>`;
+        developerTab.setAttribute("aria-label", currentReportRole === "Admin" ? "Mastereinstellungen" : "Mastereinstellungen ansehen");
         document.querySelector("#report-logout").hidden = false;
         document.querySelector("#save-project").hidden = true;
         document.querySelector("#project-picker-toggle").hidden = false;
@@ -2770,7 +3027,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#project-picker-toggle").hidden = true;
       document.querySelector("#report-login").hidden = false;
       document.querySelector("#report-login-message").textContent = "";
-      pinFields[0].focus();
+      focusFirstReportPin();
     });
     document.querySelector("#report-accounts-open").addEventListener("click", async () => {
       if (!toggleReportTab(document.querySelector("#report-accounts-open"))) return;
@@ -2831,7 +3088,9 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       const button = event.currentTarget;
       const message = document.querySelector("#project-save-message");
       button.disabled = true;
-      try { savedProjectConfiguration = await saveCurrentProject(); message.textContent = "Projekt zentral gespeichert."; await loadProjects(); }
+      const projectName = await askProjectName();
+      if (projectName === null) { button.disabled = false; return; }
+      try { savedProjectConfiguration = await saveCurrentProject(projectName); message.textContent = "Projekt zentral gespeichert."; await loadProjects(); }
       catch (error) { message.textContent = error.message; }
       finally { button.disabled = false; }
     });
@@ -2845,7 +3104,9 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#save-project").addEventListener("click", async () => {
       const button = document.querySelector("#save-project");
       button.disabled = true;
-      try { savedProjectConfiguration = await saveCurrentProject(); els.exportMessage.textContent = "Projekt zentral gespeichert."; }
+      const projectName = await askProjectName();
+      if (projectName === null) { button.disabled = false; return; }
+      try { savedProjectConfiguration = await saveCurrentProject(projectName); els.exportMessage.textContent = "Projekt zentral gespeichert."; }
       catch (error) { els.exportMessage.textContent = error.message; }
       finally { button.disabled = false; }
     });
@@ -2931,7 +3192,6 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     window.addEventListener("resize", () => render(false));
     let perspectiveFrame = 0;
     els.scroll.addEventListener("scroll", () => {
-      updateYAxisPosition();
       if (!state.perspective?.floorLines.length && !state.perspective?.bars.length) return;
       cancelAnimationFrame(perspectiveFrame);
       perspectiveFrame = requestAnimationFrame(updatePerspective);
@@ -2940,7 +3200,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#report-title").textContent = "Log in";
     reportDialog.classList.add("startup-login-dialog");
     reportDialog.showModal();
-    pinFields[0].focus();
+    focusFirstReportPin();
   })
   .catch(error => { els.updated.textContent = "nicht verfügbar"; els.empty.hidden = false; els.empty.textContent = error.message; els.scroll.hidden = true; });
 
