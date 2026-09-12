@@ -1,7 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
-static NSString * const AppVersion = @"1.0.18";
+static NSString * const AppVersion = @"1.0.19";
 static NSString * const WebsiteURL = @"https://charavision.github.io/SonntagsfrageView/";
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKUIDelegate, WKScriptMessageHandler>
