@@ -448,7 +448,7 @@ body.view-fullscreen-active .chart-section .chart-view-settings .choice label { 
   .lut-choice.is-open .lut-menu-toggle { width: calc(100% + 173px); margin-left: -173px; }
   .lut-options { right: calc(100% + 8px); width: min(165px, calc(100vw - 195px)); }
 }
-body.view-fullscreen-active.fullscreen-selection-open main > .controls {
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open main > .controls {
   inset: 24px auto auto 50%;
   box-sizing: border-box;
   width: min(660px, calc(100vw - 72px));
@@ -459,15 +459,15 @@ body.view-fullscreen-active.fullscreen-selection-open main > .controls {
   transform: translateX(-50%) scale(.7);
   transform-origin: top center;
 }
-body.view-fullscreen-active.fullscreen-selection-open .selection-tabs { margin-right: -18px; margin-left: -18px; }
-body.view-fullscreen-active.fullscreen-selection-open .option-grid,
-body.view-fullscreen-active.fullscreen-selection-open .party-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-body.view-fullscreen-active.fullscreen-selection-open .party-choice label { justify-content: flex-start; min-width: 0; white-space: normal; }
-body.view-fullscreen-active.fullscreen-selection-open .poll-options { grid-template-columns: minmax(0, 1fr); }
-body.view-fullscreen-active.fullscreen-selection-open .poll-calendar-popover { top: 0; right: auto; left: calc(100% + 7px); }
-body.view-fullscreen-active.fullscreen-selection-open .poll-choice label { min-height: 54px; }
-body.view-fullscreen-active.fullscreen-selection-open .tab-grouping { flex-direction: column; gap: 14px; }
-body.view-fullscreen-active.fullscreen-selection-open .tab-average-control { padding: 14px 0 0; border-top: 1px solid rgba(75,109,150,.65); border-left: 0; }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .selection-tabs { margin-right: -18px; margin-left: -18px; }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .option-grid,
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .party-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .party-choice label { justify-content: flex-start; min-width: 0; white-space: normal; }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .poll-options { grid-template-columns: minmax(0, 1fr); }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .poll-calendar-popover { top: 0; right: auto; left: calc(100% + 7px); }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .poll-choice label { min-height: 54px; }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .tab-grouping { flex-direction: column; gap: 14px; }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .tab-average-control { padding: 14px 0 0; border-top: 1px solid rgba(75,109,150,.65); border-left: 0; }
 body.view-fullscreen-active.fullscreen-output-open main > .outputs {
   inset: 50% auto auto 50%;
   box-sizing: border-box;
