@@ -453,7 +453,8 @@ body.view-fullscreen-active.fullscreen-selection-open main > .controls {
   margin: 0;
   padding: 0 18px 18px;
   border-radius: 18px;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scale(.7);
+  transform-origin: top center;
 }
 body.view-fullscreen-active.fullscreen-selection-open .selection-tabs { margin-right: -18px; margin-left: -18px; }
 body.view-fullscreen-active.fullscreen-selection-open .option-grid,
@@ -971,11 +972,11 @@ body.preview-split-active.view-fullscreen-active .chart-section .chart-view-sett
   transform: translateX(-50%);
 }
 body.preview-split-active.view-fullscreen-active.fullscreen-selection-open main > .controls {
-  right: calc(100vw - var(--preview-split-x, 56vw) + 24px);
-  left: 24px;
-  width: auto;
+  inset: 24px auto auto calc(var(--preview-split-x, 56vw) / 2);
+  width: min(660px, calc(var(--preview-split-x, 56vw) - 48px));
   max-width: none;
-  transform: none;
+  transform: translateX(-50%) scale(.7);
+  transform-origin: top center;
 }
 body.preview-split-active.view-fullscreen-active.fullscreen-output-open main > .outputs {
   right: calc(100vw - var(--preview-split-x, 56vw) + 24px);
