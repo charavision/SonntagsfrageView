@@ -752,6 +752,7 @@ function setViewScale(axis, next) {
 }
 
 function render(animate = true) {
+  scheduleOpenPreviewRefresh();
   applyViewMode();
   updateSelectionOrderBadges();
   const backgroundVisible = state.showLut && state.showBackground;
@@ -2267,7 +2268,9 @@ async function loadAppRelease() {
 
 loadAppRelease();
 
-function showExportPreview() {
+function buildExportPreview(preservePosition = false) {
+  const scrollLeft = preservePosition ? els.previewPages.scrollLeft : 0;
+  const scrollTop = preservePosition ? els.previewPages.scrollTop : 0;
   els.previewPages.replaceChildren();
   if (state.a4Mode) {
     const { layout, pages } = createA4Pages();
@@ -2287,6 +2290,26 @@ function showExportPreview() {
     els.previewPages.append(chart);
     els.previewPageStatus.textContent = "Schlauchausgabe";
   }
+  if (els.previewDialog.open) applyPreviewZoom();
+  if (preservePosition) {
+    els.previewPages.scrollLeft = scrollLeft;
+    els.previewPages.scrollTop = scrollTop;
+  }
+}
+
+let previewRefreshTimer;
+function scheduleOpenPreviewRefresh() {
+  if (!els.previewDialog?.open) return;
+  clearTimeout(previewRefreshTimer);
+  previewRefreshTimer = setTimeout(() => {
+    if (!els.previewDialog.open) return;
+    try { buildExportPreview(true); }
+    catch (error) { els.previewPageStatus.textContent = error.message; }
+  }, 200);
+}
+
+function showExportPreview() {
+  buildExportPreview(false);
   els.previewDialog.showModal();
   requestAnimationFrame(applyPreviewZoom);
 }

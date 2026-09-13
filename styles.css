@@ -971,14 +971,18 @@ body.preview-split-active.view-fullscreen-active .chart-section .chart-view-sett
   transform: translateX(-50%);
 }
 body.preview-split-active.view-fullscreen-active.fullscreen-selection-open main > .controls {
-  right: calc(100vw - var(--preview-split-x, 56vw) + 62px);
-  left: 62px;
+  right: calc(100vw - var(--preview-split-x, 56vw) + 24px);
+  left: 24px;
   width: auto;
+  max-width: none;
+  transform: none;
 }
 body.preview-split-active.view-fullscreen-active.fullscreen-output-open main > .outputs {
-  right: calc(100vw - var(--preview-split-x, 56vw) + 62px);
-  left: 62px;
+  right: calc(100vw - var(--preview-split-x, 56vw) + 24px);
+  left: 24px;
   width: auto;
+  max-width: none;
+  transform: translateY(-50%);
 }
 @media (max-width: 900px) {
   .preview-split-toggle { display: none !important; }
