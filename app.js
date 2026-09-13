@@ -189,6 +189,30 @@ function unrankOrdered(rank, universe) {
 }
 function base62Encode(value) { let text = ""; do { text = CODE_ALPHABET[Number(value % 62n)] + text; value /= 62n; } while (value); return text.padStart(13, "0"); }
 function base62Decode(text) { return [...text].reduce((value, char) => { const digit = CODE_ALPHABET.indexOf(char); if (digit < 0) throw new Error("Ungültiger Code"); return value * 62n + BigInt(digit); }, 0n); }
+const CONFIG_DATE_EPOCH = Date.UTC(1996, 0, 1);
+const CONFIG_DATE_RADIX = 16384n;
+function encodeCalendarConfiguration() {
+  if (!state.pollDateMode && !state.pollDateLabels.some(Boolean)) return "";
+  let payload = state.pollDateMode ? 1n : 0n;
+  state.pollDateLabels.forEach(date => {
+    const timestamp = date ? Date.parse(`${date}T00:00:00Z`) : NaN;
+    const days = Number.isFinite(timestamp) ? Math.max(0, Math.round((timestamp - CONFIG_DATE_EPOCH) / 86400000) + 1) : 0;
+    payload = payload * CONFIG_DATE_RADIX + BigInt(Math.min(16383, days));
+  });
+  let encoded = "";
+  do { encoded = CODE_ALPHABET[Number(payload % 62n)] + encoded; payload /= 62n; } while (payload);
+  return encoded.padStart(8, "0");
+}
+function decodeCalendarConfiguration(encoded) {
+  let payload = base62Decode(encoded);
+  const dates = Array(3).fill(null);
+  for (let index = 2; index >= 0; index -= 1) {
+    const days = Number(payload % CONFIG_DATE_RADIX);
+    payload /= CONFIG_DATE_RADIX;
+    if (days > 0) dates[index] = new Date(CONFIG_DATE_EPOCH + (days - 1) * 86400000).toISOString().slice(0, 10);
+  }
+  return { enabled: Boolean(payload % 2n), dates };
+}
 function configurationCode() {
   const partyUniverse = Object.keys(PARTY_META);
   const partyCount = orderedChoiceCount(partyUniverse.length);
@@ -206,7 +230,7 @@ function configurationCode() {
   const barNeonBits = (state.barNeon ? 0n : 1n) << 28n;
   const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits;
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
-  return base62Encode(value);
+  return base62Encode(value) + encodeCalendarConfiguration();
 }
 
 function updateConfigurationCode() {
@@ -364,6 +388,28 @@ function updatePollOptions(reset = false) {
 
 function selectedPollEntries() {
   return [...state.selectedPollRanks].sort().map(slot => ({ slot, rank: state.pollDateMode ? (state.pollRankOverrides[slot] ?? slot) : slot }));
+}
+
+function pollSelectionLabel(slot, rank, plural = false) {
+  if (state.pollDateMode) {
+    const referenceRegion = [...state.regions][0];
+    const poll = (state.data?.polls?.[referenceRegion] || [])[rank];
+    const date = state.pollDateLabels[slot] || poll?.date;
+    return date ? `${plural ? "Umfragen vom" : "Umfrage vom"} ${formatDate(date)}` : "Gewählter Zeitpunkt";
+  }
+  if (slot === 0) return plural ? "Neueste Umfragen" : "Neueste";
+  return plural ? `${slot + 1}. jüngste Umfragen` : `${slot + 1}. jüngste`;
+}
+
+function pollValueKeys() {
+  return [...new Set([...(state.data?.parties || []), ...state.otherParties])];
+}
+
+function selectedOtherPartyValues(poll) {
+  return [...state.otherParties]
+    .map(party => ({ party, value: Number(poll?.values?.[party] || 0) }))
+    .filter(entry => entry.value > 0)
+    .sort((a, b) => b.value - a.value || a.party.localeCompare(b.party, "de"));
 }
 
 document.addEventListener("click", () => {
@@ -625,7 +671,7 @@ function render(animate = true) {
   const series = state.averageMode ? selectedRegions.map(region => {
     const items = rawSeries.filter(item => item.region === region);
     if (!items.length) return null;
-    const values = Object.fromEntries(state.data.parties.map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
+    const values = Object.fromEntries(pollValueKeys().map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
     return { region, rank: 0, average: true, poll: { institute: `Ø ${items.length} Umfragen`, date: items[0].poll.date, client: "", values, sourcePolls: items.map(item => item.poll) } };
   }).filter(Boolean) : rawSeries;
   const parties = [...state.parties];
@@ -883,10 +929,7 @@ function render(animate = true) {
         growBar(bar, x + barWidth / 2, margin.top + innerH, 1, motionEnabled, newBarDelay);
       }
       if (party === "Sonstige" && state.otherParties.size) {
-        const extraValues = [...state.otherParties]
-          .map(extraParty => ({ party: extraParty, value: Number(item.poll.values[extraParty] || 0) }))
-          .filter(entry => entry.value > 0)
-          .sort((a, b) => b.value - a.value || a.party.localeCompare(b.party, "de"));
+        const extraValues = selectedOtherPartyValues(item.poll);
         if (extraValues.length) {
           const lineHeight = compact ? 11 : 13;
           const boxWidth = compact ? 92 : 112;
@@ -1195,11 +1238,14 @@ function askProjectName() {
 }
 
 function applyConfigurationCode(text) {
-  if (!/^[0-9A-Za-z]{13,17}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
+  if (!/^[0-9A-Za-z]{13,25}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
+  const hasCalendarConfiguration = text.length >= 21;
+  const calendarConfiguration = hasCalendarConfiguration ? decodeCalendarConfiguration(text.slice(-8)) : { enabled: false, dates: [null, null, null] };
+  const baseCode = hasCalendarConfiguration ? text.slice(0, -8) : text;
   const partyUniverse = Object.keys(PARTY_META);
   const partyCount = orderedChoiceCount(partyUniverse.length);
   const regionCount = orderedChoiceCount(state.data.regions.length);
-  let value = base62Decode(text);
+  let value = base62Decode(baseCode);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
   if (mode > 536870911) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
@@ -1236,11 +1282,16 @@ function applyConfigurationCode(text) {
   state.regions = new Set(unrankOrdered(regionRank, state.data.regions));
   state.parties = new Set(unrankOrdered(partyRank, partyUniverse));
   state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
-  state.pollDateMode = false;
-  state.pollRankOverrides = [0, 1, 2];
-  state.pollDateLabels = [null, null, null];
-  document.querySelector("#poll-date-mode").checked = false;
-  document.querySelector(".poll-picker")?.classList.remove("date-mode");
+  state.pollDateMode = calendarConfiguration.enabled;
+  state.pollDateLabels = calendarConfiguration.dates;
+  const referencePolls = state.data.polls[[...state.regions][0]] || [];
+  state.pollRankOverrides = calendarConfiguration.dates.map((date, slot) => {
+    if (!date) return slot;
+    const rank = referencePolls.findIndex(poll => poll.date <= date);
+    return rank < 0 ? Math.max(0, referencePolls.length - 1) : rank;
+  });
+  document.querySelector("#poll-date-mode").checked = state.pollDateMode;
+  document.querySelector(".poll-picker")?.classList.toggle("date-mode", state.pollDateMode);
   document.querySelector("#average-mode").checked = state.averageMode;
   els.mobileView.checked = state.mobileView;
   els.fullRegionNames.checked = !state.fullRegionNames;
@@ -1293,7 +1344,7 @@ async function exportChartImage(format = "jpeg") {
   const selectedParties = [...state.parties];
   const selectedPolls = selectedRegions.flatMap(region => selectedPollEntries().map(({ slot, rank }) => {
     const poll = (state.data.polls[region] || [])[rank];
-    return poll ? `${state.fullRegionNames ? region : REGION_CODES[region]} · ${slot === 0 ? "Neueste" : `${slot + 1}. jüngste`} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
+    return poll ? `${state.fullRegionNames ? region : REGION_CODES[region]} · ${pollSelectionLabel(slot, rank)} · ${poll.institute} · ${formatDate(poll.date)}${poll.client ? ` · ${poll.client}` : ""}` : null;
   }).filter(Boolean));
   const partyColumns = selectedParties.length > 5 ? 2 : 1;
   const regionColumns = selectedRegions.length > 8 ? 2 : 1;
@@ -1418,7 +1469,7 @@ function a4ExportClusters() {
   const series = state.averageMode ? regions.map(region => {
     const items = raw.filter(item => item.region === region);
     if (!items.length) return null;
-    const values = Object.fromEntries(state.data.parties.map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
+    const values = Object.fromEntries(pollValueKeys().map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
     return { region, rank: 0, average: true, poll: { values } };
   }).filter(Boolean) : raw;
   if (state.groupBy === "region") return regions.map(region => ({
@@ -1551,7 +1602,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       }).filter(Boolean))
     }] : selectedPollEntries().map(({ slot, rank }) => ({
       rank: slot,
-      label: slot === 0 ? "Neueste Umfragen" : `${slot + 1}. jüngste Umfragen`,
+      label: pollSelectionLabel(slot, rank, true),
       fill: [.68, .34, .14][slot], stroke: [1, .7, .4][slot],
       items: clusterRegions.map(region => {
         const poll = (state.data.polls[region] || [])[rank];
@@ -1625,6 +1676,11 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     const slot = (fullRowPlotWidth - sharedExportBreaks * exportBlockGap) / slotCount;
     const barWidth = Math.max(2, Math.min(34, slot * .68));
     const exportBarCenters = [];
+    const sonstigeBars = cluster.bars.filter(entry => entry.party === "Sonstige");
+    const sonstigeTop = sonstigeBars.length ? Math.min(...sonstigeBars.map(entry => {
+      const value = Number(entry.item.poll.values.Sonstige || 0);
+      return plot.bottom - value / yMax * (plot.bottom - plot.top);
+    })) : 0;
     let passedExportBreaks = 0;
     cluster.bars.forEach(({ party, item }, barIndex) => {
       const value = Number(item.poll.values[party] || 0);
@@ -1664,6 +1720,30 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       if (state.showPercentValues) {
         const percentText = formatPercent(value, false, true);
         text(`${item.average ? "Ø " : ""}${state.percentLabelMode === "with" ? percentText : percentText.replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
+      }
+      if (party === "Sonstige" && state.otherParties.size) {
+        const extraValues = selectedOtherPartyValues(item.poll);
+        if (extraValues.length) {
+          const lineHeight = 10;
+          const boxWidth = 92;
+          const boxHeight = 7 + extraValues.length * lineHeight;
+          const annotationIndex = cluster.bars.slice(0, barIndex).filter(entry => entry.party === "Sonstige").length;
+          const slotHeight = 7 + state.otherParties.size * lineHeight + 4;
+          const stackHeight = sonstigeBars.length * slotHeight;
+          const staggerX = (annotationIndex - (sonstigeBars.length - 1) / 2) * 11;
+          const boxX = Math.max(plot.left + 2, Math.min(plot.right - boxWidth - 2, (barX + barWidth / 2) - boxWidth / 2 + staggerX));
+          const boxY = Math.max(plot.top + 2, sonstigeTop - stackHeight - (state.showPercentValues ? 18 : 7) + annotationIndex * slotHeight);
+          page.append(svgEl("path", {
+            d: `M ${boxX + boxWidth / 2} ${boxY + boxHeight} L ${barX + barWidth / 2} ${Math.max(boxY + boxHeight + 2, barY - 2)}`,
+            fill: "none", stroke: "#d2e1f2", "stroke-opacity": .68, "stroke-width": .65
+          }));
+          page.append(svgEl("rect", { x: boxX, y: boxY, width: boxWidth, height: boxHeight, rx: 4, fill: "#071225", "fill-opacity": .86, stroke: "#a9c1dc", "stroke-opacity": .46, "stroke-width": .6 }));
+          extraValues.forEach((entry, extraIndex) => {
+            const lineY = boxY + 6 + extraIndex * lineHeight + lineHeight / 2;
+            page.append(svgEl("circle", { cx: boxX + 7, cy: lineY - 1, r: 2, fill: OTHER_PARTIES[entry.party].color }));
+            text(`${OTHER_PARTIES[entry.party].label} ${formatPercent(entry.value, false, true)}`, { x: boxX + 12, y: lineY + 2, fill: "#e8f0fa", "font-size": 7, "font-weight": 700 });
+          });
+        }
       }
       const electionValue = Number(state.data.elections?.[item.region]?.values?.[party] || 0);
       const delta = value - electionValue;
@@ -1734,7 +1814,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     const pageRegions = [...new Set(clusters.flatMap(cluster => cluster.bars.map(({ item }) => item.region)))];
     const sharedGroups = selectedPollEntries().map(({ slot, rank }) => ({
       rank: slot,
-      label: slot === 0 ? "Neueste Umfragen" : `${slot + 1}. jüngste Umfragen`,
+      label: pollSelectionLabel(slot, rank, true),
       fill: [.68, .34, .14][slot], stroke: [1, .7, .4][slot],
       items: pageRegions.map(region => {
         const poll = (state.data.polls[region] || [])[rank];

@@ -144,7 +144,7 @@ export default {
       const configuration = String(payload.configuration || "").trim();
       const title = String(payload.title || "Sonntagsfragen").trim().slice(0, 100) || "Sonntagsfragen";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
-      if (!/^[0-9A-Za-z]{13,17}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
+      if (!/^[0-9A-Za-z]{13,25}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       const existing = await env.REPORTS.prepare("SELECT id FROM projects WHERE user_id = ? AND configuration = ? LIMIT 1").bind(reporter.id, configuration).first();
       if (!existing) {
@@ -162,7 +162,7 @@ export default {
       const configuration = String(payload.configuration || "").trim();
       const title = String(payload.title || "Unbenannt").trim().slice(0, 100) || "Unbenannt";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
-      if (!/^[0-9A-Za-z]{13,17}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
+      if (!/^[0-9A-Za-z]{13,25}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       try {
         const result = await env.REPORTS.prepare("UPDATE projects SET configuration = ?, title = ?, detail = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ?").bind(configuration, title, detail, decodeURIComponent(projectMatch[1]), reporter.id).run();
@@ -241,7 +241,7 @@ export default {
       const requestedSubject = String(payload.subject || "").trim();
       const subject = reporter.role === "Admin" ? (requestedSubject || "Meldung") : "Meldung";
       const body = String(payload.body || "").trim();
-      const configuration = payload.configuration ? String(payload.configuration).slice(0, 15) : null;
+      const configuration = payload.configuration ? String(payload.configuration).slice(0, 25) : null;
       if (subject.length > 100 || !body || body.length > 3000) return json({ error: "Bitte die Beschreibung vollständig ausfüllen." }, 400, origin);
       const id = crypto.randomUUID();
       await env.REPORTS.prepare("INSERT INTO reports (id, subject, body, configuration, reporter) VALUES (?, ?, ?, ?, ?)").bind(id, subject, body, configuration, reporter.workName).run();
