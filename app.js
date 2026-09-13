@@ -2641,7 +2641,7 @@ async function loadReportAccounts() {
       const loading = document.createElement("p"); loading.className = "report-empty"; loading.textContent = "Projekte werden geladen …";
       panel.append(loading); row.append(panel);
       try {
-        const { projects } = await reportRequest(`/accounts/${encodeURIComponent(account.id)}/projects`);
+        const { projects } = await reportRequest(`/accounts/${encodeURIComponent(account.id)}/projects?update=${Date.now()}`, { cache: "no-store" });
         panel.replaceChildren();
         if (!projects.length) {
           const empty = document.createElement("p"); empty.className = "report-empty"; empty.textContent = "Keine gespeicherten Projekte."; panel.append(empty);
