@@ -2080,11 +2080,73 @@ function createA4Pages() {
 
 function applyPreviewZoom() {
   const percent = Number(els.previewZoom.value);
-  const baseWidth = Math.min(920, Math.max(280, els.previewPages.clientWidth - 56));
+  const baseWidth = document.body.classList.contains("preview-split-active") ? 920 : Math.min(920, Math.max(280, els.previewPages.clientWidth - 56));
   els.previewZoomValue.textContent = `${percent} %`;
   els.previewPages.querySelectorAll(".preview-sheet").forEach(sheet => {
     sheet.style.width = `${baseWidth * percent / 100}px`;
     sheet.style.maxWidth = "none";
+  });
+}
+
+function setPreviewSplitPosition(clientX) {
+  const minimum = 320;
+  const maximum = Math.max(minimum, window.innerWidth - 320);
+  const position = Math.max(minimum, Math.min(maximum, clientX));
+  document.documentElement.style.setProperty("--preview-split-x", `${position}px`);
+}
+
+function setPreviewSplit(active) {
+  if (active && window.matchMedia("(max-width: 900px)").matches) return;
+  const toggle = document.querySelector("#preview-split-toggle");
+  const splitter = document.querySelector("#preview-splitter");
+  if (els.previewDialog.open) els.previewDialog.close();
+  document.body.classList.toggle("preview-split-active", active);
+  els.previewDialog.classList.toggle("preview-split", active);
+  toggle.setAttribute("aria-pressed", String(active));
+  toggle.setAttribute("aria-label", active ? "Geteilte Vorschau schließen" : "Vorschau im geteilten Vollbild anzeigen");
+  splitter.hidden = !active;
+  if (active) {
+    if (!getComputedStyle(document.documentElement).getPropertyValue("--preview-split-x").trim()) setPreviewSplitPosition(window.innerWidth * .56);
+    els.previewDialog.show();
+  } else {
+    els.previewDialog.showModal();
+  }
+  requestAnimationFrame(applyPreviewZoom);
+}
+
+function closeExportPreview() {
+  document.body.classList.remove("preview-split-active");
+  els.previewDialog.classList.remove("preview-split");
+  document.querySelector("#preview-split-toggle").setAttribute("aria-pressed", "false");
+  document.querySelector("#preview-splitter").hidden = true;
+  if (els.previewDialog.open) els.previewDialog.close();
+}
+
+function installPreviewSplitter() {
+  const splitter = document.querySelector("#preview-splitter");
+  let dragging = false;
+  splitter.addEventListener("pointerdown", event => {
+    dragging = true;
+    splitter.setPointerCapture(event.pointerId);
+    splitter.classList.add("dragging");
+  });
+  splitter.addEventListener("pointermove", event => {
+    if (!dragging) return;
+    setPreviewSplitPosition(event.clientX);
+  });
+  const stop = event => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove("dragging");
+    if (splitter.hasPointerCapture(event.pointerId)) splitter.releasePointerCapture(event.pointerId);
+  };
+  splitter.addEventListener("pointerup", stop);
+  splitter.addEventListener("pointercancel", stop);
+  splitter.addEventListener("keydown", event => {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    const current = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--preview-split-x")) || window.innerWidth * .56;
+    setPreviewSplitPosition(current + (event.key === "ArrowLeft" ? -24 : 24));
   });
 }
 
@@ -3399,10 +3461,12 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       try { showExportPreview(); }
       catch (error) { els.exportMessage.textContent = `Vorschau fehlgeschlagen: ${error.message}`; }
     });
-    document.querySelector("#close-preview").addEventListener("click", () => els.previewDialog.close());
-    els.previewDialog.addEventListener("click", event => { if (event.target === els.previewDialog) els.previewDialog.close(); });
+    document.querySelector("#close-preview").addEventListener("click", closeExportPreview);
+    document.querySelector("#preview-split-toggle").addEventListener("click", () => setPreviewSplit(!document.body.classList.contains("preview-split-active")));
+    els.previewDialog.addEventListener("click", event => { if (event.target === els.previewDialog && !document.body.classList.contains("preview-split-active")) closeExportPreview(); });
     els.previewZoom.addEventListener("input", applyPreviewZoom);
     installPreviewGestures();
+    installPreviewSplitter();
     const changePreviewZoom = direction => {
       els.previewZoom.value = String(Math.max(Number(els.previewZoom.min), Math.min(Number(els.previewZoom.max), Number(els.previewZoom.value) + direction * Number(els.previewZoom.step))));
       applyPreviewZoom();
