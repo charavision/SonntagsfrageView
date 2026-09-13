@@ -2773,7 +2773,14 @@ async function loadReportAccounts() {
       const panel = document.createElement("div"); panel.className = "report-account-projects";
       row.append(panel);
       try {
-        let projects = account.projects || [];
+        let projects = [];
+        try {
+          const accountProjects = await reportRequest(`/accounts/${encodeURIComponent(account.id)}/projects?update=${Date.now()}`, { cache: "no-store" });
+          projects = accountProjects.projects || [];
+        } catch (error) {
+          if (!Array.isArray(account.projects)) throw error;
+        }
+        if (!projects.length) projects = account.projects || [];
         if (!projects.length && account.workName === currentReportIdentity?.work) {
           const ownProjects = await reportRequest(`/projects?update=${Date.now()}`, { cache: "no-store" });
           projects = ownProjects.projects || [];
