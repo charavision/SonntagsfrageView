@@ -1146,7 +1146,7 @@ async function loadProjects() {
     meta.textContent = `${project.configuration} · ${formatTimestamp(project.updated_at)}`;
     button.append(title, detail, meta);
     button.addEventListener("click", () => {
-      applyConfigurationCode(project.configuration);
+      applyConfigurationCode(project.configuration, { nativeLayout: true });
       restoreSavedPollSelection(project.poll_selection);
       els.inputCode.value = project.configuration;
       document.querySelector("#report-dialog").classList.remove("project-picker-dialog", "startup-project-dialog");
@@ -1261,7 +1261,7 @@ function askProjectName() {
   });
 }
 
-function applyConfigurationCode(text) {
+function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   if (!/^[0-9A-Za-z]{13,25}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
   const hasCalendarConfiguration = text.length >= 21;
   const calendarConfiguration = hasCalendarConfiguration ? decodeCalendarConfiguration(text.slice(-8)) : { enabled: false, dates: [null, null, null] };
@@ -1295,6 +1295,10 @@ function applyConfigurationCode(text) {
   yAxisMode = ["dynamic", "static", "off", "dynamic"][(mode >> 24) & 3];
   state.barColorMode = ["party", "lightblue", "gray", "party"][(mode >> 26) & 3];
   state.barNeon = !(mode & 268435456);
+  // Projects can be opened on a different kind of device than the one on
+  // which they were saved. Keep their content/settings, but always use the
+  // layout that belongs to the device currently displaying the project.
+  if (nativeLayout) state.mobileView = startsMobile;
   if (state.mobileView) state.electionDates = false;
   document.querySelector("#chart-view-settings").hidden = state.mobileView;
   value %= legacySpace;
@@ -3402,7 +3406,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       const input = document.querySelector("#project-input-code");
       const message = document.querySelector("#project-code-message");
       try {
-        applyConfigurationCode(input.value.trim());
+        applyConfigurationCode(input.value.trim(), { nativeLayout: true });
         els.inputCode.value = input.value.trim();
         reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog");
         reportDialog.close();
