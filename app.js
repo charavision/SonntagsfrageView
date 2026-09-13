@@ -390,6 +390,28 @@ function selectedPollEntries() {
   return [...state.selectedPollRanks].sort().map(slot => ({ slot, rank: state.pollDateMode ? (state.pollRankOverrides[slot] ?? slot) : slot }));
 }
 
+function savedPollSelection() {
+  return {
+    dateMode: state.pollDateMode,
+    rankOverrides: state.pollRankOverrides.slice(0, 3),
+    dateLabels: state.pollDateLabels.slice(0, 3)
+  };
+}
+
+function restoreSavedPollSelection(selection) {
+  if (!selection || typeof selection !== "object") return;
+  state.pollDateMode = Boolean(selection.dateMode);
+  state.pollRankOverrides = [0, 1, 2].map((fallback, index) => {
+    const rank = Number(selection.rankOverrides?.[index]);
+    return Number.isInteger(rank) && rank >= 0 ? rank : fallback;
+  });
+  state.pollDateLabels = [0, 1, 2].map(index => /^\d{4}-\d{2}-\d{2}$/.test(selection.dateLabels?.[index] || "") ? selection.dateLabels[index] : null);
+  document.querySelector("#poll-date-mode").checked = state.pollDateMode;
+  document.querySelector(".poll-picker")?.classList.toggle("date-mode", state.pollDateMode);
+  updatePollOptions(false);
+  render(false);
+}
+
 function pollSelectionLabel(slot, rank, plural = false) {
   if (state.pollDateMode) {
     const referenceRegion = [...state.regions][0];
@@ -1125,6 +1147,7 @@ async function loadProjects() {
     button.append(title, detail, meta);
     button.addEventListener("click", () => {
       applyConfigurationCode(project.configuration);
+      restoreSavedPollSelection(project.poll_selection);
       els.inputCode.value = project.configuration;
       document.querySelector("#report-dialog").classList.remove("project-picker-dialog", "startup-project-dialog");
       document.querySelector("#report-dialog").close();
@@ -1156,6 +1179,7 @@ async function saveCurrentProject(projectName = "") {
   if (!currentReportRole || !state.data) throw new Error("Bitte zuerst anmelden.");
   const payload = {
     configuration: configurationCode(),
+    pollSelection: savedPollSelection(),
     title: projectName.trim().slice(0, 100) || "Unbenannt",
     detail: document.querySelector("#chart-meta")?.textContent?.trim() || "Aktuelle Konfiguration"
   };

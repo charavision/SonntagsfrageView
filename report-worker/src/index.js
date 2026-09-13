@@ -58,16 +58,38 @@ const authenticate = async (env, suppliedHash) => {
   }
 };
 
-const ensureProjectsTable = env => env.REPORTS.prepare(`CREATE TABLE IF NOT EXISTS projects (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  configuration TEXT NOT NULL,
-  title TEXT NOT NULL,
-  detail TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  UNIQUE(user_id, configuration)
-)`).run();
+const ensureProjectsTable = async env => {
+  await env.REPORTS.prepare(`CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    configuration TEXT NOT NULL,
+    title TEXT NOT NULL,
+    detail TEXT NOT NULL,
+    poll_selection TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE(user_id, configuration)
+  )`).run();
+  const columns = await env.REPORTS.prepare("PRAGMA table_info(projects)").all();
+  if (!(columns.results || []).some(column => column.name === "poll_selection")) {
+    await env.REPORTS.prepare("ALTER TABLE projects ADD COLUMN poll_selection TEXT").run();
+  }
+};
+
+const sanitizePollSelection = value => {
+  if (!value || typeof value !== "object") return null;
+  const dateLabels = [0, 1, 2].map(index => /^\d{4}-\d{2}-\d{2}$/.test(value.dateLabels?.[index] || "") ? value.dateLabels[index] : null);
+  const rankOverrides = [0, 1, 2].map((fallback, index) => {
+    const rank = Number(value.rankOverrides?.[index]);
+    return Number.isInteger(rank) && rank >= 0 && rank < 10000 ? rank : fallback;
+  });
+  return { dateMode: Boolean(value.dateMode), dateLabels, rankOverrides };
+};
+
+const parsePollSelection = value => {
+  try { return value ? sanitizePollSelection(JSON.parse(value)) : null; }
+  catch { return null; }
+};
 
 export default {
   async fetch(request, env) {
@@ -135,8 +157,8 @@ export default {
 
     if (url.pathname === "/projects" && request.method === "GET") {
       await ensureProjectsTable(env);
-      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 5").bind(reporter.id).all();
-      return json({ projects: result.results || [] }, 200, origin);
+      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, poll_selection, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 5").bind(reporter.id).all();
+      return json({ projects: (result.results || []).map(project => ({ ...project, poll_selection: parsePollSelection(project.poll_selection) })) }, 200, origin);
     }
 
     if (url.pathname === "/projects" && request.method === "POST") {
@@ -144,6 +166,7 @@ export default {
       const configuration = String(payload.configuration || "").trim();
       const title = String(payload.title || "Sonntagsfragen").trim().slice(0, 100) || "Sonntagsfragen";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
+      const pollSelection = sanitizePollSelection(payload.pollSelection);
       if (!/^[0-9A-Za-z]{13,25}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       const existing = await env.REPORTS.prepare("SELECT id FROM projects WHERE user_id = ? AND configuration = ? LIMIT 1").bind(reporter.id, configuration).first();
@@ -152,7 +175,7 @@ export default {
         if (Number(count?.count || 0) >= 5) return json({ error: "Es können maximal fünf Projekte gespeichert werden." }, 409, origin);
       }
       const id = existing?.id || crypto.randomUUID();
-      await env.REPORTS.prepare("INSERT INTO projects (id, user_id, configuration, title, detail) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, configuration) DO UPDATE SET title = excluded.title, detail = excluded.detail, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(id, reporter.id, configuration, title, detail).run();
+      await env.REPORTS.prepare("INSERT INTO projects (id, user_id, configuration, title, detail, poll_selection) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, configuration) DO UPDATE SET title = excluded.title, detail = excluded.detail, poll_selection = excluded.poll_selection, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(id, reporter.id, configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null).run();
       return json({ ok: true, id }, existing ? 200 : 201, origin);
     }
 
@@ -162,10 +185,11 @@ export default {
       const configuration = String(payload.configuration || "").trim();
       const title = String(payload.title || "Unbenannt").trim().slice(0, 100) || "Unbenannt";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
+      const pollSelection = sanitizePollSelection(payload.pollSelection);
       if (!/^[0-9A-Za-z]{13,25}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       try {
-        const result = await env.REPORTS.prepare("UPDATE projects SET configuration = ?, title = ?, detail = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ?").bind(configuration, title, detail, decodeURIComponent(projectMatch[1]), reporter.id).run();
+        const result = await env.REPORTS.prepare("UPDATE projects SET configuration = ?, title = ?, detail = ?, poll_selection = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ?").bind(configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null, decodeURIComponent(projectMatch[1]), reporter.id).run();
         if (!result.meta?.changes) return json({ error: "Projekt nicht gefunden." }, 404, origin);
         return json({ ok: true, id: decodeURIComponent(projectMatch[1]) }, 200, origin);
       } catch (error) {
