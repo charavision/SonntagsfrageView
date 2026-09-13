@@ -207,8 +207,18 @@ export default {
 
     if (url.pathname === "/accounts" && request.method === "GET") {
       if (reporter.role !== "Admin") return json({ error: "Nur Admin darf Accounts verwalten." }, 403, origin);
-      const result = await env.REPORTS.prepare("SELECT id, person_name, work_name, role, active, created_at FROM report_users ORDER BY created_at ASC").all();
-      const stored = (result.results || []).map(user => ({ id: user.id, personName: user.person_name, workName: user.work_name, role: user.role, active: Boolean(user.active), system: false }));
+      await ensureProjectsTable(env);
+      const [result, projectResult] = await Promise.all([
+        env.REPORTS.prepare("SELECT id, person_name, work_name, role, active, created_at FROM report_users ORDER BY created_at ASC").all(),
+        env.REPORTS.prepare("SELECT id, user_id, configuration, title, detail, poll_selection, created_at, updated_at FROM projects ORDER BY updated_at DESC").all()
+      ]);
+      const projectsByUser = new Map();
+      (projectResult.results || []).forEach(project => {
+        const projects = projectsByUser.get(project.user_id) || [];
+        if (projects.length < 5) projects.push({ ...project, poll_selection: parsePollSelection(project.poll_selection) });
+        projectsByUser.set(project.user_id, projects);
+      });
+      const stored = (result.results || []).map(user => ({ id: user.id, personName: user.person_name, workName: user.work_name, role: user.role, active: Boolean(user.active), system: false, projects: projectsByUser.get(user.id) || [] }));
       return json({ accounts: stored }, 200, origin);
     }
 

@@ -2617,7 +2617,7 @@ async function loadReports() {
 async function loadReportAccounts() {
   const list = document.querySelector("#report-account-list");
   list.innerHTML = '<p class="report-empty">Accounts werden geladen …</p>';
-  const { accounts } = await reportRequest("/accounts");
+  const { accounts } = await reportRequest(`/accounts?update=${Date.now()}`, { cache: "no-store" });
   list.replaceChildren();
   accounts.forEach(account => {
     const row = document.createElement("div"); row.className = "report-account-row";
@@ -2638,10 +2638,9 @@ async function loadReportAccounts() {
       document.querySelectorAll(".report-account-projects-button.active").forEach(button => button.classList.remove("active"));
       projectsButton.classList.add("active");
       const panel = document.createElement("div"); panel.className = "report-account-projects";
-      const loading = document.createElement("p"); loading.className = "report-empty"; loading.textContent = "Projekte werden geladen …";
-      panel.append(loading); row.append(panel);
+      row.append(panel);
       try {
-        const { projects } = await reportRequest(`/accounts/${encodeURIComponent(account.id)}/projects?update=${Date.now()}`, { cache: "no-store" });
+        const projects = account.projects || [];
         panel.replaceChildren();
         if (!projects.length) {
           const empty = document.createElement("p"); empty.className = "report-empty"; empty.textContent = "Keine gespeicherten Projekte."; panel.append(empty);
