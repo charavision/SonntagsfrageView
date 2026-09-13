@@ -586,6 +586,10 @@ body.view-fullscreen-active .fullscreen-report-tools .view-switch { margin-top: 
 .preview-header small { color: var(--muted); }
 .preview-header button { width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: #102744; color: white; cursor: pointer; font-size: 24px; line-height: 1; }
 .preview-header .preview-zoom { align-items: center; gap: 8px; margin-left: auto; }
+.preview-header .preview-a4-controls { display: flex; align-items: center; gap: 6px; }
+.preview-header .preview-a4-controls button { width: auto; min-width: 92px; padding: 0 10px; border-radius: 9px; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.preview-header .preview-a4-controls button:disabled { opacity: .38; cursor: not-allowed; }
+.preview-header .preview-download { font-size: 21px; font-weight: 900; }
 .preview-zoom button { width: 28px; height: 28px; font-size: 18px; }
 .preview-zoom input { width: clamp(90px, 16vw, 190px); accent-color: var(--accent); }
 .preview-zoom output { min-width: 48px; color: #dce8f7; font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
@@ -596,6 +600,11 @@ body.view-fullscreen-active .fullscreen-report-tools .view-switch { margin-top: 
 .export-settings-panel fieldset { padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
 .export-settings-panel legend { color: var(--muted); font-size: 11px; font-weight: 800; }
 .export-settings-panel select { min-width: 120px; padding: 7px; border: 1px solid var(--line); border-radius: 7px; background: #071326; color: white; }
+.export-cycle-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0 0 12px; }
+.export-cycle-setting > span { color: var(--muted); font-size: 12px; font-weight: 800; }
+.export-cycle-setting button { min-width: 108px; min-height: 36px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; background: #102744; color: var(--ink); cursor: pointer; font-weight: 800; }
+.export-cycle-setting.is-disabled { opacity: .42; }
+.export-cycle-setting button:disabled { cursor: not-allowed; }
 .outputs > small { color: var(--muted); font-size: 11px; }
 .export-controls { display: flex; align-items: center; gap: 8px; }
 .export-action { display: flex; align-items: stretch; flex-direction: column; gap: 4px; }
@@ -990,4 +999,39 @@ body.preview-split-active.view-fullscreen-active.fullscreen-output-open main > .
 }
 @media (max-width: 900px) {
   .preview-split-toggle { display: none !important; }
+  .preview-a4-controls, .preview-download { display: none !important; }
+}
+
+@media (max-width: 900px) {
+  body.mobile-mode.view-fullscreen-active.fullscreen-selection-open main > .controls,
+  body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open main > .controls {
+    inset: 18px auto auto 50%;
+    width: min(660px, calc(100vw - 28px));
+    max-width: none;
+    max-height: calc(100dvh - 36px);
+    padding: 0 12px 14px;
+    overflow-x: hidden;
+    border-radius: 16px;
+    transform: translateX(-50%) scale(.84);
+    transform-origin: top center;
+  }
+  body.view-fullscreen-active.fullscreen-selection-open .selection-tabs { margin-right: -12px; margin-left: -12px; }
+  body.view-fullscreen-active.fullscreen-selection-open .selection-tabs button { min-width: 0; padding: 13px 5px 11px; font-size: clamp(12px, 4vw, 17px); }
+  body.view-fullscreen-active.fullscreen-selection-open .option-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.view-fullscreen-active.fullscreen-selection-open .party-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.view-fullscreen-active.fullscreen-selection-open .poll-options { grid-template-columns: minmax(0, 1fr); }
+  body.view-fullscreen-active.fullscreen-selection-open .region-choice label,
+  body.view-fullscreen-active.fullscreen-selection-open .party-choice label { min-width: 0; overflow: hidden; }
+  body.view-fullscreen-active.fullscreen-selection-open .tab-grouping { position: static; flex-direction: column; gap: 12px; padding-bottom: 0; background: none; }
+  body.view-fullscreen-active.fullscreen-selection-open .tab-average-control { padding: 12px 0 0; border-top: 1px solid rgba(75,109,150,.65); border-left: 0; }
+}
+
+@media (min-width: 901px) {
+  body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .tab-grouping {
+    position: sticky;
+    z-index: 2;
+    bottom: -18px;
+    padding-bottom: 14px;
+    background: linear-gradient(180deg, rgba(7,19,38,.3), rgba(7,19,38,.98) 24%);
+  }
 }

@@ -45,7 +45,7 @@ try {
     else if (value && typeof value === "object") storedViewScales[platform] = { x: Number(value.x) || 1, y: Number(value.y) || 1 };
   });
 } catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), otherParties: new Set(), selectedPollRanks: new Set([0]), pollTimeMode: "current", pollDateMode: false, pollRankOverrides: [0, 1, 2], pollDateLabels: [null, null, null], averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, barColorMode: "party", barNeon: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), otherParties: new Set(), selectedPollRanks: new Set([0]), pollTimeMode: "current", pollDateMode: false, pollRankOverrides: [0, 1, 2], pollDateLabels: [null, null, null], averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, barColorMode: "party", barNeon: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", a4DiagramFormat: "auto", chartLayout: new Map(), perspective: null };
 let savedProjectConfiguration = null;
 function currentPlatformLabel() {
   if (window.AndroidApp) return "Android";
@@ -229,7 +229,8 @@ function configurationCode() {
   const yAxisBits = BigInt({ dynamic: 0, static: 1, off: 2 }[yAxisMode] || 0) << 24n;
   const barColorBits = BigInt({ party: 0, lightblue: 1, gray: 2 }[state.barColorMode] || 0) << 26n;
   const barNeonBits = (state.barNeon ? 0n : 1n) << 28n;
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits;
+  const diagramFormatBits = BigInt({ auto: 0, "1x1": 1, "1x2": 2, "1x3": 3, "2x2": 4, "2x3": 5 }[state.a4DiagramFormat] || 0) << 29n;
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits + diagramFormatBits;
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value) + encodeCalendarConfiguration();
 }
@@ -588,6 +589,8 @@ const labelModeOptions = {
   percent: [["with", "Mit %"], ["without", "Ohne %"], ["off", "Aus"]],
   since: [["color", "Farbig"], ["gray", "Grau"], ["off", "Aus"]]
 };
+const a4OrientationOptions = [["auto", "Auto"], ["portrait", "Hochkant"], ["landscape", "Horizontal"]];
+const a4DiagramFormatOptions = [["auto", "Auto"], ["1x1", "1×1"], ["1x2", "1×2"], ["1x3", "1×3"], ["2x2", "2×2"], ["2x3", "2×3"]];
 let yAxisMode = "dynamic";
 function updateYAxisPosition() {
   const layer = els.chart.querySelector(".y-axis-layer");
@@ -664,6 +667,37 @@ function advanceCycleButton(button, options) {
   const option = options[(index + 1 + options.length) % options.length];
   setCycleButton(button, option[0], options);
   return option[0];
+}
+
+function updateA4Controls() {
+  const disabled = !state.a4Mode;
+  const orientationButton = document.querySelector("#a4-orientation-cycle");
+  const formatButton = document.querySelector("#a4-diagram-format-cycle");
+  const previewOrientation = document.querySelector("#preview-a4-orientation");
+  const previewFormat = document.querySelector("#preview-a4-format");
+  [orientationButton, formatButton, previewOrientation, previewFormat].forEach(button => { if (button) button.disabled = disabled; });
+  setCycleButton(orientationButton, state.a4Orientation, a4OrientationOptions);
+  setCycleButton(formatButton, state.a4DiagramFormat, a4DiagramFormatOptions);
+  if (previewOrientation) { previewOrientation.dataset.value = state.a4Orientation; previewOrientation.textContent = `A4: ${a4OrientationOptions.find(([value]) => value === state.a4Orientation)?.[1] || "Auto"}`; }
+  if (previewFormat) { previewFormat.dataset.value = state.a4DiagramFormat; previewFormat.textContent = `Format: ${a4DiagramFormatOptions.find(([value]) => value === state.a4DiagramFormat)?.[1] || "Auto"}`; }
+  document.querySelector("#a4-orientation-settings")?.classList.toggle("is-disabled", disabled);
+  document.querySelector("#a4-diagram-format-settings")?.classList.toggle("is-disabled", disabled);
+}
+
+function cycleA4Orientation() {
+  const current = a4OrientationOptions.findIndex(([value]) => value === state.a4Orientation);
+  state.a4Orientation = a4OrientationOptions[(current + 1) % a4OrientationOptions.length][0];
+  if (state.a4Orientation === "landscape" && state.a4DiagramFormat === "1x3") state.a4DiagramFormat = "1x2";
+  updateA4Controls();
+  render(false);
+}
+
+function cycleA4DiagramFormat() {
+  const available = state.a4Orientation === "landscape" ? a4DiagramFormatOptions.filter(([value]) => value !== "1x3") : a4DiagramFormatOptions;
+  const current = available.findIndex(([value]) => value === state.a4DiagramFormat);
+  state.a4DiagramFormat = available[(current + 1 + available.length) % available.length][0];
+  updateA4Controls();
+  render(false);
 }
 
 function partyDisplayLabel(party, region, poll = null) {
@@ -1189,6 +1223,7 @@ function render(animate = true) {
   updatePerspective();
   updateYAxisPosition();
   updateConfigurationCode();
+  updateA4Controls();
   updateExportSummary();
 }
 
@@ -1366,7 +1401,7 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   let value = base62Decode(baseCode);
   const legacySpace = regionCount * partyCount * 7n;
   const mode = Number(value / legacySpace);
-  if (mode > 536870911) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  if (mode > 4294967295) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
@@ -1389,6 +1424,8 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   yAxisMode = ["dynamic", "static", "off", "dynamic"][(mode >> 24) & 3];
   state.barColorMode = ["party", "lightblue", "gray", "party"][(mode >> 26) & 3];
   state.barNeon = !(mode & 268435456);
+  state.a4DiagramFormat = ["auto", "1x1", "1x2", "1x3", "2x2", "2x3", "auto", "auto"][(mode >>> 29) & 7];
+  if (state.a4Orientation === "landscape" && state.a4DiagramFormat === "1x3") state.a4DiagramFormat = "1x2";
   if (!state.showLabels) {
     state.showSinceElection = false;
     state.sinceElectionMode = "off";
@@ -1440,8 +1477,7 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   els.electionDates.checked = state.electionDates;
   document.querySelector("#a4-mode").checked = state.a4Mode;
   document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
-  document.querySelector("#a4-orientation-settings").hidden = !state.a4Mode;
-  document.querySelector(`input[name="a4-orientation"][value="${state.a4Orientation}"]`).checked = true;
+  updateA4Controls();
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
   els.parties.querySelectorAll('input[name="party"]').forEach(input => input.checked = state.parties.has(input.value));
   updatePollOptions(false);
@@ -1612,8 +1648,20 @@ function a4ExportClusters() {
 function a4LayoutFor(clusters) {
   const largestCluster = Math.max(0, ...clusters.map(cluster => cluster.bars.length));
   const forcedLandscape = state.a4Orientation === "landscape";
-  const forcedPortrait = state.a4Orientation === "portrait";
+  const forcedPortrait = state.a4Orientation === "portrait" || (state.a4Orientation === "auto" && state.a4DiagramFormat === "1x3");
   const landscape = forcedLandscape || (!forcedPortrait && largestCluster > 34);
+  const selectedFormat = state.a4DiagramFormat === "1x3" && landscape ? "1x2" : state.a4DiagramFormat;
+  if (selectedFormat !== "auto") {
+    const dimensions = landscape ? { width: 1754, height: 1240 } : { width: 1240, height: 1754 };
+    const formats = {
+      "1x1": { columns: 1, rows: 1, capacity: 1, maxBars: 51 },
+      "1x2": { columns: 1, rows: 2, capacity: 2, maxBars: 34 },
+      "1x3": { columns: 1, rows: 3, capacity: 3, maxBars: 34 },
+      "2x2": { columns: 2, rows: 2, capacity: 4, maxBars: 17 },
+      "2x3": { columns: landscape ? 3 : 2, rows: landscape ? 2 : 3, capacity: 5, maxBars: 17, sharedPollLegend: true }
+    };
+    return { ...dimensions, ...formats[selectedFormat], landscape, diagramFormat: selectedFormat };
+  }
   if (landscape) {
     if (largestCluster > 34) return { width: 1754, height: 1240, columns: 1, rows: 2, capacity: 2, landscape: true };
     return { width: 1754, height: 1240, columns: 3, rows: 2, capacity: 5, landscape: true, sharedPollLegend: true };
@@ -1623,19 +1671,35 @@ function a4LayoutFor(clusters) {
   return { width: 1240, height: 1754, columns: 2, rows: state.fullRegionNames ? 3 : 4, capacity: state.fullRegionNames ? 6 : 8, landscape: false };
 }
 
+function fitA4ClustersToLayout(clusters, layout) {
+  if (!layout.maxBars) return clusters;
+  return clusters.flatMap(cluster => {
+    if (cluster.bars.length <= layout.maxBars) return [cluster];
+    const parts = Math.ceil(cluster.bars.length / layout.maxBars);
+    return Array.from({ length: parts }, (_, index) => ({
+      ...cluster,
+      title: index ? `${cluster.title} · ${index + 1}/${parts}` : cluster.title,
+      bars: cluster.bars.slice(index * layout.maxBars, (index + 1) * layout.maxBars),
+      legendBars: cluster.bars
+    }));
+  });
+}
+
 function updateExportSummary() {
   if (!state.data || !els.exportSummary) return;
   const clusters = a4ExportClusters();
   const format = document.querySelector("#export-format")?.value || "pdf";
   const usePages = state.a4Mode || format === "pdf";
-  const pages = usePages ? Math.max(1, Math.ceil(clusters.length / a4LayoutFor(clusters).capacity)) : 1;
-  els.exportSummary.textContent = `${clusters.length} ${clusters.length === 1 ? "Diagramm" : "Diagramme"} auf ${pages} ${pages === 1 ? "Seite" : "Seiten"}`;
+  const layout = a4LayoutFor(clusters);
+  const fittedClusters = fitA4ClustersToLayout(clusters, layout);
+  const pages = usePages ? Math.max(1, Math.ceil(fittedClusters.length / layout.capacity)) : 1;
+  els.exportSummary.textContent = `${fittedClusters.length} ${fittedClusters.length === 1 ? "Diagramm" : "Diagramme"} auf ${pages} ${pages === 1 ? "Seite" : "Seiten"}`;
 }
 
 function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const { width, height, columns } = layout;
   const rows = layout.sharedPollLegend
-    ? 2
+    ? layout.rows
     : pageCount > 1
       ? layout.rows
       : Math.max(1, Math.min(layout.rows, Math.ceil(clusters.length / columns)));
@@ -1984,25 +2048,24 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         text(group.label, { x: groupX + 24, y: transparencyY, fill: "#8fa6c1", "font-size": 9.33, "font-weight": 700 });
       });
     }
-    let stackedLegendOffset = 0;
     if (!layout.sharedPollLegend && (!splitClusterRow || showSideLegend)) pollLegendGroups.forEach((group, groupIndex) => {
-      const groupX = showSideLegend ? x + tileWidth * .82 : plot.left;
+      const groupWidth = showSideLegend ? pollGroupWidth : plotWidth / Math.max(1, pollLegendGroups.length);
+      const groupX = showSideLegend ? x + tileWidth * .82 : plot.left + groupIndex * groupWidth;
       const layout = pollGroupLayouts[groupIndex];
-      const legendBaseY = showSideLegend ? plot.top + 22 + groupIndex * (42 + noteRows * 11) : plot.bottom + pollLegendOffset + stackedLegendOffset;
+      const legendBaseY = showSideLegend ? plot.top + 22 + groupIndex * (42 + noteRows * 11) : plot.bottom + pollLegendOffset;
       if (!group.noSwatch) page.append(svgEl("rect", { x: groupX, y: legendBaseY - 8, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
       text(group.label, { x: groupX + (group.noSwatch ? 0 : 24), y: legendBaseY, fill: "#8fa6c1", "font-size": 9.33, "font-weight": 700, "letter-spacing": ".03em" });
-      const itemColumnWidth = (showSideLegend ? pollGroupWidth : plotWidth) / layout.columns;
+      const itemColumnWidth = groupWidth / layout.columns;
       group.items.forEach((note, noteIndex) => {
         const noteColumn = Math.floor(noteIndex / layout.rows), noteRow = noteIndex % layout.rows;
         const noteFontSize = Math.max(5.2, Math.min(9.33, (itemColumnWidth - 8) / (String(note).length * .56)));
         text(note, { x: groupX + noteColumn * itemColumnWidth, y: legendBaseY + 15 + noteRow * 11, fill: "#9bb0c9", "font-size": noteFontSize });
       });
-      if (!showSideLegend) stackedLegendOffset += 28 + layout.rows * 11;
     });
   });
   if (layout.sharedPollLegend) {
-    const legendX = left + 2 * (tileWidth + gapX) + 16;
-    const legendY = top + tileHeight + gapY + 28;
+    const legendX = left + (columns - 1) * (tileWidth + gapX) + 16;
+    const legendY = top + (rows - 1) * (tileHeight + gapY) + 28;
     const legendWidth = tileWidth - 32;
     const pageRegions = [...new Set(clusters.flatMap(cluster => cluster.bars.map(({ item }) => item.region)))];
     const sharedGroups = [...state.selectedPollRanks].sort().map(slot => ({
@@ -2016,15 +2079,13 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       }).filter(Boolean)
     })).filter(group => group.items.length);
     text("UMFRAGEDATEN", { x: legendX, y: legendY, fill: "#59d9ff", "font-size": 14, "font-weight": 800, "letter-spacing": ".06em" });
-    // Stack the transparency groups vertically. Long institute names used to
-    // run into the neighbouring group when all three groups shared one row.
-    let groupOffsetY = 0;
-    sharedGroups.forEach(group => {
-      const groupX = legendX;
-      const groupY = legendY + 24 + groupOffsetY;
-      const columns = group.items.length > 5 ? 2 : 1;
+    const groupWidth = legendWidth / Math.max(1, sharedGroups.length);
+    sharedGroups.forEach((group, groupIndex) => {
+      const groupX = legendX + groupIndex * groupWidth;
+      const groupY = legendY + 24;
+      const columns = group.items.length > 6 ? 2 : 1;
       const rows = Math.ceil(group.items.length / columns);
-      const columnWidth = legendWidth / columns;
+      const columnWidth = groupWidth / columns;
       page.append(svgEl("rect", { x: groupX, y: groupY - 8, width: 18, height: 9, rx: 1, fill: "#dce8f7", "fill-opacity": group.fill, stroke: "#dce8f7", "stroke-opacity": group.stroke, "stroke-width": 1 }));
       text(group.label, { x: groupX + 24, y: groupY, fill: "#dce8f7", "font-size": 9.33, "font-weight": 700 });
       group.items.forEach((item, itemIndex) => {
@@ -2033,7 +2094,6 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         const itemFontSize = Math.max(5.2, Math.min(9.33, (columnWidth - 8) / (String(item).length * .56)));
         text(item, { x: groupX + column * columnWidth, y: groupY + 16 + row * 11, fill: "#9bb0c9", "font-size": itemFontSize });
       });
-      groupOffsetY += 28 + rows * 11;
     });
   }
   const footerStamp = formatTimestamp(now);
@@ -2079,9 +2139,10 @@ function pdfFromJpegs(images, layout) {
 }
 
 function createA4Pages() {
-  const clusters = a4ExportClusters();
+  let clusters = a4ExportClusters();
   if (!clusters.length) throw new Error("Bitte mindestens eine Partei und ein Parlament auswählen.");
   const layout = a4LayoutFor(clusters);
+  clusters = fitA4ClustersToLayout(clusters, layout);
   const pageGroups = layout.splitLargeCluster
     ? clusters.map(cluster => {
       const splitAt = 30;
@@ -2397,7 +2458,7 @@ const developerFeatures = [
   ["labels", "Beschriftungen"], ["regionLabelMode", "Beschriftung: Parlamente"], ["partyLabelMode", "Beschriftung: Parteien"], ["percentLabelMode", "Beschriftung: Prozentwerte"], ["sinceElectionMode", "Beschriftung: Seit Wahl"],
   ["barColors", "Balken"], ["barColorMode", "Balken: Farbe"], ["barNeon", "Balken: Neon"], ["percentValues", "Prozentwerte"],
   ["lut", "LUT"], ["yAxisMode", "LUT: Y-Achse"], ["background", "LUT: Hintergrund"], ["brackets", "LUT: Klammern"], ["viewSize", "Zoom"], ["uiScale", "Bediengrößen-Regler"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
-  ["a4Output", "A4-Ausgabe"], ["export3d", "3D (für Grafikausgabe)"]
+  ["a4Output", "A4-Ausgabe"], ["a4DiagramFormat", "A4-Diagrammformat"], ["export3d", "3D (für Grafikausgabe)"]
 ];
 const developerFeatureOptions = {
   regionLabelMode: [["auto", "Auto"], ["0", "0°"], ["90", "90°"], ["off", "Aus"]],
@@ -2563,6 +2624,7 @@ function applyDeveloperSettings() {
   setVisible("#preview-export", settings.preview.visible);
   const a4Choice = document.querySelector('input[name="output-shape"][value="a4"]')?.closest("label");
   if (a4Choice) a4Choice.hidden = !settings.a4Output.visible;
+  document.querySelector("#a4-diagram-format-settings").hidden = !settings.a4DiagramFormat.visible;
   const export3dChoice = document.querySelector("#export-3d")?.closest("label");
   if (export3dChoice) export3dChoice.hidden = !settings.export3d.visible;
   els.updateData.disabled = !settings.dataUpdate.value;
@@ -3170,7 +3232,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#export-3d").checked = state.export3d;
     document.querySelector("#a4-mode").checked = state.a4Mode;
     document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
-    document.querySelector("#a4-orientation-settings").hidden = !state.a4Mode;
+    updateA4Controls();
     if (startsMobile) document.querySelector("#chart-view-settings").hidden = true;
     updateHeaderTimestamp(data);
     buildControls();
@@ -3865,10 +3927,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       state.export3d = event.currentTarget.checked;
       render(false);
     });
-    a4Mode.addEventListener("change", event => { state.a4Mode = event.currentTarget.checked; render(false); });
+    a4Mode.addEventListener("change", event => { state.a4Mode = event.currentTarget.checked; updateA4Controls(); render(false); });
     exportFormat.addEventListener("change", event => {
       if (event.currentTarget.value === "pdf" && !state.a4Mode) {
-        state.a4Mode = true; a4Mode.checked = true; render(false);
+        state.a4Mode = true; a4Mode.checked = true; updateA4Controls(); render(false);
         return;
       }
       updateExportSummary();
@@ -3876,16 +3938,17 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelectorAll('input[name="output-shape"]').forEach(input => input.addEventListener("change", event => {
       state.a4Mode = event.currentTarget.value === "a4";
       a4Mode.checked = state.a4Mode;
-      document.querySelector("#a4-orientation-settings").hidden = !state.a4Mode;
+      updateA4Controls();
       render(false);
     }));
-    document.querySelectorAll('input[name="a4-orientation"]').forEach(input => input.addEventListener("change", event => {
-      state.a4Orientation = event.currentTarget.value;
-      render(false);
-    }));
+    document.querySelector("#a4-orientation-cycle").addEventListener("click", cycleA4Orientation);
+    document.querySelector("#a4-diagram-format-cycle").addEventListener("click", cycleA4DiagramFormat);
+    document.querySelector("#preview-a4-orientation").addEventListener("click", cycleA4Orientation);
+    document.querySelector("#preview-a4-format").addEventListener("click", cycleA4DiagramFormat);
+    document.querySelector("#preview-download").addEventListener("click", () => document.querySelector("#export-file").click());
     document.querySelector("#export-file").addEventListener("click", () => {
       const format = exportFormat.value;
-      if (format === "pdf" && !state.a4Mode) { state.a4Mode = true; a4Mode.checked = true; render(false); }
+      if (format === "pdf" && !state.a4Mode) { state.a4Mode = true; a4Mode.checked = true; updateA4Controls(); render(false); }
       const operation = state.a4Mode || format === "pdf" ? exportA4(format) : exportChartImage(format);
       operation.catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; });
     });
