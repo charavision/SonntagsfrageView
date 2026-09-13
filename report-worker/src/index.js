@@ -83,7 +83,8 @@ const sanitizePollSelection = value => {
     const rank = Number(value.rankOverrides?.[index]);
     return Number.isInteger(rank) && rank >= 0 && rank < 10000 ? rank : fallback;
   });
-  return { dateMode: Boolean(value.dateMode), dateLabels, rankOverrides };
+  const mode = ["current", "from", "free"].includes(value.mode) ? value.mode : (value.dateMode ? "free" : "current");
+  return { mode, dateMode: mode !== "current", dateLabels, rankOverrides };
 };
 
 const parsePollSelection = value => {
@@ -209,6 +210,17 @@ export default {
       const result = await env.REPORTS.prepare("SELECT id, person_name, work_name, role, active, created_at FROM report_users ORDER BY created_at ASC").all();
       const stored = (result.results || []).map(user => ({ id: user.id, personName: user.person_name, workName: user.work_name, role: user.role, active: Boolean(user.active), system: false }));
       return json({ accounts: stored }, 200, origin);
+    }
+
+    const accountProjectsMatch = url.pathname.match(/^\/accounts\/([^/]+)\/projects$/);
+    if (accountProjectsMatch && request.method === "GET") {
+      if (reporter.role !== "Admin") return json({ error: "Nur Admin darf Projekte anderer Accounts ansehen." }, 403, origin);
+      await ensureProjectsTable(env);
+      const accountId = decodeURIComponent(accountProjectsMatch[1]);
+      const account = await env.REPORTS.prepare("SELECT id FROM report_users WHERE id = ? LIMIT 1").bind(accountId).first();
+      if (!account) return json({ error: "Account nicht gefunden." }, 404, origin);
+      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, poll_selection, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 5").bind(accountId).all();
+      return json({ projects: (result.results || []).map(project => ({ ...project, poll_selection: parsePollSelection(project.poll_selection) })) }, 200, origin);
     }
 
     const accountPinMatch = url.pathname.match(/^\/accounts\/([^/]+)\/pin$/);

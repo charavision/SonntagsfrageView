@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interaktive Darstellung aktueller Sonntagsfragen für Bundestag und Landtage.">
   <title>Sonntagsfragen – Bund & Länder</title>
-  <link rel="stylesheet" href="styles.css?v=project-management-248">
+  <link rel="stylesheet" href="styles.css?v=account-projects-272">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -75,9 +75,9 @@
           <span class="mobile-poll-hint">max. drei</span>
         </div>
         <div class="poll-time-switch" role="group" aria-label="Zeitraum der Umfragen">
-          <span class="poll-time-current">Aktuelle</span>
-          <label class="switch"><input id="poll-date-mode" type="checkbox"><span></span></label>
-          <span class="poll-time-custom">Zeitpunkt wählen</span>
+          <button type="button" data-poll-time-mode="current" class="active" aria-pressed="true">Aktuelle</button>
+          <button type="button" data-poll-time-mode="from" aria-pressed="false">Ab Stichtag</button>
+          <button type="button" data-poll-time-mode="free" aria-pressed="false">Freie Wahl</button>
         </div>
         <div class="poll-actions">
           <div id="poll-options" class="poll-options"></div>
@@ -209,6 +209,10 @@
     </footer>
   </main>
   <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-title">
+    <div class="title-lockup startup-project-brand" aria-hidden="true">
+      <h1>Sonntagsfragen</h1>
+      <p class="creator">visualizer by <b>charavision</b></p>
+    </div>
     <div class="preview-header"><strong id="report-title">Info</strong><div class="report-header-actions"><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Info schließen">×</button></div></div>
     <div class="report-content">
       <form id="report-login" class="report-login">
@@ -260,6 +264,10 @@
         <small id="android-app-message" aria-live="polite"></small>
       </section>
       <section id="report-projects" class="report-projects" hidden aria-labelledby="report-projects-title">
+        <div id="startup-project-greeting" class="startup-project-greeting" hidden>
+          <strong id="startup-project-person"></strong>
+          <span id="startup-project-work"></span>
+        </div>
         <form id="project-code-input" class="project-code-input">
           <label class="sr-only" for="project-input-code">Input Configuration</label>
           <input id="project-input-code" maxlength="25" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
@@ -342,6 +350,6 @@
   </dialog>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=native-project-layout-249" defer></script>
+  <script src="app.js?v=account-projects-272" defer></script>
 </body>
 </html>
