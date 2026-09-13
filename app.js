@@ -1700,6 +1700,8 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     const slot = (fullRowPlotWidth - sharedExportBreaks * exportBlockGap) / slotCount;
     const barWidth = Math.max(2, Math.min(34, slot * .68));
     const exportBarCenters = [];
+    const otherPartyLinks = [];
+    const otherPartyCards = [];
     const sonstigeBars = cluster.bars.filter(entry => entry.party === "Sonstige");
     const sonstigeTop = sonstigeBars.length ? Math.min(...sonstigeBars.map(entry => {
       const value = Number(entry.item.poll.values.Sonstige || 0);
@@ -1754,25 +1756,32 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
           const annotationIndex = cluster.bars.slice(0, barIndex).filter(entry => entry.party === "Sonstige").length;
           const slotHeight = 7 + state.otherParties.size * lineHeight + 4;
           const stackHeight = sonstigeBars.length * slotHeight;
-          const staggerX = (annotationIndex - (sonstigeBars.length - 1) / 2) * 11;
-          const boxX = Math.max(plot.left + 2, Math.min(plot.right - boxWidth - 2, (barX + barWidth / 2) - boxWidth / 2 + staggerX));
+          const barCenterX = barX + barWidth / 2;
+          const boxX = barCenterX - boxWidth / 2;
           const boxY = Math.max(plot.top + 2, sonstigeTop - stackHeight - (state.showPercentValues ? 18 : 7) + annotationIndex * slotHeight);
-          page.append(svgEl("path", {
-            d: `M ${boxX + boxWidth / 2} ${boxY + boxHeight} L ${barX + barWidth / 2} ${Math.max(boxY + boxHeight + 2, barY - 2)}`,
+          const percentLabelY = Math.max(plot.top + 8, barY - 5);
+          const lineEndY = Math.max(boxY + boxHeight + 2, percentLabelY - 9);
+          otherPartyLinks.push(svgEl("path", {
+            d: `M ${barCenterX} ${boxY + boxHeight} L ${barCenterX} ${lineEndY}`,
             fill: "none", stroke: "#d2e1f2", "stroke-opacity": .68, "stroke-width": .65
           }));
-          page.append(svgEl("rect", { x: boxX, y: boxY, width: boxWidth, height: boxHeight, rx: 4, fill: "#071225", "fill-opacity": .86, stroke: "#a9c1dc", "stroke-opacity": .46, "stroke-width": .6 }));
+          const card = svgEl("g");
+          card.append(svgEl("rect", { x: boxX, y: boxY, width: boxWidth, height: boxHeight, rx: 4, fill: "#071225", "fill-opacity": .94, stroke: "#a9c1dc", "stroke-opacity": .58, "stroke-width": .6 }));
           extraValues.forEach((entry, extraIndex) => {
             const lineY = boxY + 6 + extraIndex * lineHeight + lineHeight / 2;
-            page.append(svgEl("circle", { cx: boxX + 7, cy: lineY - 1, r: 2, fill: OTHER_PARTIES[entry.party].color }));
-            text(`${OTHER_PARTIES[entry.party].label} ${formatPercent(entry.value, false, true)}`, { x: boxX + 12, y: lineY + 2, fill: "#e8f0fa", "font-size": 7, "font-weight": 700 });
+            card.append(svgEl("circle", { cx: boxX + 7, cy: lineY - 1, r: 2, fill: OTHER_PARTIES[entry.party].color }));
+            const label = svgEl("text", { x: boxX + 12, y: lineY + 2, fill: "#e8f0fa", "font-size": 7, "font-weight": 700, style: 'font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' });
+            label.textContent = `${OTHER_PARTIES[entry.party].label} ${formatPercent(entry.value, false, true)}`;
+            card.append(label);
           });
+          otherPartyCards.push(card);
         }
       }
       const electionValue = Number(state.data.elections?.[item.region]?.values?.[party] || 0);
       const delta = value - electionValue;
       if (state.showSinceElection) text(formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
     });
+    page.append(...otherPartyLinks, ...otherPartyCards);
     if (state.showSinceElection) text("Seit Wahl*", { x: plot.left - 5, y: plot.bottom + 19, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8, "font-weight": 700 });
     let runStart = 0;
     while (runStart < cluster.bars.length) {
