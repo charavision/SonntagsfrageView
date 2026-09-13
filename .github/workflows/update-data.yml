@@ -3,7 +3,9 @@ name: Daten aktualisieren und Pages veröffentlichen
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 5 * * *"
+    # GitHub-Zeitpläne laufen in UTC. Je zwei Kandidaten decken deutsche
+    # Sommer- und Winterzeit ab; der Zeitzonen-Schritt lässt nur 00/12 Uhr durch.
+    - cron: "1 22,23,10,11 * * *"
   push:
     branches: [main]
 
@@ -20,15 +22,30 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      - name: Deutsche Ausführungszeit prüfen
+        id: local-time
+        shell: bash
+        run: |
+          hour="$(TZ=Europe/Berlin date +%H)"
+          if [[ "$hour" == "00" || "$hour" == "12" ]]; then
+            echo "scheduled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "scheduled=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: github.event_name != 'schedule' || steps.local-time.outputs.scheduled == 'true'
       - uses: actions/setup-python@v5
+        if: github.event_name != 'push' && (github.event_name != 'schedule' || steps.local-time.outputs.scheduled == 'true')
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
+      - if: github.event_name != 'push' && (github.event_name != 'schedule' || steps.local-time.outputs.scheduled == 'true')
+        run: pip install -r requirements.txt
       - name: Wahlrecht-Daten abrufen
+        if: github.event_name != 'push' && (github.event_name != 'schedule' || steps.local-time.outputs.scheduled == 'true')
         run: python scripts/update_data.py
       - name: Aktualisierte Daten speichern
+        if: github.event_name != 'push' && (github.event_name != 'schedule' || steps.local-time.outputs.scheduled == 'true')
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -37,9 +54,12 @@ jobs:
           git pull --rebase origin main
           git push
       - uses: actions/configure-pages@v5
+        if: github.event_name != 'schedule' || steps.local-time.outputs.scheduled == 'true'
         with:
           enablement: true
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'schedule' || steps.local-time.outputs.scheduled == 'true'
         with:
           path: .
       - uses: actions/deploy-pages@v4
+        if: github.event_name != 'schedule' || steps.local-time.outputs.scheduled == 'true'
