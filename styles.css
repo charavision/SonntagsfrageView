@@ -960,6 +960,26 @@ body.preview-split-active.view-fullscreen-active .fullscreen-help,
 body.preview-split-active.view-fullscreen-active .ui-scale-toggle,
 body.preview-split-active.view-fullscreen-active .project-picker-toggle,
 body.preview-split-active.view-fullscreen-active .view-zoom-controls { margin-right: calc(100vw - var(--preview-split-x, 56vw)); }
+body.preview-split-active.view-fullscreen-active .ui-scale-panel {
+  right: calc(100vw - var(--preview-split-x, 56vw) + 8px);
+  max-width: calc(var(--preview-split-x, 56vw) - 24px);
+}
+body.preview-split-active.view-fullscreen-active .chart-section .chart-view-settings {
+  right: auto;
+  left: calc(var(--preview-split-x, 56vw) / 2);
+  max-width: calc(var(--preview-split-x, 56vw) - 72px);
+  transform: translateX(-50%);
+}
+body.preview-split-active.view-fullscreen-active.fullscreen-selection-open main > .controls {
+  right: calc(100vw - var(--preview-split-x, 56vw) + 62px);
+  left: 62px;
+  width: auto;
+}
+body.preview-split-active.view-fullscreen-active.fullscreen-output-open main > .outputs {
+  right: calc(100vw - var(--preview-split-x, 56vw) + 62px);
+  left: 62px;
+  width: auto;
+}
 @media (max-width: 900px) {
   .preview-split-toggle { display: none !important; }
 }
