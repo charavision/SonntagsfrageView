@@ -61,8 +61,11 @@ body.intro-running.intro-reveal main { opacity: 1; transition: opacity .9s ease;
 .report-app-row button { min-height: 36px; padding: 7px 18px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
 .report-app-row span, #android-app-message { color: var(--muted); font-size: 12px; }
 #android-intro-update-row { justify-content: flex-start; padding-top: 0; }
-.helper-app-access-setting { margin: 0 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-.helper-app-access-setting label { width: 100%; }
+.helper-feature-toggle { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.helper-feature-toggle[hidden], .helper-feature-locked[hidden] { display: none !important; }
+.helper-feature-toggle input { width: 15px; height: 15px; accent-color: var(--accent); }
+.helper-feature-locked { margin-left: auto; color: #91a4ba; font-size: 11px; }
+.report-app-row.is-helper-locked button { border-color: #526075; background: #252d39; box-shadow: none; color: #8492a5; cursor: not-allowed; filter: grayscale(1); opacity: .62; }
 .edda-thanks { position: fixed; width: 100vw; max-width: none; height: 100vh; max-height: none; margin: 0; padding: 0; border: 0; inset: 0; place-content: center; justify-items: center; overflow: hidden; pointer-events: none; background: radial-gradient(circle, rgba(12,40,75,.58), rgba(2,8,20,.2) 48%, transparent 72%); color: var(--ink); }
 .edda-thanks[open] { display: grid; }
 .edda-thanks::backdrop { background: rgba(1,7,15,.2); backdrop-filter: blur(2px); }
@@ -552,7 +555,7 @@ body.view-fullscreen-active .fullscreen-report-tools .view-switch { margin-top: 
 .bar-delta { font-size: 10px; font-weight: 800; }
 .bar-delta.positive { fill: #63e6a6; }
 .bar-delta.negative { fill: #ff8b9b; }
-.new-label { fill: #fff; font-size: 9px; letter-spacing: .08em; }
+.new-label { fill: #63e6a6; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
 .region-label { fill: #fff; font-size: 11px; font-weight: 900; letter-spacing: .05em; }
 .empty-state { padding: 80px 20px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); text-align: center; }
 .outputs { display: flex; align-items: center; flex-direction: column; gap: 10px; margin-top: 18px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: rgba(10,24,45,.72); }

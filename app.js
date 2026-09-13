@@ -1064,23 +1064,26 @@ function render(animate = true) {
           old ? animateX(detailGroup, old.center, x + barWidth / 2, motionEnabled) : fadeIn(detailGroup, motionEnabled, newLabelDelay);
         }
       }
+      const valueLabelY = Math.max(margin.top - 9, y - 10);
+      if (state.showSinceElection && state.pollTimeMode === "current" && isNew) {
+        const newLabel = svgEl("text", { x: x + barWidth / 2, y: state.showPercentValues ? valueLabelY - 13 : valueLabelY, "text-anchor": "middle", class: "new-label" });
+        newLabel.textContent = "NEW";
+        els.chart.append(newLabel);
+        old ? animateX(newLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(newLabel, motionEnabled, newLabelDelay);
+      }
       if (state.showPercentValues) {
-        const valueLabel = svgEl("text", { x: x + barWidth / 2, y: Math.max(margin.top - 9, y - 10), "text-anchor": "middle", class: "bar-value" });
+        const valueLabel = svgEl("text", { x: x + barWidth / 2, y: valueLabelY, "text-anchor": "middle", class: "bar-value" });
         const percentText = formatPercent(value, false, compact);
         valueLabel.textContent = `${item.average ? "Ø " : ""}${state.percentLabelMode === "with" ? percentText : percentText.replace(" %", "")}`;
         els.chart.append(valueLabel);
         old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       }
       if (state.showSinceElection) {
-        const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${state.sinceElectionMode === "gray" ? "gray" : delta >= 0 ? "positive" : "negative"}` });
+        const historical = state.pollTimeMode !== "current";
+        const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${historical || state.sinceElectionMode === "gray" ? "gray" : delta >= 0 ? "positive" : "negative"}` });
         const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
-        deltaLine.textContent = formatPercent(delta, true);
+        deltaLine.textContent = historical ? "−" : formatPercent(delta, true);
         deltaLabel.append(deltaLine);
-        if (isNew) {
-          const newLine = svgEl("tspan", { x: x + barWidth / 2, dy: 13, class: "new-label" });
-          newLine.textContent = "NEW";
-          deltaLabel.append(newLine);
-        }
         els.chart.append(deltaLabel);
         old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, newLabelDelay);
       }
@@ -1714,7 +1717,11 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
     const column = index % columns, row = Math.floor(index / columns);
     const x = left + column * (tileWidth + gapX), y = top + row * (tileHeight + gapY);
     text(cluster.title, { x: x + 16, y: y + 27, fill: "#dce8f7", "font-size": 18, "font-weight": 800 });
-    text(minuteStamp, { x: x + 16, y: y + 43, fill: "#8fa6c1", "font-size": 10.7 });
+    const newestClusterPoll = cluster.bars.map(bar => bar.item.poll).filter(Boolean).sort((left, right) => String(right.date).localeCompare(String(left.date)))[0];
+    const clusterStamp = state.pollTimeMode === "current"
+      ? minuteStamp
+      : `${newestClusterPoll ? formatDate(newestClusterPoll.date) : "–"} · (historisch)`;
+    text(clusterStamp, { x: x + 16, y: y + 43, fill: "#8fa6c1", "font-size": 10.7 });
     const splitClusterRow = Boolean(layout.splitLargeCluster);
     const showSideLegend = Boolean(splitClusterRow && cluster.continuation);
     const fullRowPlotWidth = tileWidth - 52;
@@ -1885,9 +1892,15 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         }));
       }
       page.append(svgEl("rect", { x: barX, y: barY, width: barWidth, height: barHeight, rx: state.barNeon ? 2 : 0, fill: frontColor, "fill-opacity": state.barNeon ? fillOpacity : (item.average || item.rank === 0 ? 1 : fillOpacity), stroke: state.barNeon ? visual.stroke : "#f4f7fb", "stroke-opacity": state.barNeon ? strokeOpacity : .12, "stroke-width": state.barNeon ? 1.5 : .01 }));
+      const election = state.data.elections?.[item.region];
+      const isNew = !election?.represented?.includes(party) && value >= 5 && party !== "Sonstige";
+      const percentLabelY = Math.max(plot.top + 8, barY - 5);
+      if (state.showSinceElection && state.pollTimeMode === "current" && isNew) {
+        text("NEW", { x: barX + barWidth / 2, y: state.showPercentValues ? percentLabelY - 10 : percentLabelY, "text-anchor": "middle", fill: "#63e6a6", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 800, "letter-spacing": ".08em" });
+      }
       if (state.showPercentValues) {
         const percentText = formatPercent(value, false, true);
-        text(`${item.average ? "Ø " : ""}${state.percentLabelMode === "with" ? percentText : percentText.replace(" %", "")}`, { x: barX + barWidth / 2, y: Math.max(plot.top + 8, barY - 5), "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
+        text(`${item.average ? "Ø " : ""}${state.percentLabelMode === "with" ? percentText : percentText.replace(" %", "")}`, { x: barX + barWidth / 2, y: percentLabelY, "text-anchor": "middle", fill: "#f4f8ff", "font-size": cluster.bars.length > 18 ? 6 : 8, "font-weight": 700 });
       }
       if (party === "Sonstige" && state.otherParties.size) {
         const extraValues = selectedOtherPartyValues(item.poll);
@@ -1901,7 +1914,6 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
           const barCenterX = barX + barWidth / 2;
           const boxX = barCenterX - boxWidth / 2;
           const boxY = Math.max(plot.top + 2, sonstigeTop - stackHeight - (state.showPercentValues ? 18 : 7) + annotationIndex * slotHeight);
-          const percentLabelY = Math.max(plot.top + 8, barY - 5);
           const lineEndY = Math.max(boxY + boxHeight + 2, percentLabelY - 9);
           otherPartyLinks.push(svgEl("path", {
             d: `M ${barCenterX} ${boxY + boxHeight} L ${barCenterX} ${lineEndY}`,
@@ -1921,7 +1933,10 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       }
       const electionValue = Number(state.data.elections?.[item.region]?.values?.[party] || 0);
       const delta = value - electionValue;
-      if (state.showSinceElection) text(formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
+      if (state.showSinceElection) {
+        const historical = state.pollTimeMode !== "current";
+        text(historical ? "−" : formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: historical || state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
+      }
     });
     page.append(...otherPartyLinks, ...otherPartyCards);
     if (state.showSinceElection) text("Seit Wahl*", { x: plot.left - 5, y: plot.bottom + 19, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8, "font-weight": 700 });
@@ -2207,6 +2222,23 @@ function installPreviewGestures() {
   surface.addEventListener("pointercancel", release);
 }
 
+function applyHelperFeatureAccess() {
+  document.querySelectorAll("#report-app [data-helper-feature]").forEach(row => {
+    const key = row.dataset.helperFeature;
+    const toggle = row.querySelector(".helper-feature-toggle");
+    const input = toggle?.querySelector("input");
+    const locked = row.querySelector(".helper-feature-locked");
+    const button = row.querySelector("button");
+    const isAdmin = currentReportRole === "Admin";
+    const enabled = helperFeatureEnabled(key);
+    if (toggle) toggle.hidden = !isAdmin;
+    if (input) input.checked = enabled;
+    if (locked) locked.hidden = isAdmin || enabled;
+    row.classList.toggle("is-helper-locked", !isAdmin && !enabled);
+    if (button) button.disabled = !isAdmin && !enabled;
+  });
+}
+
 async function loadAppRelease() {
   const version = document.querySelector("#android-app-version");
   const reportVersion = document.querySelector("#report-current-version");
@@ -2222,6 +2254,7 @@ async function loadAppRelease() {
   appButton.textContent = runsInAndroidApp ? "Update App" : "Android";
   macButton.textContent = runsInMacApp ? "Update-App" : "macOS";
   introUpdateRow.hidden = !introUpdater;
+  applyHelperFeatureAccess();
   if (!introUpdateRow.hidden) {
     introUpdateButton.onclick = () => {
       message.textContent = "Intro und Weboberfläche werden aktualisiert …";
@@ -2264,9 +2297,8 @@ async function loadAppRelease() {
     reportVersion.textContent = `nicht verfügbar · ${currentPlatformLabel()}`;
     message.textContent = error.message;
   }
+  applyHelperFeatureAccess();
 }
-
-loadAppRelease();
 
 function buildExportPreview(preservePosition = false) {
   const scrollLeft = preservePosition ? els.previewPages.scrollLeft : 0;
@@ -2384,7 +2416,10 @@ const defaultDeveloperSettings = () => {
     mobile: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: developerDefaultValue(key, "mobile") }])),
     desktop: Object.fromEntries(developerFeatures.map(([key]) => [key, { visible: true, value: developerDefaultValue(key, "desktop") }]))
   };
-  ["mobile", "desktop"].forEach(platform => { defaults[platform].helperAppAccess = { visible: false, value: false }; });
+  ["mobile", "desktop"].forEach(platform => {
+    defaults[platform].helperAppAccess = { visible: false, value: false };
+    ["helperAndroidAccess", "helperMacAccess", "helperIntroAccess"].forEach(key => { defaults[platform][key] = { visible: false, value: false }; });
+  });
   return defaults;
 };
 let developerSettings = defaultDeveloperSettings();
@@ -2396,6 +2431,9 @@ const completeDeveloperSettings = input => {
   }));
   ["mobile", "desktop"].forEach(platform => {
     if (input?.[platform]?.helperAppAccess) defaults[platform].helperAppAccess = input[platform].helperAppAccess;
+    ["helperAndroidAccess", "helperMacAccess", "helperIntroAccess"].forEach(key => {
+      if (input?.[platform]?.[key]) defaults[platform][key] = input[platform][key];
+    });
   });
   if (!input?.mobile?.tabMode || !input?.desktop?.tabMode) {
     try {
@@ -2415,10 +2453,17 @@ const completeDeveloperSettings = input => {
       if (typeof local === "boolean") ["mobile", "desktop"].forEach(platform => { defaults[platform].helperAppAccess.value = local; });
     } catch (error) { /* Ungültige lokale Einstellung ignorieren. */ }
   }
+  try {
+    const local = JSON.parse(localStorage.getItem("helper-feature-access") || "null");
+    if (local) ["mobile", "desktop"].forEach(platform => ["helperAndroidAccess", "helperMacAccess", "helperIntroAccess"].forEach(key => {
+      if (!input?.[platform]?.[key] && typeof local[key] === "boolean") defaults[platform][key].value = local[key];
+    }));
+  } catch (error) { /* Ungültige lokale Einstellung ignorieren. */ }
   return defaults;
 };
 
-const helperAppAccessEnabled = () => Boolean(developerSettings.mobile.helperAppAccess?.value || developerSettings.desktop.helperAppAccess?.value);
+const helperFeatureEnabled = key => Boolean(developerSettings.mobile[key]?.value || developerSettings.desktop[key]?.value);
+loadAppRelease();
 
 async function fetchDeveloperSettings(force = false) {
   if (force) publicDeveloperSettingsPromise = null;
@@ -2618,7 +2663,7 @@ function saveDeveloperSettings() {
       const pending = structuredClone(developerSettings);
       localStorage.setItem("developer-tab-mode", JSON.stringify({ mobile: pending.mobile.tabMode.value, desktop: pending.desktop.tabMode.value }));
       localStorage.setItem("developer-fullscreen-default", JSON.stringify({ mobile: pending.mobile.fullscreenDefault.value, desktop: pending.desktop.fullscreenDefault.value }));
-      localStorage.setItem("helper-app-access", JSON.stringify(Boolean(pending.mobile.helperAppAccess.value || pending.desktop.helperAppAccess.value)));
+      localStorage.setItem("helper-feature-access", JSON.stringify(Object.fromEntries(["helperAndroidAccess", "helperMacAccess", "helperIntroAccess"].map(key => [key, Boolean(pending.mobile[key]?.value || pending.desktop[key]?.value)]))));
       const payload = await reportRequest("/settings/developer", { method: "PATCH", body: JSON.stringify({ settings: developerSettings }) });
       developerSettings = completeDeveloperSettings(payload.settings);
       if (!payload.settings?.mobile?.tabMode) developerSettings.mobile.tabMode = pending.mobile.tabMode;
@@ -2627,6 +2672,9 @@ function saveDeveloperSettings() {
       if (!payload.settings?.desktop?.fullscreenDefault) developerSettings.desktop.fullscreenDefault = pending.desktop.fullscreenDefault;
       if (!payload.settings?.mobile?.helperAppAccess) developerSettings.mobile.helperAppAccess = pending.mobile.helperAppAccess;
       if (!payload.settings?.desktop?.helperAppAccess) developerSettings.desktop.helperAppAccess = pending.desktop.helperAppAccess;
+      ["helperAndroidAccess", "helperMacAccess", "helperIntroAccess"].forEach(key => ["mobile", "desktop"].forEach(platform => {
+        if (!payload.settings?.[platform]?.[key]) developerSettings[platform][key] = pending[platform][key];
+      }));
       publicDeveloperSettingsPromise = Promise.resolve(developerSettings);
       message.textContent = "Einstellungen gespeichert.";
     } catch (error) { message.textContent = error.message; }
@@ -3623,11 +3671,8 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-info").hidden = true;
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
-        document.querySelector("#report-app-open").hidden = currentReportRole !== "Admin" && !helperAppAccessEnabled();
-        const helperAppAccessSetting = document.querySelector("#helper-app-access-setting");
-        const helperAppAccessToggle = document.querySelector("#helper-app-access");
-        helperAppAccessSetting.hidden = currentReportRole !== "Admin";
-        helperAppAccessToggle.checked = helperAppAccessEnabled();
+        document.querySelector("#report-app-open").hidden = false;
+        applyHelperFeatureAccess();
         const developerTab = document.querySelector("#report-developer-open");
         developerTab.setAttribute("aria-label", currentReportRole === "Admin" ? "Mastereinstellungen" : "Mastereinstellungen ansehen");
         document.querySelector("#report-logout").hidden = false;
@@ -3688,13 +3733,15 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       if (!toggleReportTab(document.querySelector("#report-app-open"))) return;
       loadAppRelease();
     });
-    document.querySelector("#helper-app-access").addEventListener("change", event => {
+    document.querySelectorAll("#report-app [data-helper-feature] .helper-feature-toggle input").forEach(input => input.addEventListener("change", event => {
       if (currentReportRole !== "Admin") return;
+      const key = event.currentTarget.closest("[data-helper-feature]").dataset.helperFeature;
       const enabled = event.currentTarget.checked;
-      ["mobile", "desktop"].forEach(platform => { developerSettings[platform].helperAppAccess = { visible: false, value: enabled }; });
-      localStorage.setItem("helper-app-access", JSON.stringify(enabled));
+      ["mobile", "desktop"].forEach(platform => { developerSettings[platform][key] = { visible: false, value: enabled }; });
+      localStorage.setItem("helper-feature-access", JSON.stringify(Object.fromEntries(["helperAndroidAccess", "helperMacAccess", "helperIntroAccess"].map(feature => [feature, helperFeatureEnabled(feature)]))));
+      applyHelperFeatureAccess();
       saveDeveloperSettings();
-    });
+    }));
     document.querySelector("#report-book-open").addEventListener("click", () => toggleReportTab(document.querySelector("#report-book-open")));
     document.querySelector("#report-info-open").addEventListener("click", () => toggleReportTab(document.querySelector("#report-info-open")));
     document.querySelector("#report-projects-open").addEventListener("click", () => {
