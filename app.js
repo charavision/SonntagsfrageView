@@ -2640,7 +2640,11 @@ async function loadReportAccounts() {
       const panel = document.createElement("div"); panel.className = "report-account-projects";
       row.append(panel);
       try {
-        const projects = account.projects || [];
+        let projects = account.projects || [];
+        if (!projects.length && account.workName === currentReportIdentity?.work) {
+          const ownProjects = await reportRequest(`/projects?update=${Date.now()}`, { cache: "no-store" });
+          projects = ownProjects.projects || [];
+        }
         panel.replaceChildren();
         if (!projects.length) {
           const empty = document.createElement("p"); empty.className = "report-empty"; empty.textContent = "Keine gespeicherten Projekte."; panel.append(empty);
