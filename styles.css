@@ -1026,12 +1026,8 @@ body.preview-split-active.view-fullscreen-active.fullscreen-output-open main > .
   body.view-fullscreen-active.fullscreen-selection-open .tab-average-control { padding: 12px 0 0; border-top: 1px solid rgba(75,109,150,.65); border-left: 0; }
 }
 
-@media (min-width: 901px) {
-  body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .tab-grouping {
-    position: sticky;
-    z-index: 2;
-    bottom: -18px;
-    padding-bottom: 14px;
-    background: linear-gradient(180deg, rgba(7,19,38,.3), rgba(7,19,38,.98) 24%);
-  }
+body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .tab-grouping {
+  position: static;
+  padding-bottom: 0;
+  background: none;
 }
