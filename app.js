@@ -1213,7 +1213,7 @@ function render(animate = true) {
   const regionLabelY = margin.top + innerH + (needsVerticalRegionNames
     ? (compact ? regionSpace * .55 + 26 : regionSpace + 26)
     : 48) + sinceElectionOffset + bracketOffset;
-  const regionNameY = regionLabelY - (!compact && regionFirst && (needsVerticalRegionNames || state.regionLabelMode === "90") ? 18 : 0);
+  const regionNameY = regionLabelY - (!compact && regionFirst && (needsVerticalRegionNames || state.regionLabelMode === "90") ? 46 : 0);
   const partyLabelY = compact && needsVerticalRegionNames
     ? margin.top + innerH + regionSpace + 28 + nestedPartyOffset + sinceElectionOffset + bracketOffset
     : margin.top + innerH + 48 + regionSpace + (compact ? 22 : 18) + nestedPartyOffset + sinceElectionOffset + bracketOffset;
