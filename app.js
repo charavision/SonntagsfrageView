@@ -1213,13 +1213,14 @@ function render(animate = true) {
   const regionLabelY = margin.top + innerH + (needsVerticalRegionNames
     ? (compact ? regionSpace * .55 + 26 : regionSpace + 26)
     : 48) + sinceElectionOffset + bracketOffset;
+  const regionNameY = regionLabelY - (!compact && regionFirst && (needsVerticalRegionNames || state.regionLabelMode === "90") ? 18 : 0);
   const partyLabelY = compact && needsVerticalRegionNames
     ? margin.top + innerH + regionSpace + 28 + nestedPartyOffset + sinceElectionOffset + bracketOffset
     : margin.top + innerH + 48 + regionSpace + (compact ? 22 : 18) + nestedPartyOffset + sinceElectionOffset + bracketOffset;
   const regionLabel = bar => state.fullRegionNames ? bar.region : REGION_CODES[bar.region] || bar.region;
   const partyLabel = bar => bar.party === "CDU/CSU" && selectedRegions.length > 1 ? "CDU/CSU" : partyDisplayLabel(bar.party, bar.region, bar.item.poll);
   if (state.showLabels) {
-    appendGroupedLabels(regionFirst ? regionLabel : partyLabel, regionLabelY, regionFirst ? "region-label" : "party-label", regionFirst ? "region" : "party");
+    appendGroupedLabels(regionFirst ? regionLabel : partyLabel, regionFirst ? regionNameY : regionLabelY, regionFirst ? "region-label" : "party-label", regionFirst ? "region" : "party");
     appendGroupedLabels(regionFirst ? partyLabel : regionLabel, partyLabelY, regionFirst ? "party-label" : "region-label", regionFirst ? "party" : "region");
   }
   const legendX = compact ? margin.left / 2 : margin.left - 10;
