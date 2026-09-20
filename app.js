@@ -248,6 +248,14 @@ function updateConfigurationCode() {
   return code;
 }
 
+function configurationShareUrl() {
+  const url = window.location.protocol === "http:" || window.location.protocol === "https:"
+    ? new URL(window.location.origin + window.location.pathname)
+    : new URL("https://charavision.github.io/SonntagsfrageView/");
+  url.searchParams.set("config", configurationCode());
+  return url.toString();
+}
+
 function makeChoice(container, group, value, checked, color, code, nextElection, displayLabel) {
   const wrap = document.createElement("div");
   wrap.className = `choice ${group.includes("party") ? "party-choice" : ""} ${group === "region" ? "region-choice" : ""}`;
@@ -3255,6 +3263,15 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     if (startsMobile) document.querySelector("#chart-view-settings").hidden = true;
     updateHeaderTimestamp(data);
     buildControls();
+    const sharedConfiguration = new URLSearchParams(window.location.search).get("config");
+    if (sharedConfiguration) {
+      try {
+        applyConfigurationCode(sharedConfiguration, { nativeLayout: true });
+        els.codeMessage.textContent = "Geteilte Konfiguration übernommen.";
+      } catch (error) {
+        els.codeMessage.textContent = `Geteilter Link ungültig: ${error.message}`;
+      }
+    }
     updateComparisonButtons();
     updateElectionVisibility();
     updatePollOptions(true);
@@ -3973,6 +3990,14 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#preview-a4-orientation").addEventListener("click", cycleA4Orientation);
     document.querySelector("#preview-a4-format").addEventListener("click", cycleA4DiagramFormat);
     document.querySelector("#preview-download").addEventListener("click", () => document.querySelector("#export-file").click());
+    document.querySelector("#copy-config-link").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(configurationShareUrl());
+        els.exportMessage.textContent = "Link kopiert.";
+      } catch (error) {
+        els.exportMessage.textContent = "Link konnte nicht kopiert werden.";
+      }
+    });
     document.querySelector("#export-file").addEventListener("click", () => {
       const format = exportFormat.value;
       if (format === "pdf" && !state.a4Mode) { state.a4Mode = true; a4Mode.checked = true; updateA4Controls(); render(false); }
