@@ -972,7 +972,7 @@ function render(animate = true) {
     perspectiveFloorLines.length = 0;
     perspectiveFloorRows.length = 0;
   }
-  if (backgroundVisible) els.chart.append(floor);
+  if (backgroundVisible && (!compact || use3dGrid)) els.chart.append(floor);
 
   let yAxisLayer = null;
   if (state.showLut) {
