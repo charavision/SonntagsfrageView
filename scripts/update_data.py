@@ -185,9 +185,14 @@ def extract_election_result(url: str) -> dict:
             value_text = clean(cell.get_text(" ", strip=True))
             texts.extend([value_text] * int(cell.get("colspan", 1)))
         values = {party: 0.0 for party in PARTIES}
+        recognized_values = 0
         for index, party in enumerate(headers):
             if party and index < len(texts):
-                values[party] = number(texts[index])
+                if re.search(r"\d+(?:[,.]\d+)?\s*%", texts[index]):
+                    values[party] = number(texts[index])
+                    recognized_values += 1
+        if recognized_values < 2:
+            continue
         return {"date": next((iso_date(t) for t in texts if iso_date(t)), None), "values": values}
     return {"date": None, "values": {party: 0.0 for party in PARTIES}}
 
