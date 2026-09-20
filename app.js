@@ -598,13 +598,13 @@ function changeValueFor(item, party) {
 }
 
 function changeLegend() {
-  return state.changeMode === "development" ? "Entwicklung" : "Seit Wahl*";
+  return state.changeMode === "development" ? "Entwicklung*" : "Seit Wahl*";
 }
 
 const labelModeOptions = {
   rotation: [["0", "0°"], ["90", "90°"], ["auto", "Auto"], ["off", "Aus"]],
   percent: [["with", "Mit %"], ["without", "Ohne %"], ["off", "Aus"]],
-  change: [["election", "Seit Wahl"], ["development", "Entwicklung"]],
+  change: [["election", "Seit Wahl*"], ["development", "Entwicklung*"], ["off", "Aus"]],
   since: [["color", "Farbig"], ["gray", "Grau"]]
 };
 const a4OrientationOptions = [["auto", "Auto"], ["portrait", "Hochkant"], ["landscape", "Horizontal"]];
@@ -673,7 +673,7 @@ function setCycleButton(button, value, options) {
 function setLabelsEnabled(enabled) {
   state.showLabels = Boolean(enabled);
   if (els?.showLabels) els.showLabels.checked = state.showLabels;
-  state.showSinceElection = state.showLabels;
+  state.showSinceElection = state.showLabels && state.changeMode !== "off";
   if (els?.showSinceElection) els.showSinceElection.checked = state.showSinceElection;
 }
 function advanceCycleButton(button, options) {
@@ -802,8 +802,9 @@ function setViewScale(axis, next) {
 function render(animate = true) {
   scheduleOpenPreviewRefresh();
   applyViewMode();
-  setCycleButton(els.changeMode, state.changeMode, labelModeOptions.change);
+  setCycleButton(els.changeMode, state.showSinceElection ? state.changeMode : "off", labelModeOptions.change);
   setCycleButton(els.sinceElectionMode, state.sinceElectionMode, labelModeOptions.since);
+  els.changeMode.closest(".change-options-group")?.classList.toggle("is-off", !state.showSinceElection);
   updateSelectionOrderBadges();
   const backgroundVisible = state.showLut && state.showBackground;
   els.chartSection.classList.toggle("mobile-view", state.mobileView);
@@ -970,9 +971,8 @@ function render(animate = true) {
   if (!use3dGrid) {
     perspectiveFloorLines.length = 0;
     perspectiveFloorRows.length = 0;
-  } else {
-    els.chart.append(floor);
   }
+  if (backgroundVisible) els.chart.append(floor);
 
   let yAxisLayer = null;
   if (state.showLut) {
@@ -1479,8 +1479,9 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   setCycleButton(els.regionLabelMode, state.regionLabelMode, labelModeOptions.rotation);
   setCycleButton(els.partyLabelMode, state.partyLabelMode, labelModeOptions.rotation);
   setCycleButton(els.percentLabelMode, state.showPercentValues ? state.percentLabelMode : "off", labelModeOptions.percent);
-  setCycleButton(els.changeMode, state.changeMode, labelModeOptions.change);
+  setCycleButton(els.changeMode, state.showSinceElection ? state.changeMode : "off", labelModeOptions.change);
   setCycleButton(els.sinceElectionMode, state.sinceElectionMode, labelModeOptions.since);
+  els.changeMode.closest(".change-options-group")?.classList.toggle("is-off", !state.showSinceElection);
   els.showBarColors.checked = state.barColors;
   setCycleButton(els.barColorMode, state.barColorMode, [["party", "Parteifarben"], ["lightblue", "Hellblau"], ["gray", "Grau"]]);
   setCycleButton(els.barNeonMode, state.barNeon ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
@@ -1783,7 +1784,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const regionsY = partyY + 70;
   headerLegend(partyX, regionsY, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 3, rightLegendWidth / 3);
   const regionLegendRows = Math.ceil(selectedRegions.length / 3);
-  if (state.showSinceElection && state.changeMode === "election") text("* = Differenz seit der letzten Wahl", { x: partyX, y: regionsY + 31 + regionLegendRows * 12, fill: "#8fa6c1", "font-size": 8 });
+  if (state.showSinceElection) text(state.changeMode === "development" ? "* = Entwicklung seit der letzten Umfrage" : "* = Differenz seit der letzten Wahl", { x: partyX, y: regionsY + 31 + regionLegendRows * 12, fill: "#8fa6c1", "font-size": 8 });
   const gapX = 18, gapY = 18, left = 42;
   const standardTop = Math.max(landscapeHeader ? 265 : 300, regionsY + 62 + regionLegendRows * 12);
   const top = layout.splitLargeCluster ? Math.max(245, standardTop - 42) : standardTop;
@@ -2618,6 +2619,7 @@ function applyDeveloperSettings() {
   setVisible("#region-label-mode", settings.regionLabelMode.visible);
   setVisible("#party-label-mode", settings.partyLabelMode.visible);
   setVisible("#percent-label-mode", settings.percentLabelMode.visible && settings.percentValues.visible);
+  setVisible(".change-options-group", settings.sinceElection.visible);
   setVisible("#change-mode", settings.sinceElectionMode.visible && settings.sinceElection.visible);
   setVisible("#since-election-mode", settings.sinceElectionMode.visible && settings.sinceElection.visible);
   setVisible(".bar-colors-choice", settings.barColors.visible);
@@ -3357,9 +3359,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     els.changeMode.addEventListener("click", event => {
       if (!state.showLabels) return;
-      state.changeMode = advanceCycleButton(event.currentTarget, labelModeOptions.change);
-      state.showSinceElection = true;
-      els.showSinceElection.checked = true;
+      const nextMode = advanceCycleButton(event.currentTarget, labelModeOptions.change);
+      state.showSinceElection = nextMode !== "off";
+      if (state.showSinceElection) state.changeMode = nextMode;
+      els.showSinceElection.checked = state.showSinceElection;
       render(false);
     });
     els.sinceElectionMode.addEventListener("click", event => {
