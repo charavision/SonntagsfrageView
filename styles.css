@@ -516,6 +516,8 @@ body.view-fullscreen-active .fullscreen-report-tools button { justify-self: star
 body.view-fullscreen-active .fullscreen-report-tools small { grid-column: 1; }
 body.view-fullscreen-active .fullscreen-report-tools .view-switch { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
 .chart-scroll { position: relative; overflow-x: auto; overscroll-behavior-inline: contain; padding-bottom: 12px; border: 0; border-radius: 24px; background: radial-gradient(circle at 50% 18%, rgba(42,103,164,.28), transparent 42%), linear-gradient(160deg, #172744 0%, #081326 70%, #050d1b 100%); box-shadow: 0 0 42px rgba(6,16,32,.72), 0 24px 70px rgba(8,19,38,.18); }
+.view-gesture-status { position: absolute; z-index: 12; top: 18px; left: 50%; padding: 8px 13px; border: 1px solid rgba(89,217,255,.72); border-radius: 999px; background: rgba(7,19,38,.82); color: #eaf3ff; box-shadow: 0 8px 24px rgba(0,0,0,.3); opacity: 0; pointer-events: none; transform: translate(-50%, -8px); transition: opacity .18s ease, transform .18s ease; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.view-gesture-status.visible { opacity: 1; transform: translate(-50%, 0); }
 .view-zoom-controls { position: absolute; z-index: 4; top: 56px; right: 10px; display: grid; grid-template-columns: repeat(3, 33px); grid-template-rows: repeat(3, 33px); width: 103px; gap: 2px; }
 .view-zoom-controls[hidden] { display: none; }
 .view-zoom-controls button { display: grid; width: 33px; height: 33px; padding: 0; place-items: center; border: 1px solid #6682a5; border-radius: 9px; background: linear-gradient(145deg, #244a70, #0b213b); box-shadow: inset 1px 1px 1px rgba(255,255,255,.16), inset -2px -2px 4px rgba(0,0,0,.38), 0 3px 8px rgba(0,0,0,.28); color: #fff; cursor: pointer; font-size: 22px; font-weight: 800; line-height: 1; }
@@ -912,6 +914,7 @@ body.view-fullscreen-active .fullscreen-logo small,
   .average-symbol { font-size: 22px; }
   .chart-section { padding-right: 8px; padding-left: 8px; }
   .chart-scroll {
+    touch-action: pan-x pan-y;
     border-radius: 18px;
     background-image: url("mobile-grid.svg"), radial-gradient(circle at 50% 18%, rgba(42,103,164,.28), transparent 42%), linear-gradient(160deg, #172744 0%, #081326 70%, #050d1b 100%);
     background-position: center var(--mobile-floor-y, 329px), center, center;

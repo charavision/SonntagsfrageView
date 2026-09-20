@@ -807,6 +807,85 @@ function setViewScale(axis, next) {
   render(false);
 }
 
+let viewGestureStatusTimer;
+function showViewGestureStatus(axis = "both") {
+  let status = document.querySelector("#view-gesture-status");
+  if (!status) {
+    status = document.createElement("div");
+    status.id = "view-gesture-status";
+    status.className = "view-gesture-status";
+    document.querySelector(".chart-view-frame")?.append(status);
+  }
+  const width = Math.round(currentViewScale("x") * 100);
+  const height = Math.round(currentViewScale("y") * 100);
+  status.textContent = axis === "x" ? `Breite ${width} %` : axis === "y" ? `Höhe ${height} %` : `Breite ${width} % · Höhe ${height} %`;
+  status.classList.add("visible");
+  clearTimeout(viewGestureStatusTimer);
+  viewGestureStatusTimer = setTimeout(() => status.classList.remove("visible"), 900);
+}
+
+function setGestureViewScales(nextX, nextY, axis = "both") {
+  const platform = state.mobileView ? "mobile" : "desktop";
+  state.viewScales[platform].x = Math.max(.4, Math.min(3, Math.round(nextX * 10) / 10));
+  state.viewScales[platform].y = Math.max(.6, Math.min(1.8, Math.round(nextY * 10) / 10));
+  localStorage.setItem("view-scales", JSON.stringify(state.viewScales));
+  render(false);
+  showViewGestureStatus(axis);
+}
+
+function installViewScaleGestures() {
+  const surface = els.scroll;
+  if (!surface) return;
+  let touchGesture = null;
+  const touchDistances = touches => ({
+    x: Math.max(1, Math.abs(touches[0].clientX - touches[1].clientX)),
+    y: Math.max(1, Math.abs(touches[0].clientY - touches[1].clientY))
+  });
+  surface.addEventListener("touchstart", event => {
+    if (!state.viewSizeEnabled || !state.viewZoomEnabled || event.touches.length !== 2) return;
+    const distance = touchDistances(event.touches);
+    touchGesture = { ...distance, scaleX: currentViewScale("x"), scaleY: currentViewScale("y") };
+    event.preventDefault();
+  }, { passive: false });
+  surface.addEventListener("touchmove", event => {
+    if (!touchGesture || event.touches.length !== 2) return;
+    event.preventDefault();
+    const distance = touchDistances(event.touches);
+    const ratioX = distance.x / touchGesture.x;
+    const ratioY = distance.y / touchGesture.y;
+    const changeX = Math.abs(Math.log(ratioX));
+    const changeY = Math.abs(Math.log(ratioY));
+    if (Math.max(changeX, changeY) < .035) return;
+    if (changeX >= changeY) setGestureViewScales(touchGesture.scaleX * ratioX, currentViewScale("y"), "x");
+    else setGestureViewScales(currentViewScale("x"), touchGesture.scaleY * ratioY, "y");
+  }, { passive: false });
+  const endTouchGesture = event => { if (event.touches.length < 2) touchGesture = null; };
+  surface.addEventListener("touchend", endTouchGesture, { passive: true });
+  surface.addEventListener("touchcancel", () => { touchGesture = null; }, { passive: true });
+  surface.addEventListener("wheel", event => {
+    if (!event.ctrlKey || !state.viewSizeEnabled || !state.viewZoomEnabled) return;
+    event.preventDefault();
+    const factor = Math.exp(-event.deltaY * .012);
+    if (event.shiftKey) setGestureViewScales(currentViewScale("x") * factor, currentViewScale("y"), "x");
+    else if (event.altKey) setGestureViewScales(currentViewScale("x"), currentViewScale("y") * factor, "y");
+    else setGestureViewScales(currentViewScale("x") * factor, currentViewScale("y") * factor, "both");
+  }, { passive: false });
+  let trackpadGesture = null;
+  surface.addEventListener("gesturestart", event => {
+    if (!state.viewSizeEnabled || !state.viewZoomEnabled) return;
+    event.preventDefault();
+    trackpadGesture = { scaleX: currentViewScale("x"), scaleY: currentViewScale("y") };
+  }, { passive: false });
+  surface.addEventListener("gesturechange", event => {
+    if (!trackpadGesture || !Number.isFinite(event.scale)) return;
+    event.preventDefault();
+    if (event.shiftKey) setGestureViewScales(trackpadGesture.scaleX * event.scale, currentViewScale("y"), "x");
+    else if (event.altKey) setGestureViewScales(currentViewScale("x"), trackpadGesture.scaleY * event.scale, "y");
+    else setGestureViewScales(trackpadGesture.scaleX * event.scale, trackpadGesture.scaleY * event.scale, "both");
+  }, { passive: false });
+  surface.addEventListener("gestureend", () => { trackpadGesture = null; }, { passive: true });
+}
+
 function render(animate = true) {
   scheduleOpenPreviewRefresh();
   applyViewMode();
@@ -3503,6 +3582,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     els.viewSizeUp.addEventListener("click", () => setViewScale("y", currentViewScale("y") + .1));
     els.viewWidthDown.addEventListener("click", () => setViewScale("x", currentViewScale("x") - .2));
     els.viewWidthUp.addEventListener("click", () => setViewScale("x", currentViewScale("x") + .2));
+    installViewScaleGestures();
     document.querySelectorAll(".cluster-mode-button").forEach(button => button.addEventListener("click", event => {
       state.groupBy = event.currentTarget.dataset.group;
       render();
