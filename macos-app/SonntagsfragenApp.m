@@ -1,7 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
-static NSString * const AppVersion = @"1.0.19";
+static NSString * const AppVersion = @"1.0.20";
 static NSString * const WebsiteURL = @"https://charavision.github.io/SonntagsfrageView/";
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKUIDelegate, WKScriptMessageHandler>
@@ -16,7 +16,8 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
     configuration.websiteDataStore = WKWebsiteDataStore.defaultDataStore;
     [configuration.userContentController addScriptMessageHandler:self name:@"refreshIntro"];
     [configuration.userContentController addScriptMessageHandler:self name:@"installUpdate"];
-    NSString *bridge = @"window.MacApp={isSurfaceReady:function(){return true},refreshIntro:function(){window.webkit.messageHandlers.refreshIntro.postMessage(null)},installUpdate:function(url){window.webkit.messageHandlers.installUpdate.postMessage(url)}};";
+    [configuration.userContentController addScriptMessageHandler:self name:@"saveFile"];
+    NSString *bridge = @"window.MacApp={isSurfaceReady:function(){return true},refreshIntro:function(){window.webkit.messageHandlers.refreshIntro.postMessage(null)},installUpdate:function(url){window.webkit.messageHandlers.installUpdate.postMessage(url)},saveFile:function(filename,dataUrl){window.webkit.messageHandlers.saveFile.postMessage({filename:filename,dataUrl:dataUrl})}};";
     [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:bridge injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 
     self.webView = [[WKWebView alloc] initWithFrame:NSZeroRect configuration:configuration];
@@ -46,7 +47,35 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
     } else if ([message.name isEqualToString:@"installUpdate"] && [message.body isKindOfClass:NSString.class]) {
         NSString *address = (NSString *)message.body;
         if ([address hasPrefix:@"https://github.com/charavision/SonntagsfrageView/"]) [NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:address]];
+    } else if ([message.name isEqualToString:@"saveFile"] && [message.body isKindOfClass:NSDictionary.class]) {
+        [self saveFileFromPayload:(NSDictionary *)message.body];
     }
+}
+
+- (void)saveFileFromPayload:(NSDictionary *)payload {
+    NSString *filename = [payload[@"filename"] isKindOfClass:NSString.class] ? [payload[@"filename"] lastPathComponent] : @"Sonntagsfragen-Export";
+    NSString *dataURL = [payload[@"dataUrl"] isKindOfClass:NSString.class] ? payload[@"dataUrl"] : nil;
+    NSRange separator = [dataURL rangeOfString:@"," options:0];
+    if (!dataURL || separator.location == NSNotFound) return;
+    NSString *base64 = [dataURL substringFromIndex:separator.location + 1];
+    NSData *data = [[NSData alloc] initWithBase64EncodedString:base64 options:NSDataBase64DecodingIgnoreUnknownCharacters];
+    if (!data) return;
+
+    NSSavePanel *panel = NSSavePanel.savePanel;
+    panel.nameFieldStringValue = filename;
+    panel.canCreateDirectories = YES;
+    panel.extensionHidden = NO;
+    [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse result) {
+        if (result == NSModalResponseOK && panel.URL) {
+            NSError *error = nil;
+            if (![data writeToURL:panel.URL options:NSDataWritingAtomic error:&error]) {
+                NSAlert *alert = [NSAlert new];
+                alert.messageText = @"Datei konnte nicht gespeichert werden";
+                alert.informativeText = error.localizedDescription ?: @"Unbekannter Fehler";
+                [alert beginSheetModalForWindow:self.window completionHandler:nil];
+            }
+        }
+    }];
 }
 
 - (nullable WKWebView *)webView:(WKWebView *)webView createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration forNavigationAction:(WKNavigationAction *)navigationAction windowFeatures:(WKWindowFeatures *)windowFeatures {

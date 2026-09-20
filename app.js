@@ -1636,12 +1636,7 @@ async function exportChartImage(format = "jpeg") {
       blob => blob ? resolve(blob) : reject(new Error("Die Bildgröße konnte nicht verarbeitet werden.")),
       isPng ? "image/png" : "image/jpeg", isPng ? undefined : .94
     ));
-    const downloadUrl = URL.createObjectURL(imageBlob);
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = `sonntagsfragen-${configurationCode()}.${isPng ? "png" : "jpg"}`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    await downloadBlob(imageBlob, `sonntagsfragen-${configurationCode()}.${isPng ? "png" : "jpg"}`);
     els.exportMessage.textContent = `${exportWidth} × ${exportHeight} Pixel`;
   } finally {
     URL.revokeObjectURL(blobUrl);
@@ -2441,19 +2436,29 @@ async function exportA4(format) {
   if (format === "pdf") {
     const jpegs = [];
     for (const page of pages) jpegs.push(new Uint8Array(await (await rasterizeA4Page(page, "image/jpeg", .94, layout)).arrayBuffer()));
-    downloadBlob(pdfFromJpegs(jpegs, layout), `sonntagsfragen-${configurationCode()}.pdf`);
+    await downloadBlob(pdfFromJpegs(jpegs, layout), `sonntagsfragen-${configurationCode()}.pdf`);
   } else {
     for (let index = 0; index < pages.length; index += 1) {
       const mime = format === "jpeg" ? "image/jpeg" : "image/png";
       const extension = format === "jpeg" ? "jpg" : "png";
-      downloadBlob(await rasterizeA4Page(pages[index], mime, format === "jpeg" ? .94 : undefined, layout), `sonntagsfragen-${configurationCode()}-seite-${index + 1}.${extension}`);
+      await downloadBlob(await rasterizeA4Page(pages[index], mime, format === "jpeg" ? .94 : undefined, layout), `sonntagsfragen-${configurationCode()}-seite-${index + 1}.${extension}`);
       await new Promise(resolve => setTimeout(resolve, 180));
     }
   }
   els.exportMessage.textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"} erstellt`;
 }
 
-function downloadBlob(blob, filename) {
+async function downloadBlob(blob, filename) {
+  if (window.MacApp?.saveFile) {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("Die Datei konnte nicht vorbereitet werden."));
+      reader.readAsDataURL(blob);
+    });
+    window.MacApp.saveFile(filename, dataUrl);
+    return;
+  }
   const url = URL.createObjectURL(blob), link = document.createElement("a");
   link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1200);
 }
