@@ -1,12 +1,14 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
-static NSString * const AppVersion = @"1.0.20";
+static NSString * const AppVersion = @"1.0.21";
 static NSString * const WebsiteURL = @"https://charavision.github.io/SonntagsfrageView/";
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKUIDelegate, WKScriptMessageHandler>
 @property(nonatomic, strong) NSWindow *window;
 @property(nonatomic, strong) WKWebView *webView;
+@property(nonatomic, strong) NSMutableDictionary<NSString *, NSMutableData *> *saveTransfers;
+@property(nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *saveFilenames;
 @end
 
 @implementation AppDelegate
@@ -17,10 +19,15 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
     [configuration.userContentController addScriptMessageHandler:self name:@"refreshIntro"];
     [configuration.userContentController addScriptMessageHandler:self name:@"installUpdate"];
     [configuration.userContentController addScriptMessageHandler:self name:@"saveFile"];
-    NSString *bridge = @"window.MacApp={isSurfaceReady:function(){return true},refreshIntro:function(){window.webkit.messageHandlers.refreshIntro.postMessage(null)},installUpdate:function(url){window.webkit.messageHandlers.installUpdate.postMessage(url)},saveFile:function(filename,dataUrl){window.webkit.messageHandlers.saveFile.postMessage({filename:filename,dataUrl:dataUrl})}};";
+    [configuration.userContentController addScriptMessageHandler:self name:@"saveFileStart"];
+    [configuration.userContentController addScriptMessageHandler:self name:@"saveFileChunk"];
+    [configuration.userContentController addScriptMessageHandler:self name:@"saveFileFinish"];
+    NSString *bridge = @"window.MacApp={isSurfaceReady:function(){return true},refreshIntro:function(){window.webkit.messageHandlers.refreshIntro.postMessage(null)},installUpdate:function(url){window.webkit.messageHandlers.installUpdate.postMessage(url)},saveFile:function(filename,dataUrl){window.webkit.messageHandlers.saveFile.postMessage({filename:filename,dataUrl:dataUrl})},saveFileStart:function(id,filename){window.webkit.messageHandlers.saveFileStart.postMessage({id:id,filename:filename})},saveFileChunk:function(id,data){window.webkit.messageHandlers.saveFileChunk.postMessage({id:id,data:data})},saveFileFinish:function(id){window.webkit.messageHandlers.saveFileFinish.postMessage({id:id})}};";
     [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:bridge injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 
     self.webView = [[WKWebView alloc] initWithFrame:NSZeroRect configuration:configuration];
+    self.saveTransfers = [NSMutableDictionary new];
+    self.saveFilenames = [NSMutableDictionary new];
     self.webView.UIDelegate = self;
     self.webView.customUserAgent = [NSString stringWithFormat:@"SonntagsfragenMac/%@", AppVersion];
     [self.webView setValue:@NO forKey:@"drawsBackground"];
@@ -49,6 +56,29 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
         if ([address hasPrefix:@"https://github.com/charavision/SonntagsfrageView/"]) [NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:address]];
     } else if ([message.name isEqualToString:@"saveFile"] && [message.body isKindOfClass:NSDictionary.class]) {
         [self saveFileFromPayload:(NSDictionary *)message.body];
+    } else if ([message.name isEqualToString:@"saveFileStart"] && [message.body isKindOfClass:NSDictionary.class]) {
+        NSDictionary *payload = (NSDictionary *)message.body;
+        NSString *transferId = [payload[@"id"] isKindOfClass:NSString.class] ? payload[@"id"] : nil;
+        NSString *filename = [payload[@"filename"] isKindOfClass:NSString.class] ? [payload[@"filename"] lastPathComponent] : @"Sonntagsfragen-Export";
+        if (transferId) {
+            self.saveTransfers[transferId] = [NSMutableData new];
+            self.saveFilenames[transferId] = filename;
+        }
+    } else if ([message.name isEqualToString:@"saveFileChunk"] && [message.body isKindOfClass:NSDictionary.class]) {
+        NSDictionary *payload = (NSDictionary *)message.body;
+        NSString *transferId = [payload[@"id"] isKindOfClass:NSString.class] ? payload[@"id"] : nil;
+        NSString *base64 = [payload[@"data"] isKindOfClass:NSString.class] ? payload[@"data"] : nil;
+        NSData *chunk = base64 ? [[NSData alloc] initWithBase64EncodedString:base64 options:0] : nil;
+        if (transferId && chunk && self.saveTransfers[transferId]) [self.saveTransfers[transferId] appendData:chunk];
+    } else if ([message.name isEqualToString:@"saveFileFinish"] && [message.body isKindOfClass:NSDictionary.class]) {
+        NSString *transferId = [message.body[@"id"] isKindOfClass:NSString.class] ? message.body[@"id"] : nil;
+        NSData *data = transferId ? self.saveTransfers[transferId] : nil;
+        NSString *filename = transferId ? self.saveFilenames[transferId] : nil;
+        if (transferId) {
+            [self.saveTransfers removeObjectForKey:transferId];
+            [self.saveFilenames removeObjectForKey:transferId];
+        }
+        if (data && filename) [self presentSavePanelForData:data filename:filename];
     }
 }
 
@@ -61,6 +91,10 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
     NSData *data = [[NSData alloc] initWithBase64EncodedString:base64 options:NSDataBase64DecodingIgnoreUnknownCharacters];
     if (!data) return;
 
+    [self presentSavePanelForData:data filename:filename];
+}
+
+- (void)presentSavePanelForData:(NSData *)data filename:(NSString *)filename {
     NSSavePanel *panel = NSSavePanel.savePanel;
     panel.nameFieldStringValue = filename;
     panel.canCreateDirectories = YES;

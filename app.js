@@ -2449,6 +2449,24 @@ async function exportA4(format) {
 }
 
 async function downloadBlob(blob, filename) {
+  if (window.MacApp?.saveFileStart && window.MacApp?.saveFileChunk && window.MacApp?.saveFileFinish) {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("Die Datei konnte nicht vorbereitet werden."));
+      reader.readAsDataURL(blob);
+    });
+    const transferId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const base64 = String(dataUrl).slice(String(dataUrl).indexOf(",") + 1);
+    const chunkSize = 256 * 1024;
+    window.MacApp.saveFileStart(transferId, filename);
+    for (let offset = 0; offset < base64.length; offset += chunkSize) {
+      window.MacApp.saveFileChunk(transferId, base64.slice(offset, offset + chunkSize));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    window.MacApp.saveFileFinish(transferId);
+    return;
+  }
   if (window.MacApp?.saveFile) {
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
