@@ -604,7 +604,7 @@ function changeLegend() {
 const labelModeOptions = {
   rotation: [["0", "0°"], ["90", "90°"], ["auto", "Auto"], ["off", "Aus"]],
   percent: [["with", "Mit %"], ["without", "Ohne %"], ["off", "Aus"]],
-  change: [["election", "Seit Wahl*"], ["development", "Entwicklung*"], ["off", "Aus"]],
+  change: [["election", "Seit Wahl"], ["development", "Entwicklung"], ["off", "Aus"]],
   since: [["color", "Farbig"], ["gray", "Grau"]]
 };
 const a4OrientationOptions = [["auto", "Auto"], ["portrait", "Hochkant"], ["landscape", "Horizontal"]];
@@ -1129,9 +1129,10 @@ function render(animate = true) {
         old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       }
       if (state.showSinceElection) {
+        const showChangeValue = change.available && Math.round(Math.abs(delta) * 10) >= 1;
         const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${!change.available || state.sinceElectionMode === "gray" ? "gray" : delta >= 0 ? "positive" : "negative"}` });
         const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
-        deltaLine.textContent = change.available ? formatPercent(delta, true) : "−";
+        deltaLine.textContent = showChangeValue ? formatPercent(delta, true) : "";
         deltaLabel.append(deltaLine);
         els.chart.append(deltaLabel);
         old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, newLabelDelay);
@@ -2016,7 +2017,8 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const change = changeValueFor(item, party);
       const delta = change.value;
       if (state.showSinceElection) {
-        text(change.available ? formatPercent(delta, true) : "−", { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: !change.available || state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
+        const showChangeValue = change.available && Math.round(Math.abs(delta) * 10) >= 1;
+        text(showChangeValue ? formatPercent(delta, true) : "", { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: !change.available || state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
       }
     });
     page.append(...otherPartyLinks, ...otherPartyCards);
