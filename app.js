@@ -45,7 +45,7 @@ try {
     else if (value && typeof value === "object") storedViewScales[platform] = { x: Number(value.x) || 1, y: Number(value.y) || 1 };
   });
 } catch (error) { /* Ungültigen lokalen Wert ignorieren. */ }
-const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), otherParties: new Set(), selectedPollRanks: new Set([0]), pollTimeMode: "current", pollDateMode: false, pollRankOverrides: [0, 1, 2], pollDateLabels: [null, null, null], averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, barColorMode: "party", barNeon: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", a4DiagramFormat: "auto", chartLayout: new Map(), perspective: null };
+const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), otherParties: new Set(), selectedPollRanks: new Set([0]), pollTimeMode: "current", pollDateMode: false, pollRankOverrides: [0, 1, 2], pollDateLabels: [null, null, null], averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, changeMode: "election", sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, barColorMode: "party", barNeon: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", a4DiagramFormat: "auto", chartLayout: new Map(), perspective: null };
 let savedProjectConfiguration = null;
 function currentPlatformLabel() {
   if (window.AndroidApp) return "Android";
@@ -89,7 +89,7 @@ const els = {
   scroll: document.querySelector("#chart-scroll"), title: document.querySelector("#chart-title"),
   meta: document.querySelector("#chart-meta"),
   description: document.querySelector("#chart-description"), empty: document.querySelector("#empty-state"),
-  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), abbreviationMode: document.querySelector("#abbreviation-mode"), showSinceElection: document.querySelector("#show-since-election"), sinceElectionMode: document.querySelector("#since-election-mode"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), labelsMenuToggle: document.querySelector("#labels-menu-toggle"), regionLabelMode: document.querySelector("#region-label-mode"), partyLabelMode: document.querySelector("#party-label-mode"), showBarColors: document.querySelector("#show-bar-colors"), barMenuToggle: document.querySelector("#bar-menu-toggle"), barColorMode: document.querySelector("#bar-color-mode"), barNeonMode: document.querySelector("#bar-neon-mode"), showPercentValues: document.querySelector("#show-percent-values"), percentLabelMode: document.querySelector("#percent-label-mode"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataStand: document.querySelector("#report-data-stand"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
+  chartSection: document.querySelector(".chart-section"), mobileView: document.querySelector("#mobile-view"), fullRegionNames: document.querySelector("#full-region-names"), abbreviationMode: document.querySelector("#abbreviation-mode"), showSinceElection: document.querySelector("#show-since-election"), changeMode: document.querySelector("#change-mode"), sinceElectionMode: document.querySelector("#since-election-mode"), showBrackets: document.querySelector("#show-brackets"), showLabels: document.querySelector("#show-labels"), labelsMenuToggle: document.querySelector("#labels-menu-toggle"), regionLabelMode: document.querySelector("#region-label-mode"), partyLabelMode: document.querySelector("#party-label-mode"), showBarColors: document.querySelector("#show-bar-colors"), barMenuToggle: document.querySelector("#bar-menu-toggle"), barColorMode: document.querySelector("#bar-color-mode"), barNeonMode: document.querySelector("#bar-neon-mode"), showPercentValues: document.querySelector("#show-percent-values"), percentLabelMode: document.querySelector("#percent-label-mode"), showLut: document.querySelector("#show-lut"), showBackground: document.querySelector("#show-background"), viewZoomEnabled: document.querySelector("#view-zoom-enabled"), viewZoomControls: document.querySelector("#view-zoom-controls"), fullscreenEnabled: document.querySelector("#fullscreen-enabled"), fullscreenEnter: document.querySelector("#view-fullscreen-enter"), fullscreenExit: document.querySelector("#view-fullscreen-exit"), fullscreenSettings: document.querySelector("#fullscreen-view-settings-toggle"), fullscreenSelection: document.querySelector("#fullscreen-selection-toggle"), fullscreenOutput: document.querySelector("#fullscreen-output-toggle"), fullscreenHelp: document.querySelector("#fullscreen-help"), reportMobileView: document.querySelector("#report-mobile-view"), reportUpdateData: document.querySelector("#report-update-data"), reportDataStand: document.querySelector("#report-data-stand"), viewSizeDown: document.querySelector("#view-size-down"), viewSizeUp: document.querySelector("#view-size-up"), viewWidthDown: document.querySelector("#view-width-down"), viewWidthUp: document.querySelector("#view-width-up"),
   electionDates: document.querySelector("#election-dates"),
   tooltip: document.querySelector("#tooltip"), inputCode: document.querySelector("#input-code"),
   outputCode: document.querySelector("#output-code"), codeMessage: document.querySelector("#code-message"),
@@ -230,7 +230,8 @@ function configurationCode() {
   const barColorBits = BigInt({ party: 0, lightblue: 1, gray: 2 }[state.barColorMode] || 0) << 26n;
   const barNeonBits = (state.barNeon ? 0n : 1n) << 28n;
   const diagramFormatBits = BigInt({ auto: 0, "1x1": 1, "1x2": 2, "1x3": 3, "2x2": 4, "2x3": 5 }[state.a4DiagramFormat] || 0) << 29n;
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits + diagramFormatBits;
+  const changeModeBits = (state.changeMode === "development" ? 1n : 0n) << 32n;
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits + diagramFormatBits + changeModeBits;
   value += mode * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
   return base62Encode(value) + encodeCalendarConfiguration();
 }
@@ -584,10 +585,27 @@ function formatPercent(value, signed = false, omitZeroDecimal = false) {
   return `${value > 0 ? "+" : "−"}${absolute}`;
 }
 
+function changeValueFor(item, party) {
+  const value = Number(item.poll.values[party] || 0);
+  if (state.changeMode === "development") {
+    const sourceRank = Number.isInteger(item.sourceRank) ? item.sourceRank : 0;
+    const previousPoll = (state.data.polls[item.region] || [])[sourceRank + 1];
+    return previousPoll ? { available: true, value: value - Number(previousPoll.values[party] || 0) } : { available: false, value: 0 };
+  }
+  if (state.pollTimeMode !== "current") return { available: false, value: 0 };
+  const election = state.data.elections?.[item.region];
+  return election ? { available: true, value: value - Number(election.values?.[party] || 0) } : { available: false, value: 0 };
+}
+
+function changeLegend() {
+  return state.changeMode === "development" ? "Entwicklung" : "Seit Wahl*";
+}
+
 const labelModeOptions = {
   rotation: [["0", "0°"], ["90", "90°"], ["auto", "Auto"], ["off", "Aus"]],
   percent: [["with", "Mit %"], ["without", "Ohne %"], ["off", "Aus"]],
-  since: [["color", "Farbig"], ["gray", "Grau"], ["off", "Aus"]]
+  change: [["election", "Seit Wahl"], ["development", "Entwicklung"]],
+  since: [["color", "Farbig"], ["gray", "Grau"]]
 };
 const a4OrientationOptions = [["auto", "Auto"], ["portrait", "Hochkant"], ["landscape", "Horizontal"]];
 const a4DiagramFormatOptions = [["auto", "Auto"], ["1x1", "1×1"], ["1x2", "1×2"], ["1x3", "1×3"], ["2x2", "2×2"], ["2x3", "2×3"]];
@@ -655,12 +673,8 @@ function setCycleButton(button, value, options) {
 function setLabelsEnabled(enabled) {
   state.showLabels = Boolean(enabled);
   if (els?.showLabels) els.showLabels.checked = state.showLabels;
-  if (!state.showLabels) {
-    state.showSinceElection = false;
-    state.sinceElectionMode = "off";
-    if (els?.showSinceElection) els.showSinceElection.checked = false;
-    if (els?.sinceElectionMode) setCycleButton(els.sinceElectionMode, "off", labelModeOptions.since);
-  }
+  state.showSinceElection = state.showLabels;
+  if (els?.showSinceElection) els.showSinceElection.checked = state.showSinceElection;
 }
 function advanceCycleButton(button, options) {
   const index = options.findIndex(([key]) => key === button.dataset.value);
@@ -788,6 +802,8 @@ function setViewScale(axis, next) {
 function render(animate = true) {
   scheduleOpenPreviewRefresh();
   applyViewMode();
+  setCycleButton(els.changeMode, state.changeMode, labelModeOptions.change);
+  setCycleButton(els.sinceElectionMode, state.sinceElectionMode, labelModeOptions.since);
   updateSelectionOrderBadges();
   const backgroundVisible = state.showLut && state.showBackground;
   els.chartSection.classList.toggle("mobile-view", state.mobileView);
@@ -804,7 +820,7 @@ function render(animate = true) {
     const items = rawSeries.filter(item => item.region === region);
     if (!items.length) return null;
     const values = Object.fromEntries(pollValueKeys().map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
-    return { region, rank: 0, average: true, poll: { institute: `Ø ${items.length} Umfragen`, date: items[0].poll.date, client: "", values, sourcePolls: items.map(item => item.poll) } };
+    return { region, rank: 0, sourceRank: items[0].sourceRank, average: true, poll: { institute: `Ø ${items.length} Umfragen`, date: items[0].poll.date, client: "", values, sourcePolls: items.map(item => item.poll) } };
   }).filter(Boolean) : rawSeries;
   const parties = [...state.parties];
   const motionEnabled = animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -999,8 +1015,8 @@ function render(animate = true) {
       const old = oldLayout.get(key);
       const value = Number(item.poll.values[party] || 0);
       const election = state.data.elections?.[item.region];
-      const baseline = Number(election?.values?.[party] || 0);
-      const delta = value - baseline;
+      const change = changeValueFor(item, party);
+      const delta = change.value;
       const isNew = !election?.represented?.includes(party) && value >= 5 && party !== "Sonstige";
       const h = state.barColors ? (value / yMax) * innerH : 0;
       if (barIndex > 0 && secondaryBlockKey(group.bars[barIndex]) !== secondaryBlockKey(group.bars[barIndex - 1])) passedBlockBreaks += 1;
@@ -1113,10 +1129,9 @@ function render(animate = true) {
         old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       }
       if (state.showSinceElection) {
-        const historical = state.pollTimeMode !== "current";
-        const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${historical || state.sinceElectionMode === "gray" ? "gray" : delta >= 0 ? "positive" : "negative"}` });
+        const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${!change.available || state.sinceElectionMode === "gray" ? "gray" : delta >= 0 ? "positive" : "negative"}` });
         const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
-        deltaLine.textContent = historical ? "−" : formatPercent(delta, true);
+        deltaLine.textContent = change.available ? formatPercent(delta, true) : "−";
         deltaLabel.append(deltaLine);
         els.chart.append(deltaLabel);
         old ? animateX(deltaLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(deltaLabel, motionEnabled, newLabelDelay);
@@ -1200,7 +1215,7 @@ function render(animate = true) {
   }
   const legendX = compact ? margin.left / 2 : margin.left - 10;
   [
-    ...(state.showSinceElection ? [["Seit Wahl*", margin.top + innerH + 20]] : []),
+    ...(state.showSinceElection ? [[changeLegend(), margin.top + innerH + 20]] : []),
     ...(state.showLabels ? [[regionFirst ? "Parlament" : "Partei", regionLabelY], [regionFirst ? "Partei" : "Parlament", partyLabelY]] : [])
   ].forEach(([text, y]) => {
     if (!yAxisLayer || yAxisMode === "off") return;
@@ -1400,8 +1415,9 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   const regionCount = orderedChoiceCount(state.data.regions.length);
   let value = base62Decode(baseCode);
   const legacySpace = regionCount * partyCount * 7n;
-  const mode = Number(value / legacySpace);
-  if (mode > 4294967295) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  const modeValue = value / legacySpace;
+  const mode = Number(modeValue);
+  if (modeValue > 8589934591n) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
@@ -1425,10 +1441,10 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   state.barColorMode = ["party", "lightblue", "gray", "party"][(mode >> 26) & 3];
   state.barNeon = !(mode & 268435456);
   state.a4DiagramFormat = ["auto", "1x1", "1x2", "1x3", "2x2", "2x3", "auto", "auto"][(mode >>> 29) & 7];
+  state.changeMode = modeValue & (1n << 32n) ? "development" : "election";
   if (state.a4Orientation === "landscape" && state.a4DiagramFormat === "1x3") state.a4DiagramFormat = "1x2";
   if (!state.showLabels) {
     state.showSinceElection = false;
-    state.sinceElectionMode = "off";
   }
   // Projects can be opened on a different kind of device than the one on
   // which they were saved. Keep their content/settings, but always use the
@@ -1463,7 +1479,8 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   setCycleButton(els.regionLabelMode, state.regionLabelMode, labelModeOptions.rotation);
   setCycleButton(els.partyLabelMode, state.partyLabelMode, labelModeOptions.rotation);
   setCycleButton(els.percentLabelMode, state.showPercentValues ? state.percentLabelMode : "off", labelModeOptions.percent);
-  setCycleButton(els.sinceElectionMode, state.showSinceElection ? state.sinceElectionMode : "off", labelModeOptions.since);
+  setCycleButton(els.changeMode, state.changeMode, labelModeOptions.change);
+  setCycleButton(els.sinceElectionMode, state.sinceElectionMode, labelModeOptions.since);
   els.showBarColors.checked = state.barColors;
   setCycleButton(els.barColorMode, state.barColorMode, [["party", "Parteifarben"], ["lightblue", "Hellblau"], ["gray", "Grau"]]);
   setCycleButton(els.barNeonMode, state.barNeon ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
@@ -1631,7 +1648,7 @@ function a4ExportClusters() {
     const items = raw.filter(item => item.region === region);
     if (!items.length) return null;
     const values = Object.fromEntries(pollValueKeys().map(party => [party, items.reduce((sum, item) => sum + Number(item.poll.values[party] || 0), 0) / items.length]));
-    return { region, rank: 0, average: true, poll: { date: items[0].poll.date, values } };
+    return { region, rank: 0, sourceRank: items[0].sourceRank, average: true, poll: { date: items[0].poll.date, values } };
   }).filter(Boolean) : raw;
   if (state.groupBy === "region") return regions.map(region => ({
     title: `${region} (${REGION_CODES[region]})`,
@@ -1766,7 +1783,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const regionsY = partyY + 70;
   headerLegend(partyX, regionsY, "PARLAMENTE", selectedRegions.map(region => `${region} (${REGION_CODES[region]})`), 3, rightLegendWidth / 3);
   const regionLegendRows = Math.ceil(selectedRegions.length / 3);
-  if (state.showSinceElection) text("* = Differenz seit der letzten Wahl", { x: partyX, y: regionsY + 31 + regionLegendRows * 12, fill: "#8fa6c1", "font-size": 8 });
+  if (state.showSinceElection && state.changeMode === "election") text("* = Differenz seit der letzten Wahl", { x: partyX, y: regionsY + 31 + regionLegendRows * 12, fill: "#8fa6c1", "font-size": 8 });
   const gapX = 18, gapY = 18, left = 42;
   const standardTop = Math.max(landscapeHeader ? 265 : 300, regionsY + 62 + regionLegendRows * 12);
   const top = layout.splitLargeCluster ? Math.max(245, standardTop - 42) : standardTop;
@@ -1995,15 +2012,14 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
           otherPartyCards.push(card);
         }
       }
-      const electionValue = Number(state.data.elections?.[item.region]?.values?.[party] || 0);
-      const delta = value - electionValue;
+      const change = changeValueFor(item, party);
+      const delta = change.value;
       if (state.showSinceElection) {
-        const historical = state.pollTimeMode !== "current";
-        text(historical ? "−" : formatPercent(delta, true), { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: historical || state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
+        text(change.available ? formatPercent(delta, true) : "−", { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: !change.available || state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
       }
     });
     page.append(...otherPartyLinks, ...otherPartyCards);
-    if (state.showSinceElection) text("Seit Wahl*", { x: plot.left - 5, y: plot.bottom + 19, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8, "font-weight": 700 });
+    if (state.showSinceElection) text(changeLegend(), { x: plot.left - 5, y: plot.bottom + 19, "text-anchor": "end", fill: "#8fa6c1", "font-size": 8, "font-weight": 700 });
     let runStart = 0;
     while (runStart < cluster.bars.length) {
       const runKey = state.groupBy === "party" ? cluster.bars[runStart].item.region : cluster.bars[runStart].party;
@@ -2454,8 +2470,8 @@ async function reportRequest(path, options = {}) {
 const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
   ["pollDateSelection", "Umfragen: Zeitmodi"],
-  ["abbreviations", "Abkürzungen"], ["sinceElection", "Seit Wahl"],
-  ["labels", "Beschriftungen"], ["regionLabelMode", "Beschriftung: Parlamente"], ["partyLabelMode", "Beschriftung: Parteien"], ["percentLabelMode", "Beschriftung: Prozentwerte"], ["sinceElectionMode", "Beschriftung: Seit Wahl"],
+  ["abbreviations", "Abkürzungen"], ["sinceElection", "Veränderung"],
+  ["labels", "Beschriftungen"], ["regionLabelMode", "Beschriftung: Parlamente"], ["partyLabelMode", "Beschriftung: Parteien"], ["percentLabelMode", "Beschriftung: Prozentwerte"], ["sinceElectionMode", "Beschriftung: Veränderungsfarbe"],
   ["barColors", "Balken"], ["barColorMode", "Balken: Farbe"], ["barNeon", "Balken: Neon"], ["percentValues", "Prozentwerte"],
   ["lut", "LUT"], ["yAxisMode", "LUT: Y-Achse"], ["background", "LUT: Hintergrund"], ["brackets", "LUT: Klammern"], ["viewSize", "Zoom"], ["uiScale", "Bediengrößen-Regler"], ["fullscreen", "Vollbild"], ["fullscreenDefault", "Vollbild standard"], ["preview", "Vorschau"],
   ["a4Output", "A4-Ausgabe"], ["a4DiagramFormat", "A4-Diagrammformat"], ["export3d", "3D (für Grafikausgabe)"]
@@ -2464,7 +2480,7 @@ const developerFeatureOptions = {
   regionLabelMode: [["auto", "Auto"], ["0", "0°"], ["90", "90°"], ["off", "Aus"]],
   partyLabelMode: [["auto", "Auto"], ["0", "0°"], ["90", "90°"], ["off", "Aus"]],
   percentLabelMode: [["with", "Mit %"], ["without", "Ohne %"], ["off", "Aus"]],
-  sinceElectionMode: [["color", "Farbig"], ["gray", "Grau"], ["off", "Aus"]],
+  sinceElectionMode: [["color", "Farbig"], ["gray", "Grau"]],
   barColorMode: [["party", "Parteifarben"], ["lightblue", "Hellblau"], ["gray", "Grau"]],
   yAxisMode: [["static", "Statisch"], ["dynamic", "Dynamisch"], ["off", "Aus"]]
 };
@@ -2562,17 +2578,15 @@ function applyDeveloperSettings() {
   state.mobileView = settings.deviceForce.value === "mobile";
   state.electionDates = !state.mobileView;
   state.fullRegionNames = !settings.abbreviations.value;
-  state.showSinceElection = Boolean(settings.sinceElection.value);
   state.showBrackets = Boolean(settings.brackets.value);
   setLabelsEnabled(settings.labels.value);
+  state.showSinceElection = state.showLabels && Boolean(settings.sinceElection.value);
   state.regionLabelMode = settings.regionLabelMode.value;
   state.partyLabelMode = settings.partyLabelMode.value;
   state.percentLabelMode = settings.percentLabelMode.value;
-  state.sinceElectionMode = settings.sinceElectionMode.value;
-  state.showSinceElection = state.showSinceElection && state.sinceElectionMode !== "off";
+  state.sinceElectionMode = settings.sinceElectionMode.value === "gray" ? "gray" : "color";
   if (!state.showLabels) {
     state.showSinceElection = false;
-    state.sinceElectionMode = "off";
   }
   state.barColors = Boolean(settings.barColors.value);
   state.barColorMode = settings.barColorMode.value;
@@ -2604,6 +2618,7 @@ function applyDeveloperSettings() {
   setVisible("#region-label-mode", settings.regionLabelMode.visible);
   setVisible("#party-label-mode", settings.partyLabelMode.visible);
   setVisible("#percent-label-mode", settings.percentLabelMode.visible && settings.percentValues.visible);
+  setVisible("#change-mode", settings.sinceElectionMode.visible && settings.sinceElection.visible);
   setVisible("#since-election-mode", settings.sinceElectionMode.visible && settings.sinceElection.visible);
   setVisible(".bar-colors-choice", settings.barColors.visible);
   setVisible("#bar-color-mode", settings.barColorMode.visible);
@@ -3340,10 +3355,17 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       els.showPercentValues.checked = state.showPercentValues;
       render(false);
     });
+    els.changeMode.addEventListener("click", event => {
+      if (!state.showLabels) return;
+      state.changeMode = advanceCycleButton(event.currentTarget, labelModeOptions.change);
+      state.showSinceElection = true;
+      els.showSinceElection.checked = true;
+      render(false);
+    });
     els.sinceElectionMode.addEventListener("click", event => {
       if (!state.showLabels) return;
       state.sinceElectionMode = advanceCycleButton(event.currentTarget, labelModeOptions.since);
-      state.showSinceElection = state.sinceElectionMode !== "off";
+      state.showSinceElection = true;
       els.showSinceElection.checked = state.showSinceElection;
       render(false);
     });

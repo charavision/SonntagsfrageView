@@ -430,6 +430,7 @@ body.view-fullscreen-active .chart-section .chart-view-settings .choice label { 
 .labels-choice > input:not(:checked) ~ .label-options { opacity: .38; filter: grayscale(.65); pointer-events: none; }
 .label-option-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px; box-sizing: border-box; width: 100%; min-height: 40px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; background: rgba(16,31,56,.92); color: #dce8f7; cursor: pointer; font: inherit; font-size: 11px; text-align: left; }
 .label-option-row:hover, .label-option-row:focus-visible { border-color: #59d9ff; background: rgba(22,48,80,.96); }
+.label-option-row.label-sub-option { width: calc(100% - 14px); margin-left: 14px; }
 .label-option-value { color: #fff; font-weight: 800; }
 .lut-choice { position: relative; }
 .lut-menu-toggle { display: flex; align-items: center; gap: 7px; box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 9px; background: rgba(16,31,56,.92); color: #dce8f7; cursor: pointer; font: inherit; font-size: 14px; transition: width .18s ease, margin-left .18s ease, border-color .15s, background .15s; }
