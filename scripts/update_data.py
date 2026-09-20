@@ -101,21 +101,34 @@ def extract_row_table(url: str) -> list[dict]:
             cells = row.find_all(["th", "td"], recursive=False)
             if not cells:
                 continue
-            row_headers = headers[:len(cells)]
-            if len(cells) > len(headers) or sum(party is not None for party in row_headers) < 5:
+            texts = []
+            for cell in cells:
+                value = clean(cell.get_text(" ", strip=True))
+                texts.extend([value] * int(cell.get("colspan", 1)))
+            row_headers = headers[:len(texts)]
+            if len(texts) > len(headers) or sum(party is not None for party in row_headers) < 5:
                 continue
-            texts = [clean(c.get_text(" ", strip=True)) for c in cells]
             poll_date = next((iso_date(t) for t in texts[:5] if iso_date(t)), None)
             if not poll_date:
                 continue
             first_cell_is_date = iso_date(texts[0]) is not None
-            institute = re.sub(r"^Umfragen\s+", "", page_title) if first_cell_is_date else texts[0]
-            if not institute or (not first_cell_is_date and "wahl" in institute.lower()) or institute.lower() in {"institut", "veröffentl."}:
+            is_election_result = bool(re.search(
+                r"(?:Bundestags|Landtags|Abgeordnetenhaus|Bürgerschafts)wahl(?:\s+am)?",
+                texts[0], re.I
+            ))
+            institute = "Wahlergebnis" if is_election_result else (re.sub(r"^Umfragen\s+", "", page_title) if first_cell_is_date else texts[0])
+            institute = re.sub(r"Forschungs-\s*gruppe", "Forschungsgruppe", institute, flags=re.I)
+            if not institute or institute.lower() in {"institut", "veröffentl."}:
                 continue
             values = {party: 0.0 for party in PARTIES}
+            recognized_values = 0
             for idx, party in enumerate(row_headers):
                 if party and idx < len(texts):
-                    values[party] = number(texts[idx])
+                    if re.search(r"\d+(?:[,.]\d+)?", texts[idx]):
+                        values[party] = number(texts[idx])
+                        recognized_values += 1
+            if recognized_values < 2:
+                continue
             other_index = next((i for i, p in enumerate(row_headers) if p == "Sonstige"), None)
             if other_index is not None:
                 other_text = texts[other_index]
@@ -142,7 +155,7 @@ def extract_row_table(url: str) -> list[dict]:
                         values[extra_party] = float(match.group(1).replace(",", "."))
                 nums = [float(x.replace(",", ".")) for x in re.findall(r"\d+(?:[,.]\d+)?", other_text)]
                 values["Sonstige"] = max(0.0, sum(nums) - embedded_fw - embedded_bsw)
-            client = "" if first_cell_is_date else (texts[1] if len(texts) > 1 else "")
+            client = "" if first_cell_is_date or is_election_result else (texts[1] if len(texts) > 1 else "")
             results.append({"date": poll_date, "institute": institute, "client": client, "values": values, "source": url})
     return results
 
