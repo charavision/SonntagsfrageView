@@ -1129,7 +1129,7 @@ function render(animate = true) {
         old ? animateX(valueLabel, old.center, x + barWidth / 2, motionEnabled) : fadeIn(valueLabel, motionEnabled, newLabelDelay);
       }
       if (state.showSinceElection) {
-        const showChangeValue = change.available && Math.round(Math.abs(delta) * 10) >= 1;
+        const showChangeValue = change.available && Math.abs(delta) + 1e-9 >= .05;
         const deltaLabel = svgEl("text", { x: x + barWidth / 2, y: margin.top + innerH + 20, "text-anchor": "middle", class: `bar-delta ${!change.available || state.sinceElectionMode === "gray" ? "gray" : delta >= 0 ? "positive" : "negative"}` });
         const deltaLine = svgEl("tspan", { x: x + barWidth / 2 });
         deltaLine.textContent = showChangeValue ? formatPercent(delta, true) : "";
@@ -2017,7 +2017,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       const change = changeValueFor(item, party);
       const delta = change.value;
       if (state.showSinceElection) {
-        const showChangeValue = change.available && Math.round(Math.abs(delta) * 10) >= 1;
+        const showChangeValue = change.available && Math.abs(delta) + 1e-9 >= .05;
         text(showChangeValue ? formatPercent(delta, true) : "", { x: barX + barWidth / 2, y: plot.bottom + 19, "text-anchor": "middle", fill: !change.available || state.sinceElectionMode === "gray" ? "#91a4ba" : delta >= 0 ? "#63e6a6" : "#ff8b9b", "font-size": 9.33, "font-weight": 700 });
       }
     });
