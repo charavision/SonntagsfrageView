@@ -28,7 +28,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "1.0.25";
+    private static final String APP_VERSION = "1.0.26";
     private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
     private static final String[] NOTIFICATION_REGIONS = {"Bundestag", "Baden-Württemberg", "Bayern", "Berlin", "Brandenburg", "Bremen", "Hamburg", "Hessen", "Mecklenburg-Vorpommern", "Niedersachsen", "Nordrhein-Westfalen", "Rheinland-Pfalz", "Saarland", "Sachsen", "Sachsen-Anhalt", "Schleswig-Holstein", "Thüringen"};
     private WebView webView;

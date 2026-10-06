@@ -30,8 +30,8 @@ public class NotificationJobService extends JobService {
     private static final int PERIODIC_JOB_ID = 42010;
     private static final int INITIAL_JOB_ID = 42011;
     private static final long DEFAULT_REFRESH_INTERVAL_MS = 30L * 60L * 1000L;
-    private static final String CHANNEL_POLLS = "new_polls";
-    private static final String CHANNEL_SYSTEM = "system_messages";
+    private static final String CHANNEL_POLLS = "new_polls_high_v2";
+    private static final String CHANNEL_SYSTEM = "system_messages_high_v2";
     private static final String POLLS_URL = "https://charavision.github.io/SonntagsfrageView/data/polls.json";
     private static final String SYSTEM_URL = "https://sonntagsfragen-report.charavisionj5.workers.dev/notifications/system";
 
@@ -150,7 +150,7 @@ public class NotificationJobService extends JobService {
         HttpURLConnection connection = (HttpURLConnection) new URL(address + (address.contains("?") ? "&" : "?") + "t=" + System.currentTimeMillis()).openConnection();
         connection.setConnectTimeout(12000);
         connection.setReadTimeout(15000);
-        connection.setRequestProperty("User-Agent", "Sonntagsfragen-Android/1.0.25");
+        connection.setRequestProperty("User-Agent", "Sonntagsfragen-Android/1.0.26");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder result = new StringBuilder();
             String line;
@@ -162,8 +162,16 @@ public class NotificationJobService extends JobService {
     private void createChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(new NotificationChannel(CHANNEL_POLLS, "Neue Umfragen", NotificationManager.IMPORTANCE_DEFAULT));
-        manager.createNotificationChannel(new NotificationChannel(CHANNEL_SYSTEM, "Systemnachrichten", NotificationManager.IMPORTANCE_DEFAULT));
+        NotificationChannel polls = new NotificationChannel(CHANNEL_POLLS, "Neue Umfragen", NotificationManager.IMPORTANCE_HIGH);
+        polls.setDescription("Einblendungen bei neuen Umfragen");
+        polls.enableVibration(true);
+        polls.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        NotificationChannel system = new NotificationChannel(CHANNEL_SYSTEM, "Systemnachrichten", NotificationManager.IMPORTANCE_HIGH);
+        system.setDescription("Einblendungen für Nachrichten der Administratoren");
+        system.enableVibration(true);
+        system.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        manager.createNotificationChannel(polls);
+        manager.createNotificationChannel(system);
     }
 
     private void notify(String channel, String title, String body, int id) {
@@ -180,7 +188,9 @@ public class NotificationJobService extends JobService {
                 .setStyle(new Notification.BigTextStyle().bigText(body))
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)
-                .setPriority(Notification.PRIORITY_DEFAULT);
+                .setDefaults(Notification.DEFAULT_ALL)
+                .setPriority(Notification.PRIORITY_HIGH)
+                .setVisibility(Notification.VISIBILITY_PUBLIC);
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(id, notification.build());
         } catch (SecurityException ignored) { }
     }
