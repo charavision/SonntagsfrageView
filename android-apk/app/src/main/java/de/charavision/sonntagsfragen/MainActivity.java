@@ -1,9 +1,12 @@
 package de.charavision.sonntagsfragen;
 
 import android.annotation.SuppressLint;
+import android.Manifest;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
@@ -19,10 +22,15 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.util.HashSet;
+import java.util.Set;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "1.0.21";
+    private static final String APP_VERSION = "1.0.22";
     private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
+    private static final String[] NOTIFICATION_REGIONS = {"Bundestag", "Baden-Württemberg", "Bayern", "Berlin", "Brandenburg", "Bremen", "Hamburg", "Hessen", "Mecklenburg-Vorpommern", "Niedersachsen", "Nordrhein-Westfalen", "Rheinland-Pfalz", "Saarland", "Sachsen", "Sachsen-Anhalt", "Schleswig-Holstein", "Thüringen"};
     private WebView webView;
     private volatile boolean webSurfaceReady = false;
 
@@ -121,6 +129,50 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean isSurfaceReady() {
             return webSurfaceReady;
+        }
+
+        @JavascriptInterface
+        public String getNotificationSettings() {
+            SharedPreferences preferences = getSharedPreferences(NotificationJobService.PREFERENCES, MODE_PRIVATE);
+            Set<String> regions = preferences.getStringSet("regions", null);
+            if (regions == null) {
+                regions = new HashSet<>();
+                java.util.Collections.addAll(regions, NOTIFICATION_REGIONS);
+            }
+            try {
+                JSONObject result = new JSONObject();
+                result.put("enabled", preferences.getBoolean("enabled", false));
+                result.put("polls", preferences.getBoolean("polls", true));
+                result.put("system", preferences.getBoolean("system", true));
+                result.put("regions", new JSONArray(regions));
+                return result.toString();
+            } catch (Exception error) { return "{}"; }
+        }
+
+        @JavascriptInterface
+        public void saveNotificationSettings(String json) {
+            try {
+                JSONObject input = new JSONObject(json == null ? "{}" : json);
+                boolean enabled = input.optBoolean("enabled", false);
+                JSONArray selected = input.optJSONArray("regions");
+                Set<String> regions = new HashSet<>();
+                if (selected != null) for (int index = 0; index < selected.length(); index += 1) {
+                    String region = selected.optString(index, "");
+                    for (String allowed : NOTIFICATION_REGIONS) if (allowed.equals(region)) regions.add(region);
+                }
+                getSharedPreferences(NotificationJobService.PREFERENCES, MODE_PRIVATE).edit()
+                    .putBoolean("enabled", enabled)
+                    .putBoolean("polls", input.optBoolean("polls", true))
+                    .putBoolean("system", input.optBoolean("system", true))
+                    .putStringSet("regions", regions)
+                    .apply();
+                runOnUiThread(() -> {
+                    if (enabled && Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 4201);
+                    }
+                    NotificationJobService.schedule(MainActivity.this, enabled);
+                });
+            } catch (Exception ignored) { }
         }
     }
 

@@ -2581,6 +2581,62 @@ async function reportRequest(path, options = {}) {
   return payload;
 }
 
+const notificationRegions = Object.keys(REGION_CODES);
+const defaultNotificationSettings = () => ({ enabled: false, polls: true, system: true, regions: [...notificationRegions] });
+function readNativeNotificationSettings() {
+  if (!window.AndroidApp?.getNotificationSettings) return defaultNotificationSettings();
+  try {
+    const value = JSON.parse(window.AndroidApp.getNotificationSettings() || "{}");
+    return {
+      enabled: Boolean(value.enabled),
+      polls: value.polls !== false,
+      system: value.system !== false,
+      regions: Array.isArray(value.regions) ? value.regions.filter(region => notificationRegions.includes(region)) : [...notificationRegions]
+    };
+  } catch (error) { return defaultNotificationSettings(); }
+}
+function notificationSettingsFromForm() {
+  return {
+    enabled: document.querySelector("#notifications-enabled").checked,
+    polls: document.querySelector("#notifications-polls").checked,
+    system: document.querySelector("#notifications-system").checked,
+    regions: [...document.querySelectorAll("#notification-region-list input:checked")].map(input => input.value)
+  };
+}
+function updateNotificationFormState() {
+  const enabled = document.querySelector("#notifications-enabled").checked;
+  const polls = document.querySelector("#notifications-polls").checked;
+  document.querySelector("#notification-options").classList.toggle("is-disabled", !enabled);
+  document.querySelectorAll("#notification-region-list input").forEach(input => { input.disabled = !enabled || !polls; });
+}
+function saveNativeNotificationSettings() {
+  if (!window.AndroidApp?.saveNotificationSettings) return;
+  const settings = notificationSettingsFromForm();
+  window.AndroidApp.saveNotificationSettings(JSON.stringify(settings));
+  updateNotificationFormState();
+  document.querySelector("#notification-settings-message").textContent = settings.enabled
+    ? "Einstellungen gespeichert. Android fragt gegebenenfalls noch nach der Benachrichtigungsberechtigung."
+    : "Benachrichtigungen sind deaktiviert.";
+}
+function renderNotificationSettings() {
+  const list = document.querySelector("#notification-region-list");
+  if (!list.childElementCount) notificationRegions.forEach(region => {
+    const label = document.createElement("label");
+    label.className = "notification-setting";
+    label.innerHTML = `<span><strong>${region}</strong></span><span class="switch"><input type="checkbox" value="${region}"><span></span></span>`;
+    label.querySelector("input").addEventListener("change", saveNativeNotificationSettings);
+    list.append(label);
+  });
+  const settings = readNativeNotificationSettings();
+  document.querySelector("#notifications-enabled").checked = settings.enabled;
+  document.querySelector("#notifications-polls").checked = settings.polls;
+  document.querySelector("#notifications-system").checked = settings.system;
+  list.querySelectorAll("input").forEach(input => { input.checked = settings.regions.includes(input.value); });
+  document.querySelector("#notification-admin-form").hidden = currentReportRole !== "Admin";
+  document.querySelector("#notification-settings-message").textContent = "";
+  updateNotificationFormState();
+}
+
 const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
   ["pollDateSelection", "Umfragen: Zeitmodi"],
@@ -3766,6 +3822,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     const reportTabs = {
       "report-book-open": "report-book",
       "report-info-open": "report-info",
+      "report-notifications-open": "report-notifications",
       "report-projects-open": "report-projects",
       "report-accounts-open": "report-accounts",
       "report-developer-open": "report-developer",
@@ -3888,6 +3945,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-info").hidden = true;
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
+        document.querySelector("#report-notifications-open").hidden = !window.AndroidApp?.getNotificationSettings;
         document.querySelector("#report-app-open").hidden = false;
         applyHelperFeatureAccess();
         const developerTab = document.querySelector("#report-developer-open");
@@ -3919,6 +3977,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#report-accounts").hidden = true;
       document.querySelector("#report-developer").hidden = true;
       document.querySelector("#report-app").hidden = true;
+      document.querySelector("#report-notifications").hidden = true;
       document.querySelector("#report-projects").hidden = true;
       document.querySelector("#report-book").hidden = true;
       document.querySelector("#report-info").hidden = false;
@@ -3949,6 +4008,27 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#report-app-open").addEventListener("click", () => {
       if (!toggleReportTab(document.querySelector("#report-app-open"))) return;
       loadAppRelease();
+    });
+    document.querySelector("#report-notifications-open").addEventListener("click", () => {
+      if (!toggleReportTab(document.querySelector("#report-notifications-open"))) return;
+      renderNotificationSettings();
+    });
+    ["#notifications-enabled", "#notifications-polls", "#notifications-system"].forEach(selector => {
+      document.querySelector(selector).addEventListener("change", saveNativeNotificationSettings);
+    });
+    document.querySelector("#notification-admin-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const message = document.querySelector("#notification-admin-message");
+      message.textContent = "Nachricht wird versendet …";
+      try {
+        await reportRequest("/notifications/system", { method: "POST", body: JSON.stringify({
+          title: document.querySelector("#notification-admin-title").value.trim(),
+          body: document.querySelector("#notification-admin-body").value.trim()
+        }) });
+        form.reset();
+        message.textContent = "Adminnachricht wurde an die Apps übermittelt.";
+      } catch (error) { message.textContent = error.message; }
     });
     document.querySelectorAll("#report-app [data-helper-feature] .helper-feature-toggle input").forEach(input => input.addEventListener("change", event => {
       if (currentReportRole !== "Admin") return;

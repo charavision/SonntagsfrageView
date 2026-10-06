@@ -76,6 +76,17 @@ const ensureProjectsTable = async env => {
   }
 };
 
+const ensureSystemMessagesTable = async env => {
+  await env.REPORTS.prepare(`CREATE TABLE IF NOT EXISTS system_messages (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  )`).run();
+  await env.REPORTS.prepare("CREATE INDEX IF NOT EXISTS system_messages_created_at ON system_messages(created_at DESC)").run();
+};
+
 const sanitizePollSelection = value => {
   if (!value || typeof value !== "object") return null;
   const dateLabels = [0, 1, 2].map(index => /^\d{4}-\d{2}-\d{2}$/.test(value.dateLabels?.[index] || "") ? value.dateLabels[index] : null);
@@ -130,6 +141,15 @@ export default {
         return json({ settings: developerDefaults }, 200, origin);
       }
     }
+    if (url.pathname === "/notifications/system" && request.method === "GET") {
+      try {
+        await ensureSystemMessagesTable(env);
+        const result = await env.REPORTS.prepare("SELECT id, title, body, created_at FROM system_messages ORDER BY created_at DESC LIMIT 20").all();
+        return json({ messages: result.results || [] }, 200, origin);
+      } catch (error) {
+        return json({ messages: [] }, 200, origin);
+      }
+    }
 
     const suppliedPin = request.headers.get("X-Report-Pin") || "";
     const suppliedHash = suppliedPin ? await hexDigest(suppliedPin) : "";
@@ -155,6 +175,18 @@ export default {
     }
 
     if (url.pathname === "/session" && request.method === "POST") return json({ ok: true, reporter: reporter.workName, personName: reporter.personName, workName: reporter.workName, role: reporter.role }, 200, origin);
+
+    if (url.pathname === "/notifications/system" && request.method === "POST") {
+      if (reporter.role !== "Admin") return json({ error: "Nur Admins dürfen Systemnachrichten senden." }, 403, origin);
+      const payload = await request.json().catch(() => ({}));
+      const title = String(payload.title || "").trim().slice(0, 100);
+      const body = String(payload.body || "").trim().slice(0, 1200);
+      if (!title || !body) return json({ error: "Bitte Titel und Nachricht vollständig ausfüllen." }, 400, origin);
+      await ensureSystemMessagesTable(env);
+      const id = crypto.randomUUID();
+      await env.REPORTS.prepare("INSERT INTO system_messages (id, title, body, created_by) VALUES (?, ?, ?, ?)").bind(id, title, body, reporter.workName).run();
+      return json({ ok: true, id }, 201, origin);
+    }
 
     if (url.pathname === "/projects" && request.method === "GET") {
       await ensureProjectsTable(env);

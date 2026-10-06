@@ -46,3 +46,13 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 
 CREATE INDEX IF NOT EXISTS projects_user_updated_at ON projects(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS system_messages (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS system_messages_created_at ON system_messages(created_at DESC);
