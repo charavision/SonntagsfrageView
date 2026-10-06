@@ -36,31 +36,37 @@ public class NotificationJobService extends JobService {
     private static final String SYSTEM_URL = "https://sonntagsfragen-report.charavisionj5.workers.dev/notifications/system";
 
     public static void schedule(Context context, boolean enabled) {
-        JobScheduler scheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
-        scheduler.cancel(PERIODIC_JOB_ID);
-        scheduler.cancel(INITIAL_JOB_ID);
-        if (!enabled) return;
-        ComponentName service = new ComponentName(context, NotificationJobService.class);
-        JobInfo initial = new JobInfo.Builder(INITIAL_JOB_ID, service)
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-            .setMinimumLatency(1000L)
-            .setOverrideDeadline(5000L)
-            .build();
-        scheduler.schedule(initial);
+        try {
+            JobScheduler scheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            if (scheduler == null) return;
+            scheduler.cancel(PERIODIC_JOB_ID);
+            scheduler.cancel(INITIAL_JOB_ID);
+            if (!enabled) return;
+            ComponentName service = new ComponentName(context, NotificationJobService.class);
+            JobInfo initial = new JobInfo.Builder(INITIAL_JOB_ID, service)
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                .setMinimumLatency(1000L)
+                .setOverrideDeadline(5000L)
+                .build();
+            scheduler.schedule(initial);
+        } catch (RuntimeException ignored) { }
     }
 
     private static void scheduleNextCheck(Context context, long refreshIntervalMs) {
-        SharedPreferences preferences = context.getSharedPreferences(PREFERENCES, MODE_PRIVATE);
-        if (!preferences.getBoolean("enabled", false)) return;
-        JobScheduler scheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
-        ComponentName service = new ComponentName(context, NotificationJobService.class);
-        JobInfo next = new JobInfo.Builder(PERIODIC_JOB_ID, service)
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-            .setMinimumLatency(refreshIntervalMs)
-            .setOverrideDeadline(refreshIntervalMs * 2L)
-            .setPersisted(true)
-            .build();
-        scheduler.schedule(next);
+        try {
+            SharedPreferences preferences = context.getSharedPreferences(PREFERENCES, MODE_PRIVATE);
+            if (!preferences.getBoolean("enabled", false)) return;
+            JobScheduler scheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            if (scheduler == null) return;
+            ComponentName service = new ComponentName(context, NotificationJobService.class);
+            JobInfo next = new JobInfo.Builder(PERIODIC_JOB_ID, service)
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                .setMinimumLatency(refreshIntervalMs)
+                .setOverrideDeadline(refreshIntervalMs * 2L)
+                .setPersisted(true)
+                .build();
+            scheduler.schedule(next);
+        } catch (RuntimeException ignored) { }
     }
 
     @Override
@@ -144,7 +150,7 @@ public class NotificationJobService extends JobService {
         HttpURLConnection connection = (HttpURLConnection) new URL(address + (address.contains("?") ? "&" : "?") + "t=" + System.currentTimeMillis()).openConnection();
         connection.setConnectTimeout(12000);
         connection.setReadTimeout(15000);
-        connection.setRequestProperty("User-Agent", "Sonntagsfragen-Android/1.0.24");
+        connection.setRequestProperty("User-Agent", "Sonntagsfragen-Android/1.0.25");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder result = new StringBuilder();
             String line;

@@ -28,7 +28,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "1.0.24";
+    private static final String APP_VERSION = "1.0.25";
     private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
     private static final String[] NOTIFICATION_REGIONS = {"Bundestag", "Baden-Württemberg", "Bayern", "Berlin", "Brandenburg", "Bremen", "Hamburg", "Hessen", "Mecklenburg-Vorpommern", "Niedersachsen", "Nordrhein-Westfalen", "Rheinland-Pfalz", "Saarland", "Sachsen", "Sachsen-Anhalt", "Schleswig-Holstein", "Thüringen"};
     private WebView webView;
@@ -91,12 +91,14 @@ public class MainActivity extends Activity {
         webView.setBackgroundColor(android.graphics.Color.rgb(6, 16, 32));
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
-        SharedPreferences notificationPreferences = getSharedPreferences(NotificationJobService.PREFERENCES, MODE_PRIVATE);
-        boolean notificationsEnabled = notificationPreferences.getBoolean("enabled", false);
-        NotificationJobService.schedule(this, notificationsEnabled);
-        if (notificationsEnabled && Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 4201);
-        }
+        try {
+            SharedPreferences notificationPreferences = getSharedPreferences(NotificationJobService.PREFERENCES, MODE_PRIVATE);
+            boolean notificationsEnabled = notificationPreferences.getBoolean("enabled", false);
+            NotificationJobService.schedule(this, notificationsEnabled);
+            if (notificationsEnabled && Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 4201);
+            }
+        } catch (RuntimeException ignored) { }
         loadCurrentWebApp("startup");
     }
 
