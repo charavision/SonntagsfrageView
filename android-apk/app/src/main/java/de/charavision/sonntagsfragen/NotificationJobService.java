@@ -127,7 +127,7 @@ public class NotificationJobService extends JobService {
                 unseen.add(message);
             }
             preferences.edit().putString("latest_system_message", messages.getJSONObject(0).optString("id")).apply();
-            if (last.isEmpty()) return;
+            if (last.isEmpty() && unseen.size() > 1) unseen = new ArrayList<>(unseen.subList(0, 1));
             Collections.reverse(unseen);
             for (JSONObject message : unseen) notify(CHANNEL_SYSTEM, message.optString("title", "Sonntagsfragen"), message.optString("body"), message.optString("id").hashCode());
         } catch (Exception ignored) { }
@@ -144,7 +144,7 @@ public class NotificationJobService extends JobService {
         HttpURLConnection connection = (HttpURLConnection) new URL(address + (address.contains("?") ? "&" : "?") + "t=" + System.currentTimeMillis()).openConnection();
         connection.setConnectTimeout(12000);
         connection.setReadTimeout(15000);
-        connection.setRequestProperty("User-Agent", "Sonntagsfragen-Android/1.0.23");
+        connection.setRequestProperty("User-Agent", "Sonntagsfragen-Android/1.0.24");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder result = new StringBuilder();
             String line;
