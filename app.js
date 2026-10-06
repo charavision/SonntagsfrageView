@@ -2664,6 +2664,35 @@ async function saveNotificationInterval() {
     message.textContent = error.message;
   } finally { control.disabled = false; }
 }
+async function loadNotificationHistory() {
+  const list = document.querySelector("#notification-history-list");
+  const message = document.querySelector("#notification-history-message");
+  const limit = currentReportRole === "Admin" ? 20 : 3;
+  list.replaceChildren();
+  message.textContent = "Benachrichtigungen werden geladen …";
+  try {
+    const result = await reportRequest("/notifications/system");
+    const messages = Array.isArray(result.messages) ? result.messages.slice(0, limit) : [];
+    if (!messages.length) {
+      message.textContent = "Noch keine Benachrichtigungen vorhanden.";
+      return;
+    }
+    messages.forEach(item => {
+      const article = document.createElement("article");
+      article.className = "notification-history-item";
+      const title = document.createElement("strong");
+      title.textContent = item.title || "Sonntagsfragen";
+      const body = document.createElement("p");
+      body.textContent = item.body || "";
+      const time = document.createElement("time");
+      const created = new Date(item.created_at);
+      time.textContent = Number.isNaN(created.getTime()) ? "" : created.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+      article.append(title, body, time);
+      list.append(article);
+    });
+    message.textContent = currentReportRole === "Admin" ? "Die letzten 20 Benachrichtigungen." : "Die letzten drei Benachrichtigungen.";
+  } catch (error) { message.textContent = error.message; }
+}
 
 const developerFeatures = [
   ["intro", "Intro"], ["deviceForce", "Geräteforce"], ["tabMode", "Reitermodus"], ["dataUpdate", "Datenupdate"],
@@ -4040,6 +4069,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#report-notifications-open").addEventListener("click", () => {
       if (!toggleReportTab(document.querySelector("#report-notifications-open"))) return;
       renderNotificationSettings();
+      loadNotificationHistory();
       loadNotificationInterval();
     });
     ["#notifications-enabled", "#notifications-polls", "#notifications-system"].forEach(selector => {

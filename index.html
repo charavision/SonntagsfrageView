@@ -7,7 +7,7 @@
   <title>Sonntagsfragen – Bund & Länder</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="shortcut icon" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=notification-list-1024">
+  <link rel="stylesheet" href="styles.css?v=notification-switches-1027">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -273,6 +273,11 @@
           </div>
           <small id="notification-interval-message" aria-live="polite"></small>
         </form>
+        <section class="notification-history" aria-labelledby="notification-history-title">
+          <div class="report-list-heading"><h2 id="notification-history-title">Letzte Benachrichtigungen</h2></div>
+          <div id="notification-history-list" class="notification-history-list"></div>
+          <small id="notification-history-message" aria-live="polite"></small>
+        </section>
         <div id="notification-device-settings">
           <div class="report-list-heading"><h2 id="report-notifications-title">Benachrichtigungen</h2></div>
           <label class="notification-setting notification-master"><span><strong>Benachrichtigungen</strong><small>Benachrichtigungen grundsätzlich erlauben</small></span><span class="switch"><input id="notifications-enabled" type="checkbox"><span></span></span></label>
@@ -385,6 +390,6 @@
   <div id="preview-splitter" class="preview-splitter" role="separator" aria-label="Breite von Ansicht und Vorschau ändern" aria-orientation="vertical" tabindex="0" hidden><span></span></div>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=notification-interval-1025" defer></script>
+  <script src="app.js?v=notification-history-1026" defer></script>
 </body>
 </html>
