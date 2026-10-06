@@ -29,6 +29,7 @@ public class NotificationJobService extends JobService {
     public static final String PREFERENCES = "sonntagsfragen_notifications";
     private static final int PERIODIC_JOB_ID = 42010;
     private static final int INITIAL_JOB_ID = 42011;
+    private static final long DEFAULT_REFRESH_INTERVAL_MS = 30L * 60L * 1000L;
     private static final String CHANNEL_POLLS = "new_polls";
     private static final String CHANNEL_SYSTEM = "system_messages";
     private static final String POLLS_URL = "https://charavision.github.io/SonntagsfrageView/data/polls.json";
@@ -40,25 +41,40 @@ public class NotificationJobService extends JobService {
         scheduler.cancel(INITIAL_JOB_ID);
         if (!enabled) return;
         ComponentName service = new ComponentName(context, NotificationJobService.class);
-        JobInfo periodic = new JobInfo.Builder(PERIODIC_JOB_ID, service)
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-            .setPeriodic(30L * 60L * 1000L)
-            .setPersisted(true)
-            .build();
         JobInfo initial = new JobInfo.Builder(INITIAL_JOB_ID, service)
             .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
             .setMinimumLatency(1000L)
             .setOverrideDeadline(5000L)
             .build();
-        scheduler.schedule(periodic);
         scheduler.schedule(initial);
+    }
+
+    private static void scheduleNextCheck(Context context, long refreshIntervalMs) {
+        SharedPreferences preferences = context.getSharedPreferences(PREFERENCES, MODE_PRIVATE);
+        if (!preferences.getBoolean("enabled", false)) return;
+        JobScheduler scheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+        ComponentName service = new ComponentName(context, NotificationJobService.class);
+        JobInfo next = new JobInfo.Builder(PERIODIC_JOB_ID, service)
+            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+            .setMinimumLatency(refreshIntervalMs)
+            .setOverrideDeadline(refreshIntervalMs * 2L)
+            .setPersisted(true)
+            .build();
+        scheduler.schedule(next);
     }
 
     @Override
     public boolean onStartJob(JobParameters parameters) {
         new Thread(() -> {
-            try { checkForUpdates(); }
-            finally { jobFinished(parameters, false); }
+            long refreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS;
+            try {
+                checkForUpdates();
+                refreshIntervalMs = fetchRefreshInterval();
+            }
+            finally {
+                scheduleNextCheck(NotificationJobService.this, refreshIntervalMs);
+                jobFinished(parameters, false);
+            }
         }).start();
         return true;
     }
@@ -117,11 +133,18 @@ public class NotificationJobService extends JobService {
         } catch (Exception ignored) { }
     }
 
+    private long fetchRefreshInterval() {
+        try {
+            JSONObject setting = new JSONObject(fetch("https://sonntagsfragen-report.charavisionj5.workers.dev/settings/notification-interval"));
+            return setting.optInt("intervalMinutes", 30) == 1 ? 60L * 1000L : DEFAULT_REFRESH_INTERVAL_MS;
+        } catch (Exception ignored) { return DEFAULT_REFRESH_INTERVAL_MS; }
+    }
+
     private String fetch(String address) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(address + (address.contains("?") ? "&" : "?") + "t=" + System.currentTimeMillis()).openConnection();
         connection.setConnectTimeout(12000);
         connection.setReadTimeout(15000);
-        connection.setRequestProperty("User-Agent", "Sonntagsfragen-Android/1.0.22");
+        connection.setRequestProperty("User-Agent", "Sonntagsfragen-Android/1.0.23");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder result = new StringBuilder();
             String line;

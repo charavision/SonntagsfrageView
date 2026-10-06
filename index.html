@@ -7,7 +7,7 @@
   <title>Sonntagsfragen – Bund & Länder</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="shortcut icon" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=android-notifications-1022">
+  <link rel="stylesheet" href="styles.css?v=notification-list-1024">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -267,15 +267,22 @@
           <label>Nachricht <textarea id="notification-admin-body" maxlength="1200" rows="4" required></textarea></label>
           <button type="submit">An Apps senden</button>
           <small id="notification-admin-message" aria-live="polite"></small>
+          <div class="notification-interval-control">
+            <span><strong>Prüfintervall</strong><small>Entwickleroption · gilt für alle Apps und Benutzer</small></span>
+            <div class="notification-interval-switch"><span>30 Min.</span><label class="switch"><input id="notification-interval-fast" type="checkbox" aria-label="Prüfintervall zwischen 30 Minuten und 1 Minute wechseln"><span></span></label><span>1 Min.</span></div>
+          </div>
+          <small id="notification-interval-message" aria-live="polite"></small>
         </form>
-        <div class="report-list-heading"><h2 id="report-notifications-title">Benachrichtigungen</h2></div>
-        <label class="notification-setting notification-master"><span><strong>Benachrichtigungen</strong><small>Benachrichtigungen grundsätzlich erlauben</small></span><span class="switch"><input id="notifications-enabled" type="checkbox"><span></span></span></label>
-        <div id="notification-options">
-          <label class="notification-setting"><span><strong>Neue Umfrage</strong><small>Neue Umfragen der ausgewählten Parlamente</small></span><span class="switch"><input id="notifications-polls" type="checkbox"><span></span></span></label>
-          <div id="notification-region-list" class="notification-region-list"></div>
-          <label class="notification-setting"><span><strong>Systemnachrichten</strong><small>Nachrichten der Administratoren</small></span><span class="switch"><input id="notifications-system" type="checkbox"><span></span></span></label>
+        <div id="notification-device-settings">
+          <div class="report-list-heading"><h2 id="report-notifications-title">Benachrichtigungen</h2></div>
+          <label class="notification-setting notification-master"><span><strong>Benachrichtigungen</strong><small>Benachrichtigungen grundsätzlich erlauben</small></span><span class="switch"><input id="notifications-enabled" type="checkbox"><span></span></span></label>
+          <div id="notification-options">
+            <label class="notification-setting"><span><strong>Neue Umfrage</strong><small>Neue Umfragen der ausgewählten Parlamente</small></span><span class="switch"><input id="notifications-polls" type="checkbox"><span></span></span></label>
+            <div id="notification-region-list" class="notification-region-list"></div>
+            <label class="notification-setting"><span><strong>Systemnachrichten</strong><small>Nachrichten der Administratoren</small></span><span class="switch"><input id="notifications-system" type="checkbox"><span></span></span></label>
+          </div>
+          <small id="notification-settings-message" aria-live="polite"></small>
         </div>
-        <small id="notification-settings-message" aria-live="polite"></small>
       </section>
       <section id="report-app" class="report-app" hidden aria-labelledby="report-app-title">
         <div class="report-list-heading"><h2 id="report-app-title">App</h2></div>
@@ -378,6 +385,6 @@
   <div id="preview-splitter" class="preview-splitter" role="separator" aria-label="Breite von Ansicht und Vorschau ändern" aria-orientation="vertical" tabindex="0" hidden><span></span></div>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=android-notifications-1022" defer></script>
+  <script src="app.js?v=notification-interval-1025" defer></script>
 </body>
 </html>

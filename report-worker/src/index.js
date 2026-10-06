@@ -141,6 +141,15 @@ export default {
         return json({ settings: developerDefaults }, 200, origin);
       }
     }
+    if (url.pathname === "/settings/notification-interval" && request.method === "GET") {
+      try {
+        await env.REPORTS.prepare("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))").run();
+        const setting = await env.REPORTS.prepare("SELECT value FROM app_settings WHERE key = 'notification_interval_minutes'").first();
+        return json({ intervalMinutes: setting?.value === "1" ? 1 : 30 }, 200, origin);
+      } catch (error) {
+        return json({ intervalMinutes: 30 }, 200, origin);
+      }
+    }
     if (url.pathname === "/notifications/system" && request.method === "GET") {
       try {
         await ensureSystemMessagesTable(env);
@@ -172,6 +181,14 @@ export default {
       await env.REPORTS.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('developer_settings', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(JSON.stringify(settings)).run();
       await env.REPORTS.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('intro_enabled', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(settings.desktop.intro.visible && settings.desktop.intro.value ? "1" : "0").run();
       return json({ ok: true, settings }, 200, origin);
+    }
+    if (url.pathname === "/settings/notification-interval" && request.method === "PATCH") {
+      if (reporter.role !== "Admin") return json({ error: "Nur Admin darf das Prüfintervall einstellen." }, 403, origin);
+      const payload = await request.json().catch(() => ({}));
+      const intervalMinutes = Number(payload.intervalMinutes) === 1 ? 1 : 30;
+      await env.REPORTS.prepare("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))").run();
+      await env.REPORTS.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('notification_interval_minutes', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(String(intervalMinutes)).run();
+      return json({ ok: true, intervalMinutes }, 200, origin);
     }
 
     if (url.pathname === "/session" && request.method === "POST") return json({ ok: true, reporter: reporter.workName, personName: reporter.personName, workName: reporter.workName, role: reporter.role }, 200, origin);

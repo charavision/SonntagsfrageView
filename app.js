@@ -2619,6 +2619,10 @@ function saveNativeNotificationSettings() {
     : "Benachrichtigungen sind deaktiviert.";
 }
 function renderNotificationSettings() {
+  const isAndroid = Boolean(window.AndroidApp?.getNotificationSettings);
+  document.querySelector("#notification-device-settings").hidden = !isAndroid;
+  document.querySelector("#notification-admin-form").hidden = currentReportRole !== "Admin";
+  if (!isAndroid) return;
   const list = document.querySelector("#notification-region-list");
   if (!list.childElementCount) notificationRegions.forEach(region => {
     const label = document.createElement("label");
@@ -2632,9 +2636,33 @@ function renderNotificationSettings() {
   document.querySelector("#notifications-polls").checked = settings.polls;
   document.querySelector("#notifications-system").checked = settings.system;
   list.querySelectorAll("input").forEach(input => { input.checked = settings.regions.includes(input.value); });
-  document.querySelector("#notification-admin-form").hidden = currentReportRole !== "Admin";
   document.querySelector("#notification-settings-message").textContent = "";
   updateNotificationFormState();
+}
+async function loadNotificationInterval() {
+  const control = document.querySelector("#notification-interval-fast");
+  const message = document.querySelector("#notification-interval-message");
+  if (currentReportRole !== "Admin") return;
+  message.textContent = "Prüfintervall wird geladen …";
+  try {
+    const result = await reportRequest("/settings/notification-interval");
+    control.checked = result.intervalMinutes === 1;
+    message.textContent = `Aktuell: ${control.checked ? "1 Minute" : "30 Minuten"}.`;
+  } catch (error) { message.textContent = error.message; }
+}
+async function saveNotificationInterval() {
+  const control = document.querySelector("#notification-interval-fast");
+  const message = document.querySelector("#notification-interval-message");
+  const intervalMinutes = control.checked ? 1 : 30;
+  control.disabled = true;
+  message.textContent = "Prüfintervall wird gespeichert …";
+  try {
+    await reportRequest("/settings/notification-interval", { method: "PATCH", body: JSON.stringify({ intervalMinutes }) });
+    message.textContent = `Für alle Apps und Benutzer auf ${intervalMinutes === 1 ? "1 Minute" : "30 Minuten"} gestellt.`;
+  } catch (error) {
+    control.checked = !control.checked;
+    message.textContent = error.message;
+  } finally { control.disabled = false; }
 }
 
 const developerFeatures = [
@@ -3945,7 +3973,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-info").hidden = true;
         document.querySelector("#report-session").hidden = false;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
-        document.querySelector("#report-notifications-open").hidden = !window.AndroidApp?.getNotificationSettings;
+        document.querySelector("#report-notifications-open").hidden = currentReportRole !== "Admin" && !window.AndroidApp?.getNotificationSettings;
         document.querySelector("#report-app-open").hidden = false;
         applyHelperFeatureAccess();
         const developerTab = document.querySelector("#report-developer-open");
@@ -4012,6 +4040,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#report-notifications-open").addEventListener("click", () => {
       if (!toggleReportTab(document.querySelector("#report-notifications-open"))) return;
       renderNotificationSettings();
+      loadNotificationInterval();
     });
     ["#notifications-enabled", "#notifications-polls", "#notifications-system"].forEach(selector => {
       document.querySelector(selector).addEventListener("change", saveNativeNotificationSettings);
@@ -4030,6 +4059,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         message.textContent = "Adminnachricht wurde an die Apps übermittelt.";
       } catch (error) { message.textContent = error.message; }
     });
+    document.querySelector("#notification-interval-fast").addEventListener("change", saveNotificationInterval);
     document.querySelectorAll("#report-app [data-helper-feature] .helper-feature-toggle input").forEach(input => input.addEventListener("change", event => {
       if (currentReportRole !== "Admin") return;
       const key = event.currentTarget.closest("[data-helper-feature]").dataset.helperFeature;

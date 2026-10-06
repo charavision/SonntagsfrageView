@@ -671,10 +671,13 @@ footer a { color: inherit; }
 .notification-setting strong { font-size: 13px; }
 .notification-setting small { color: var(--muted); font-size: 10px; }
 .notification-master { border-color: rgba(89,217,255,.55); background: rgba(23,66,99,.68); }
-.notification-region-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 0 0 4px 18px; }
-.notification-region-list .notification-setting { min-height: 43px; padding: 7px 10px; }
-.notification-region-list .notification-setting strong { font-size: 11px; }
-.notification-region-list .switch { transform: scale(.88); transform-origin: right center; }
+.notification-region-list { display: grid; grid-template-columns: 1fr; gap: 0; padding: 0 0 0 18px; }
+.notification-region-list .notification-setting { display: grid; justify-items: start; min-height: 58px; padding: 10px 0; gap: 7px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+.notification-region-list .notification-setting strong { font-size: 12px; }
+.notification-region-list .switch { transform: scale(.88); transform-origin: left center; }
+#notification-device-settings > .notification-setting,
+#notification-options > .notification-setting { padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+#notification-device-settings > .notification-setting:first-of-type { border-top: 1px solid var(--line); }
 #notification-options.is-disabled { pointer-events: none; opacity: .45; filter: grayscale(.55); }
 #notification-settings-message, #notification-admin-message { min-height: 1.2em; color: var(--muted); font-size: 11px; }
 .notification-admin-form { display: grid; gap: 9px; margin-bottom: 12px; padding: 13px; border: 1px solid rgba(255,82,116,.52); border-radius: 11px; background: rgba(91,24,45,.18); }
@@ -683,6 +686,11 @@ footer a { color: inherit; }
 .notification-admin-form label { display: grid; gap: 5px; color: #dce8f7; font-size: 11px; font-weight: 750; }
 .notification-admin-form input, .notification-admin-form textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: #061020; color: var(--ink); resize: vertical; }
 .notification-admin-form button { min-height: 36px; border: 1px solid var(--accent); border-radius: 8px; background: #163050; color: var(--ink); cursor: pointer; font-weight: 800; }
+.notification-interval-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.notification-interval-control > span:first-child { display: grid; gap: 2px; }
+.notification-interval-control small { color: var(--muted); font-size: 10px; font-weight: 500; }
+.notification-interval-switch { display: flex; align-items: center; gap: 7px; white-space: nowrap; color: var(--muted); font-size: 10px; font-weight: 750; }
+#notification-interval-message { min-height: 1.2em; color: var(--muted); font-size: 11px; }
 .report-projects { margin-bottom: 24px; padding: 18px 0 0; }
 .report-projects > p { margin: 5px 0 15px; color: var(--muted); font-size: 12px; }
 .project-code-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin: 14px 0; }
