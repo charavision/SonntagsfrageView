@@ -42,12 +42,14 @@ CREATE TABLE IF NOT EXISTS projects (
   detail TEXT NOT NULL,
   poll_selection TEXT,
   settings TEXT,
+  slot INTEGER,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   UNIQUE(user_id, configuration)
 );
 
 CREATE INDEX IF NOT EXISTS projects_user_updated_at ON projects(user_id, updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS projects_user_slot ON projects(user_id, slot);
 
 CREATE TABLE IF NOT EXISTS settings_slots (
   user_id TEXT NOT NULL,

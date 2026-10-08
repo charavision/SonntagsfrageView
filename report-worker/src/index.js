@@ -68,6 +68,7 @@ const ensureProjectsTable = async env => {
     detail TEXT NOT NULL,
     poll_selection TEXT,
     settings TEXT,
+    slot INTEGER,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     UNIQUE(user_id, configuration)
@@ -79,6 +80,23 @@ const ensureProjectsTable = async env => {
   if (!(columns.results || []).some(column => column.name === "settings")) {
     await env.REPORTS.prepare("ALTER TABLE projects ADD COLUMN settings TEXT").run();
   }
+  if (!(columns.results || []).some(column => column.name === "slot")) {
+    await env.REPORTS.prepare("ALTER TABLE projects ADD COLUMN slot INTEGER").run();
+  }
+  const unslotted = await env.REPORTS.prepare("SELECT id, user_id FROM projects WHERE slot IS NULL ORDER BY user_id, created_at, id").all();
+  const nextSlot = new Map();
+  for (const project of unslotted.results || []) {
+    if (!nextSlot.has(project.user_id)) {
+      const occupied = await env.REPORTS.prepare("SELECT slot FROM projects WHERE user_id = ? AND slot IS NOT NULL").bind(project.user_id).all();
+      nextSlot.set(project.user_id, new Set((occupied.results || []).map(row => Number(row.slot))));
+    }
+    const used = nextSlot.get(project.user_id);
+    const slot = [1, 2, 3, 4, 5].find(number => !used.has(number));
+    if (!slot) continue;
+    await env.REPORTS.prepare("UPDATE projects SET slot = ? WHERE id = ?").bind(slot, project.id).run();
+    used.add(slot);
+  }
+  await env.REPORTS.prepare("CREATE UNIQUE INDEX IF NOT EXISTS projects_user_slot ON projects(user_id, slot)").run();
 };
 
 const ensureSettingsSlotsTable = async env => {
@@ -92,7 +110,7 @@ const ensureSettingsSlotsTable = async env => {
 
 const sanitizeSnapshot = value => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const allowed = { ui: ["fullRegionNames", "showSinceElection", "changeMode", "sinceElectionMode", "showBrackets", "showLabels", "regionLabelMode", "partyLabelMode", "barColors", "barColorMode", "barStyle", "showPercentValues", "percentLabelMode", "showLut", "showBackground", "export3d", "chartTheme", "uiBrightness", "uiSaturation", "yAxisMode"], output: ["a4Mode", "a4Orientation", "a4DiagramFormat", "outputBarWidth", "hideEmptyClusters"] };
+  const allowed = { ui: ["fullRegionNames", "showSinceElection", "changeMode", "sinceElectionMode", "showBrackets", "showLabels", "regionLabelMode", "partyLabelMode", "barColors", "barColorMode", "barStyle", "showPercentValues", "percentLabelMode", "showLut", "showBackground", "export3d", "chartTheme", "uiBrightness", "uiSaturation", "yAxisMode"], output: ["exportFormat", "a4Mode", "a4Orientation", "a4DiagramFormat", "outputBarWidth", "hideEmptyClusters"] };
   return Object.fromEntries(Object.entries(allowed).map(([section, keys]) => [section, Object.fromEntries(keys.filter(key => ["string", "number", "boolean"].includes(typeof value[section]?.[key])).map(key => [key, value[section][key]]))]));
 };
 
@@ -288,7 +306,7 @@ export default {
 
     if (url.pathname === "/projects" && request.method === "GET") {
       await ensureProjectsTable(env);
-      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY created_at ASC LIMIT 5").bind(reporter.id).all();
+      const result = await env.REPORTS.prepare("SELECT id, slot, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY slot ASC LIMIT 5").bind(reporter.id).all();
       return json({ projects: (result.results || []).map(project => ({ ...project, poll_selection: parsePollSelection(project.poll_selection), settings: parseSnapshot(project.settings) })) }, 200, origin);
     }
 
@@ -299,16 +317,24 @@ export default {
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
       const pollSelection = sanitizePollSelection(payload.pollSelection);
       const settings = sanitizeSnapshot(payload.settings);
+      let slot = Number(payload.slot);
       if (!/^[0-9A-Za-z]{13,32}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
-      const existing = await env.REPORTS.prepare("SELECT id FROM projects WHERE user_id = ? AND configuration = ? LIMIT 1").bind(reporter.id, configuration).first();
-      if (!existing) {
-        const count = await env.REPORTS.prepare("SELECT COUNT(*) AS count FROM projects WHERE user_id = ?").bind(reporter.id).first();
-        if (Number(count?.count || 0) >= 5) return json({ error: "Es können maximal fünf Projekte gespeichert werden." }, 409, origin);
+      if (payload.slot === undefined) {
+        const existing = await env.REPORTS.prepare("SELECT id, slot FROM projects WHERE user_id = ? AND configuration = ?").bind(reporter.id, configuration).first();
+        if (existing) {
+          await env.REPORTS.prepare("UPDATE projects SET title = ?, detail = ?, poll_selection = ?, settings = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").bind(title, detail, pollSelection ? JSON.stringify(pollSelection) : null, settings ? JSON.stringify(settings) : null, existing.id).run();
+          return json({ ok: true, id: existing.id }, 200, origin);
+        }
+        const occupied = await env.REPORTS.prepare("SELECT slot FROM projects WHERE user_id = ?").bind(reporter.id).all();
+        slot = [1, 2, 3, 4, 5].find(number => !(occupied.results || []).some(row => Number(row.slot) === number));
       }
-      const id = existing?.id || crypto.randomUUID();
-      await env.REPORTS.prepare("INSERT INTO projects (id, user_id, configuration, title, detail, poll_selection, settings) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, configuration) DO UPDATE SET title = excluded.title, detail = excluded.detail, poll_selection = excluded.poll_selection, settings = excluded.settings, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(id, reporter.id, configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null, settings ? JSON.stringify(settings) : null).run();
-      return json({ ok: true, id }, existing ? 200 : 201, origin);
+      if (!Number.isInteger(slot) || slot < 1 || slot > 5) return json({ error: "Bitte einen gültigen Projektslot auswählen." }, 400, origin);
+      try {
+        const id = crypto.randomUUID();
+        await env.REPORTS.prepare("INSERT INTO projects (id, user_id, slot, configuration, title, detail, poll_selection, settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(id, reporter.id, slot, configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null, settings ? JSON.stringify(settings) : null).run();
+        return json({ ok: true, id }, 201, origin);
+      } catch (error) { return json({ error: "Dieser Slot oder diese Konfiguration ist bereits belegt." }, 409, origin); }
     }
 
     const projectMatch = url.pathname.match(/^\/projects\/([^/]+)$/);
@@ -342,7 +368,7 @@ export default {
       await ensureProjectsTable(env);
       const [result, projectResult] = await Promise.all([
         env.REPORTS.prepare("SELECT id, person_name, work_name, role, active, created_at FROM report_users ORDER BY created_at ASC").all(),
-        env.REPORTS.prepare("SELECT id, user_id, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects ORDER BY updated_at DESC").all()
+        env.REPORTS.prepare("SELECT id, user_id, slot, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects ORDER BY slot ASC").all()
       ]);
       const projectsByUser = new Map();
       (projectResult.results || []).forEach(project => {
@@ -361,7 +387,7 @@ export default {
       const accountId = decodeURIComponent(accountProjectsMatch[1]);
       const account = await env.REPORTS.prepare("SELECT id FROM report_users WHERE id = ? LIMIT 1").bind(accountId).first();
       if (!account) return json({ error: "Account nicht gefunden." }, 404, origin);
-      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 5").bind(accountId).all();
+      const result = await env.REPORTS.prepare("SELECT id, slot, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY slot ASC LIMIT 5").bind(accountId).all();
       return json({ projects: (result.results || []).map(project => ({ ...project, poll_selection: parsePollSelection(project.poll_selection), settings: parseSnapshot(project.settings) })) }, 200, origin);
     }
 
