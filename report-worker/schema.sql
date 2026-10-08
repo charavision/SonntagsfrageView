@@ -40,12 +40,23 @@ CREATE TABLE IF NOT EXISTS projects (
   configuration TEXT NOT NULL,
   title TEXT NOT NULL,
   detail TEXT NOT NULL,
+  poll_selection TEXT,
+  settings TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   UNIQUE(user_id, configuration)
 );
 
 CREATE INDEX IF NOT EXISTS projects_user_updated_at ON projects(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS settings_slots (
+  user_id TEXT NOT NULL,
+  slot INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  settings TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  PRIMARY KEY (user_id, slot)
+);
 
 CREATE TABLE IF NOT EXISTS system_messages (
   id TEXT PRIMARY KEY,

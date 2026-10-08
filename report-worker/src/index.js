@@ -4,7 +4,7 @@ const json = (body, status, origin) => new Response(JSON.stringify(body), {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": "Content-Type, X-Report-Pin",
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Vary": "Origin"
   }
 });
@@ -67,6 +67,7 @@ const ensureProjectsTable = async env => {
     title TEXT NOT NULL,
     detail TEXT NOT NULL,
     poll_selection TEXT,
+    settings TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     UNIQUE(user_id, configuration)
@@ -75,6 +76,35 @@ const ensureProjectsTable = async env => {
   if (!(columns.results || []).some(column => column.name === "poll_selection")) {
     await env.REPORTS.prepare("ALTER TABLE projects ADD COLUMN poll_selection TEXT").run();
   }
+  if (!(columns.results || []).some(column => column.name === "settings")) {
+    await env.REPORTS.prepare("ALTER TABLE projects ADD COLUMN settings TEXT").run();
+  }
+};
+
+const ensureSettingsSlotsTable = async env => {
+  await env.REPORTS.prepare(`CREATE TABLE IF NOT EXISTS settings_slots (
+    user_id TEXT NOT NULL, slot INTEGER NOT NULL, title TEXT NOT NULL, settings TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (user_id, slot)
+  )`).run();
+  await env.REPORTS.prepare("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))").run();
+};
+
+const sanitizeSnapshot = value => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const allowed = { ui: ["fullRegionNames", "showSinceElection", "changeMode", "sinceElectionMode", "showBrackets", "showLabels", "regionLabelMode", "partyLabelMode", "barColors", "barColorMode", "barStyle", "showPercentValues", "percentLabelMode", "showLut", "showBackground", "export3d", "chartTheme", "uiBrightness", "uiSaturation", "yAxisMode"], output: ["a4Mode", "a4Orientation", "a4DiagramFormat", "outputBarWidth", "hideEmptyClusters"] };
+  return Object.fromEntries(Object.entries(allowed).map(([section, keys]) => [section, Object.fromEntries(keys.filter(key => ["string", "number", "boolean"].includes(typeof value[section]?.[key])).map(key => [key, value[section][key]]))]));
+};
+
+const parseSnapshot = value => {
+  try { return value ? sanitizeSnapshot(JSON.parse(value)) : null; }
+  catch { return null; }
+};
+const parseStandardSlot = value => {
+  try {
+    const parsed = JSON.parse(value || "null");
+    return parsed && typeof parsed === "object" ? parsed : { userId: "builtin-admin", slot: Number(value || 0) };
+  } catch { return { userId: "builtin-admin", slot: Number(value || 0) }; }
 };
 
 const ensureSystemMessagesTable = async env => {
@@ -118,13 +148,20 @@ export default {
       return new Response(null, { status: 204, headers: {
         "Access-Control-Allow-Origin": origin,
         "Access-Control-Allow-Headers": "Content-Type, X-Report-Pin",
-        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
         "Vary": "Origin"
       } });
     }
     if (requestOrigin && !originAllowed) return json({ error: "Origin nicht erlaubt." }, 403, origin);
 
     const url = new URL(request.url);
+    if (url.pathname === "/settings/slots/public" && request.method === "GET") {
+      await ensureSettingsSlotsTable(env);
+      const selected = await env.REPORTS.prepare("SELECT value FROM app_settings WHERE key = 'standard_settings_slot'").first();
+      const selectedSlot = parseStandardSlot(selected?.value);
+      const row = selectedSlot.slot ? await env.REPORTS.prepare("SELECT title, settings FROM settings_slots WHERE user_id = ? AND slot = ?").bind(selectedSlot.userId, selectedSlot.slot).first() : null;
+      return json({ standard: row ? { title: row.title, settings: parseSnapshot(row.settings) } : null }, 200, origin);
+    }
     if (url.pathname === "/settings/intro" && request.method === "GET") {
       try {
         await env.REPORTS.prepare("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))").run();
@@ -168,6 +205,47 @@ export default {
     const reporter = await authenticate(env, suppliedHash);
     if (!reporter) return json({ error: "PIN nicht gültig." }, 401, origin);
 
+    if (url.pathname === "/settings/slots" && request.method === "GET") {
+      await ensureSettingsSlotsTable(env);
+      const result = await env.REPORTS.prepare("SELECT slot, title, settings, updated_at FROM settings_slots WHERE user_id = ? ORDER BY slot").bind(reporter.id).all();
+      const selected = reporter.role === "Admin" ? await env.REPORTS.prepare("SELECT value FROM app_settings WHERE key = 'standard_settings_slot'").first() : null;
+      const selectedSlot = parseStandardSlot(selected?.value);
+      return json({ slots: (result.results || []).map(row => ({ ...row, settings: parseSnapshot(row.settings) })), limit: reporter.role === "Admin" ? 10 : 2, standardSlot: selectedSlot.userId === reporter.id ? selectedSlot.slot : 0 }, 200, origin);
+    }
+    const settingsSlotMatch = url.pathname.match(/^\/settings\/slots\/(\d+)$/);
+    if (settingsSlotMatch && request.method === "PUT") {
+      const slot = Number(settingsSlotMatch[1]);
+      if (slot < 1 || slot > (reporter.role === "Admin" ? 10 : 2)) return json({ error: "Ungültiger Slot." }, 400, origin);
+      const payload = await request.json().catch(() => ({}));
+      const title = String(payload.title || "").trim().slice(0, 100);
+      const settings = sanitizeSnapshot(payload.settings);
+      if (!title || !settings || !Object.keys(settings.ui).length && !Object.keys(settings.output).length) return json({ error: "Bezeichnung und Einstellungen fehlen." }, 400, origin);
+      await ensureSettingsSlotsTable(env);
+      await env.REPORTS.prepare("INSERT INTO settings_slots (user_id, slot, title, settings) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, slot) DO UPDATE SET title = excluded.title, settings = excluded.settings, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(reporter.id, slot, title, JSON.stringify(settings)).run();
+      return json({ ok: true }, 200, origin);
+    }
+    if (settingsSlotMatch && request.method === "DELETE") {
+      const slot = Number(settingsSlotMatch[1]);
+      await ensureSettingsSlotsTable(env);
+      await env.REPORTS.prepare("DELETE FROM settings_slots WHERE user_id = ? AND slot = ?").bind(reporter.id, slot).run();
+      if (reporter.role === "Admin") {
+        const selected = await env.REPORTS.prepare("SELECT value FROM app_settings WHERE key = 'standard_settings_slot'").first();
+        const selectedSlot = parseStandardSlot(selected?.value);
+        if (selectedSlot.userId === reporter.id && selectedSlot.slot === slot) await env.REPORTS.prepare("DELETE FROM app_settings WHERE key = 'standard_settings_slot'").run();
+      }
+      return json({ ok: true }, 200, origin);
+    }
+    if (url.pathname === "/settings/slots/standard" && request.method === "PUT") {
+      if (reporter.role !== "Admin") return json({ error: "Nur Admin darf den Standard festlegen." }, 403, origin);
+      const payload = await request.json().catch(() => ({}));
+      const slot = Number(payload.slot);
+      await ensureSettingsSlotsTable(env);
+      const existing = Number.isInteger(slot) && slot >= 1 && slot <= 10 ? await env.REPORTS.prepare("SELECT slot FROM settings_slots WHERE user_id = ? AND slot = ?").bind(reporter.id, slot).first() : null;
+      if (!existing) return json({ error: "Der gewählte Slot ist leer." }, 400, origin);
+      await env.REPORTS.prepare("INSERT INTO app_settings (key, value) VALUES ('standard_settings_slot', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify({ userId: reporter.id, slot })).run();
+      return json({ ok: true, slot }, 200, origin);
+    }
+
     if (url.pathname === "/settings/intro" && request.method === "PATCH") {
       if (reporter.role !== "Admin") return json({ error: "Nur Admin darf das Intro einstellen." }, 403, origin);
       const payload = await request.json().catch(() => ({}));
@@ -210,8 +288,8 @@ export default {
 
     if (url.pathname === "/projects" && request.method === "GET") {
       await ensureProjectsTable(env);
-      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, poll_selection, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 5").bind(reporter.id).all();
-      return json({ projects: (result.results || []).map(project => ({ ...project, poll_selection: parsePollSelection(project.poll_selection) })) }, 200, origin);
+      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY created_at ASC LIMIT 5").bind(reporter.id).all();
+      return json({ projects: (result.results || []).map(project => ({ ...project, poll_selection: parsePollSelection(project.poll_selection), settings: parseSnapshot(project.settings) })) }, 200, origin);
     }
 
     if (url.pathname === "/projects" && request.method === "POST") {
@@ -220,7 +298,8 @@ export default {
       const title = String(payload.title || "Sonntagsfragen").trim().slice(0, 100) || "Sonntagsfragen";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
       const pollSelection = sanitizePollSelection(payload.pollSelection);
-      if (!/^[0-9A-Za-z]{13,27}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
+      const settings = sanitizeSnapshot(payload.settings);
+      if (!/^[0-9A-Za-z]{13,32}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       const existing = await env.REPORTS.prepare("SELECT id FROM projects WHERE user_id = ? AND configuration = ? LIMIT 1").bind(reporter.id, configuration).first();
       if (!existing) {
@@ -228,7 +307,7 @@ export default {
         if (Number(count?.count || 0) >= 5) return json({ error: "Es können maximal fünf Projekte gespeichert werden." }, 409, origin);
       }
       const id = existing?.id || crypto.randomUUID();
-      await env.REPORTS.prepare("INSERT INTO projects (id, user_id, configuration, title, detail, poll_selection) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, configuration) DO UPDATE SET title = excluded.title, detail = excluded.detail, poll_selection = excluded.poll_selection, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(id, reporter.id, configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null).run();
+      await env.REPORTS.prepare("INSERT INTO projects (id, user_id, configuration, title, detail, poll_selection, settings) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, configuration) DO UPDATE SET title = excluded.title, detail = excluded.detail, poll_selection = excluded.poll_selection, settings = excluded.settings, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(id, reporter.id, configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null, settings ? JSON.stringify(settings) : null).run();
       return json({ ok: true, id }, existing ? 200 : 201, origin);
     }
 
@@ -239,10 +318,11 @@ export default {
       const title = String(payload.title || "Unbenannt").trim().slice(0, 100) || "Unbenannt";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
       const pollSelection = sanitizePollSelection(payload.pollSelection);
-      if (!/^[0-9A-Za-z]{13,27}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
+      const settings = sanitizeSnapshot(payload.settings);
+      if (!/^[0-9A-Za-z]{13,32}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       try {
-        const result = await env.REPORTS.prepare("UPDATE projects SET configuration = ?, title = ?, detail = ?, poll_selection = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ?").bind(configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null, decodeURIComponent(projectMatch[1]), reporter.id).run();
+        const result = await env.REPORTS.prepare("UPDATE projects SET configuration = ?, title = ?, detail = ?, poll_selection = ?, settings = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ?").bind(configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null, settings ? JSON.stringify(settings) : null, decodeURIComponent(projectMatch[1]), reporter.id).run();
         if (!result.meta?.changes) return json({ error: "Projekt nicht gefunden." }, 404, origin);
         return json({ ok: true, id: decodeURIComponent(projectMatch[1]) }, 200, origin);
       } catch (error) {
@@ -262,12 +342,12 @@ export default {
       await ensureProjectsTable(env);
       const [result, projectResult] = await Promise.all([
         env.REPORTS.prepare("SELECT id, person_name, work_name, role, active, created_at FROM report_users ORDER BY created_at ASC").all(),
-        env.REPORTS.prepare("SELECT id, user_id, configuration, title, detail, poll_selection, created_at, updated_at FROM projects ORDER BY updated_at DESC").all()
+        env.REPORTS.prepare("SELECT id, user_id, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects ORDER BY updated_at DESC").all()
       ]);
       const projectsByUser = new Map();
       (projectResult.results || []).forEach(project => {
         const projects = projectsByUser.get(project.user_id) || [];
-        if (projects.length < 5) projects.push({ ...project, poll_selection: parsePollSelection(project.poll_selection) });
+        if (projects.length < 5) projects.push({ ...project, poll_selection: parsePollSelection(project.poll_selection), settings: parseSnapshot(project.settings) });
         projectsByUser.set(project.user_id, projects);
       });
       const stored = (result.results || []).map(user => ({ id: user.id, personName: user.person_name, workName: user.work_name, role: user.role, active: Boolean(user.active), system: false, projects: projectsByUser.get(user.id) || [] }));
@@ -281,8 +361,8 @@ export default {
       const accountId = decodeURIComponent(accountProjectsMatch[1]);
       const account = await env.REPORTS.prepare("SELECT id FROM report_users WHERE id = ? LIMIT 1").bind(accountId).first();
       if (!account) return json({ error: "Account nicht gefunden." }, 404, origin);
-      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, poll_selection, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 5").bind(accountId).all();
-      return json({ projects: (result.results || []).map(project => ({ ...project, poll_selection: parsePollSelection(project.poll_selection) })) }, 200, origin);
+      const result = await env.REPORTS.prepare("SELECT id, configuration, title, detail, poll_selection, settings, created_at, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 5").bind(accountId).all();
+      return json({ projects: (result.results || []).map(project => ({ ...project, poll_selection: parsePollSelection(project.poll_selection), settings: parseSnapshot(project.settings) })) }, 200, origin);
     }
 
     const accountPinMatch = url.pathname.match(/^\/accounts\/([^/]+)\/pin$/);
