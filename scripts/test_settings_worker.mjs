@@ -18,6 +18,7 @@ const database = {
           if (current?.selected_slot === params[1]) current.selected_slot = 0;
         }
         if (sql.startsWith("INSERT INTO app_settings") && sql.includes("standard_settings_slot")) settings.set("standard_settings_slot", params[0]);
+        if (sql.startsWith("INSERT INTO app_settings") && sql.includes("wave_settings")) settings.set("wave_settings", params[0]);
         if (sql.startsWith("DELETE FROM app_settings") && sql.includes("standard_settings_slot")) settings.delete("standard_settings_slot");
         if (sql.startsWith("INSERT INTO passkey_sessions")) sessions.set(params[0], { user_id: params[1], expires_at: params[2], auth_method: params[3] });
         if (sql.startsWith("DELETE FROM passkey_sessions WHERE token_hash")) sessions.delete(params[0]);
@@ -26,10 +27,11 @@ const database = {
       async first() {
         if (sql.includes("FROM passkey_sessions s JOIN report_users")) {
           const session = sessions.get(params[0]);
-          return session?.expires_at > params[1] ? { id: "builtin-admin", person_name: "Test", work_name: "Admin", role: "Admin", expires_at: session.expires_at, auth_method: session.auth_method } : null;
+          return session?.expires_at > params[1] ? { id: "builtin-admin", person_name: "Test", work_name: "Admin", role: session.role || "Admin", expires_at: session.expires_at, auth_method: session.auth_method } : null;
         }
         if (sql.includes("FROM report_users")) return { id: "builtin-admin", person_name: "Test", work_name: "Admin", role: "Admin", pin_hash: "x" };
         if (sql.includes("FROM app_settings") && sql.includes("standard_settings_slot")) return settings.has("standard_settings_slot") ? { value: settings.get("standard_settings_slot") } : null;
+        if (sql.includes("FROM app_settings") && sql.includes("wave_settings")) return settings.has("wave_settings") ? { value: settings.get("wave_settings") } : null;
         if (sql.includes("FROM settings_slots")) return slots.get(`${params[0]}:${params[1]}`) || null;
         if (sql.includes("FROM user_settings_preferences")) return preferences.get(params[0]) || null;
         return null;
@@ -52,6 +54,19 @@ let response = await worker.fetch(request("/session", "POST"), env);
 assert.equal(response.status, 200);
 sessionToken = (await response.json()).token;
 assert.ok(sessionToken);
+response = await worker.fetch(request("/settings/waves"), env);
+assert.deepEqual((await response.json()).settings, { color: "purple", transparency: 0, blur: 0 });
+response = await worker.fetch(request("/settings/waves", "PATCH", { settings: { color: "orange", transparency: 26, blur: 105 } }), env);
+assert.equal(response.status, 200);
+assert.deepEqual((await response.json()).settings, { color: "orange", transparency: 25, blur: 100 });
+response = await worker.fetch(request("/settings/waves"), env);
+assert.deepEqual((await response.json()).settings, { color: "orange", transparency: 25, blur: 100 });
+response = await worker.fetch(new Request("https://worker.example/settings/waves", { headers: { Origin: "https://charavision.github.io" } }), env);
+assert.equal(response.status, 200, "Wellen-Einstellungen sind für Gäste lesbar");
+for (const session of sessions.values()) session.role = "Helper";
+response = await worker.fetch(request("/settings/waves", "PATCH", { settings: { color: "gray" } }), env);
+assert.equal(response.status, 403, "Helfer dürfen globale Wellen nicht ändern");
+for (const session of sessions.values()) session.role = "Admin";
 response = await worker.fetch(request("/settings/slots/1", "PUT", { title: "Meine Ansicht", settings: snapshot }), env);
 assert.equal(response.status, 200);
 response = await worker.fetch(request("/settings/slots"), env);

@@ -53,6 +53,13 @@ const sanitizeDeveloperSettings = input => Object.fromEntries(["mobile", "deskto
   }))
 ]));
 
+const waveDefaults = { color: "purple", transparency: 0, blur: 0 };
+const sanitizeWaveSettings = input => ({
+  color: ["purple", "orange", "gray"].includes(input?.color) ? input.color : waveDefaults.color,
+  transparency: Number.isFinite(Number(input?.transparency)) ? Math.max(0, Math.min(100, Math.round(Number(input.transparency) / 5) * 5)) : 0,
+  blur: Number.isFinite(Number(input?.blur)) ? Math.max(0, Math.min(100, Math.round(Number(input.blur) / 5) * 5)) : 0
+});
+
 const authenticate = async (env, suppliedHash) => {
   try {
     const stored = await env.REPORTS.prepare("SELECT id, person_name, work_name, role, pin_hash FROM report_users WHERE pin_hash = ? AND active = 1 LIMIT 1").bind(suppliedHash).first();
@@ -203,6 +210,14 @@ export default {
         return json({ settings: developerDefaults }, 200, origin);
       }
     }
+    if (url.pathname === "/settings/waves" && request.method === "GET") {
+      try {
+        const setting = await env.REPORTS.prepare("SELECT value FROM app_settings WHERE key = 'wave_settings'").first();
+        return json({ settings: sanitizeWaveSettings(setting?.value ? JSON.parse(setting.value) : waveDefaults) }, 200, origin);
+      } catch (error) {
+        return json({ settings: waveDefaults }, 200, origin);
+      }
+    }
     if (url.pathname === "/settings/notification-interval" && request.method === "GET") {
       try {
         await env.REPORTS.prepare("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))").run();
@@ -317,6 +332,13 @@ export default {
       await env.REPORTS.prepare("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))").run();
       await env.REPORTS.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('developer_settings', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(JSON.stringify(settings)).run();
       await env.REPORTS.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('intro_enabled', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(settings.desktop.intro.visible && settings.desktop.intro.value ? "1" : "0").run();
+      return json({ ok: true, settings }, 200, origin);
+    }
+    if (url.pathname === "/settings/waves" && request.method === "PATCH") {
+      if (reporter.role !== "Admin") return json({ error: "Nur Admin darf die Wellen einstellen." }, 403, origin);
+      const payload = await request.json().catch(() => ({}));
+      const settings = sanitizeWaveSettings(payload.settings);
+      await env.REPORTS.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('wave_settings', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(JSON.stringify(settings)).run();
       return json({ ok: true, settings }, 200, origin);
     }
     if (url.pathname === "/settings/notification-interval" && request.method === "PATCH") {

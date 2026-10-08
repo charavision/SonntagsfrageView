@@ -1222,19 +1222,27 @@ function installViewScaleGestures() {
   surface.addEventListener("gestureend", () => { trackpadGesture = null; }, { passive: true });
 }
 
+const waveDefaults = Object.freeze({ color: "purple", transparency: 0, blur: 0 });
+let waveSettings = { ...waveDefaults };
+const wavePalettes = {
+  purple: ["#326dff", "#b34cec", "#5650f5", "#dc4ba7", "#3977ff", "#3977ff"],
+  orange: ["#3f9d69", "#f59b36", "#e77729", "#73a94b", "#f5a247", "#e8822d"],
+  gray: ["#343a44", "#737b87", "#c5c9cf", "#626a75", "#d6d9dc", "#414852"]
+};
 function appendBackgroundWave(parent, { left, right, top, bottom }, id) {
   const width = right - left, height = bottom - top;
   if (!(width > 0 && height > 0)) return;
-  const group = svgEl("g", { class: "background-wave", opacity: .8, "aria-hidden": "true", "pointer-events": "none" });
+  const group = svgEl("g", { class: "background-wave", opacity: .8 * (1 - waveSettings.transparency / 100), "aria-hidden": "true", "pointer-events": "none", ...(waveSettings.blur ? { filter: `url(#${id}-admin-blur)` } : {}) });
   const defs = svgEl("defs");
+  const colors = wavePalettes[waveSettings.color] || wavePalettes.purple;
   defs.innerHTML = `<linearGradient id="${id}-color" x1="0%" y1="0%" x2="100%" y2="0%">
-    <stop offset="0" stop-color="#326dff" stop-opacity=".15"/>
-    <stop offset=".22" stop-color="#b34cec"/>
-    <stop offset=".48" stop-color="#5650f5"/>
-    <stop offset=".7" stop-color="#dc4ba7"/>
-    <stop offset=".9" stop-color="#3977ff"/>
-    <stop offset="1" stop-color="#3977ff" stop-opacity=".15"/>
-  </linearGradient><filter id="${id}-soft" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="3"/></filter>`;
+    <stop offset="0" stop-color="${colors[0]}" stop-opacity=".15"/>
+    <stop offset=".22" stop-color="${colors[1]}"/>
+    <stop offset=".48" stop-color="${colors[2]}"/>
+    <stop offset=".7" stop-color="${colors[3]}"/>
+    <stop offset=".9" stop-color="${colors[4]}"/>
+    <stop offset="1" stop-color="${colors[5]}" stop-opacity=".15"/>
+  </linearGradient><filter id="${id}-soft" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="3"/></filter><filter id="${id}-admin-blur" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="${(waveSettings.blur * .08).toFixed(1)}"/></filter>`;
   group.append(defs);
   const steps = Math.max(80, Math.min(1200, Math.ceil(width / 10)));
   const cycles = Math.max(1.5, width / 460);
@@ -2961,10 +2969,16 @@ function closePreviewOptions() {
 
 function syncPreviewToolbarMode() {
   const width = els.previewDialog.getBoundingClientRect().width;
-  const compact = state.mobileView || width < 1080;
+  const compact = width < 760;
   els.previewDialog.classList.toggle("mobile-preview", compact);
   els.previewDialog.classList.toggle("very-narrow-preview", width < 380);
-  if (!compact) closePreviewOptions();
+  if (previewOnlyRequested) {
+    els.previewDialog.classList.remove("preview-only-collapsed");
+    const header = els.previewDialog.querySelector(".preview-header");
+    const collapsed = header.scrollWidth > header.clientWidth + 1;
+    els.previewDialog.classList.toggle("preview-only-collapsed", collapsed);
+    if (!collapsed) closePreviewOptions();
+  } else if (!compact) closePreviewOptions();
 }
 
 function setPreviewSplitPosition(clientX) {
@@ -3256,6 +3270,43 @@ async function downloadBlob(blob, filename) {
 }
 
 const reportApiUrl = String(window.REPORT_API_URL || "").replace(/\/$/, "");
+const waveColorOptions = [["purple", "Lila"], ["orange", "Orange"], ["gray", "Grau"]];
+let waveSaveTimer = 0;
+let waveSaveChain = Promise.resolve();
+function syncWaveControls() {
+  const controls = document.querySelector("#admin-wave-controls");
+  if (!controls) return;
+  controls.hidden = currentReportRole !== "Admin";
+  setCycleButton(document.querySelector("#wave-color-mode"), waveSettings.color, waveColorOptions);
+  for (const key of ["transparency", "blur"]) {
+    document.querySelector(`#wave-${key}`).value = waveSettings[key];
+    document.querySelector(`#wave-${key}-value`).textContent = `${waveSettings[key]} %`;
+  }
+}
+async function fetchWaveSettings() {
+  if (!reportApiUrl) return;
+  try {
+    const response = await fetch(`${reportApiUrl}/settings/waves?update=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (payload.settings && wavePalettes[payload.settings.color]) waveSettings = { ...waveDefaults, ...payload.settings };
+  } catch (error) { /* Die zuletzt verfügbaren Standardwerte bleiben nutzbar. */ }
+  syncWaveControls();
+}
+function saveWaveSettings() {
+  clearTimeout(waveSaveTimer);
+  waveSaveTimer = setTimeout(() => {
+    const settings = { ...waveSettings };
+    const message = document.querySelector("#wave-settings-message");
+    waveSaveChain = waveSaveChain.catch(() => {}).then(async () => {
+      if (currentReportRole !== "Admin") return;
+      try {
+        await reportRequest("/settings/waves", { method: "PATCH", body: JSON.stringify({ settings }) });
+        message.textContent = "Global gespeichert.";
+      } catch (error) { message.textContent = `Nicht gespeichert: ${error.message}`; }
+    });
+  }, 350);
+}
 const REPORT_SESSION_KEY = "sonntagsfragen.reportSession.v1";
 const REPORT_SESSION_IDLE_MS = 15 * 60_000;
 const REPORT_SESSION_HEARTBEAT_MS = 60_000;
@@ -4555,7 +4606,7 @@ async function startSimpleAppIntro() {
   });
 }
 
-Promise.all([fetchLatestData(), fetchDeveloperSettings()])
+Promise.all([fetchLatestData(), fetchDeveloperSettings(), fetchWaveSettings()])
   .then(async ([data]) => {
     state.data = data;
     applyDeveloperSettings();
@@ -4750,6 +4801,19 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     const yAxisButton = document.querySelector("#y-axis-mode");
     const backgroundButton = document.querySelector("#background-mode");
     const bracketsButton = document.querySelector("#brackets-mode");
+    document.querySelector("#wave-color-mode").addEventListener("click", event => {
+      if (currentReportRole !== "Admin") return;
+      waveSettings.color = advanceCycleButton(event.currentTarget, waveColorOptions);
+      render(false);
+      saveWaveSettings();
+    });
+    for (const key of ["transparency", "blur"]) document.querySelector(`#wave-${key}`).addEventListener("input", event => {
+      if (currentReportRole !== "Admin") return;
+      waveSettings[key] = Number(event.currentTarget.value);
+      document.querySelector(`#wave-${key}-value`).textContent = `${waveSettings[key]} %`;
+      render(false);
+      saveWaveSettings();
+    });
     lutMenuToggle.addEventListener("click", event => {
       const choice = event.currentTarget.closest(".lut-choice");
       if (!choice.classList.contains("is-open")) {
@@ -5142,6 +5206,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     const finishReportLogin = async (session, method) => {
         reportAuthMethod = method;
         currentReportRole = session.role || (session.reporter === "Admin" ? "Admin" : "Helper");
+        syncWaveControls();
         const fallbackIdentity = reportIdentities[session.reporter] || { person: session.reporter || "Reporter", work: session.reporter || "Reporter" };
         const identity = { person: session.personName || fallbackIdentity.person, work: session.workName || fallbackIdentity.work };
         currentReportIdentity = identity;
@@ -5227,6 +5292,8 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       const token = reportSessionToken;
       clearReportSession();
       reportPin = ""; reportAuthMethod = ""; currentReportRole = ""; currentReportIdentity = null;
+      clearTimeout(waveSaveTimer);
+      syncWaveControls();
       if (token && !expired) fetch(`${reportApiUrl}/session/logout`, { method: "POST", headers: { "Content-Type": "application/json", "X-Report-Session": token }, body: "{}", keepalive: true }).catch(() => {});
       pinFields.forEach(field => { field.value = ""; });
       document.querySelector("#report-session").hidden = true;

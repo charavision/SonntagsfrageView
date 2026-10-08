@@ -149,6 +149,12 @@
                   <button id="y-axis-mode" class="lut-option-row" type="button" data-value="dynamic"><span>Y-Achse:</span><strong class="label-option-value">Dynamisch</strong></button>
                   <button id="background-mode" class="lut-option-row" type="button" data-value="on"><span>Hintergrund:</span><strong class="label-option-value">An</strong></button>
                   <button id="brackets-mode" class="lut-option-row" type="button" data-value="on"><span>Klammern:</span><strong class="label-option-value">An</strong></button>
+                  <div id="admin-wave-controls" class="admin-wave-controls" hidden>
+                    <button id="wave-color-mode" class="lut-option-row wave-admin-row" type="button" data-value="purple"><span>Wellen-Farbe:</span><strong class="label-option-value">Lila</strong></button>
+                    <div class="wave-admin-slider"><span>Wellen-Transparenz:</span><strong id="wave-transparency-value">0 %</strong><input id="wave-transparency" type="range" min="0" max="100" step="5" value="0" aria-label="Wellen-Transparenz"></div>
+                    <div class="wave-admin-slider"><span>Wellen-Blur:</span><strong id="wave-blur-value">0 %</strong><input id="wave-blur" type="range" min="0" max="100" step="5" value="0" aria-label="Wellen-Blur"></div>
+                    <span id="wave-settings-message" class="wave-settings-message" role="status"></span>
+                  </div>
                 </div>
               </div>
               <input id="view-zoom-enabled" type="checkbox" checked hidden>
