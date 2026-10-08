@@ -9,6 +9,7 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
 @property(nonatomic, strong) WKWebView *webView;
 @property(nonatomic, strong) NSMutableDictionary<NSString *, NSMutableData *> *saveTransfers;
 @property(nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *saveFilenames;
+@property(nonatomic, copy) NSString *reportSessionToken;
 @end
 
 @implementation AppDelegate
@@ -22,7 +23,8 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
     [configuration.userContentController addScriptMessageHandler:self name:@"saveFileStart"];
     [configuration.userContentController addScriptMessageHandler:self name:@"saveFileChunk"];
     [configuration.userContentController addScriptMessageHandler:self name:@"saveFileFinish"];
-    NSString *bridge = @"window.MacApp={isSurfaceReady:function(){return true},refreshIntro:function(){window.webkit.messageHandlers.refreshIntro.postMessage(null)},installUpdate:function(url){window.webkit.messageHandlers.installUpdate.postMessage(url)},saveFile:function(filename,dataUrl){window.webkit.messageHandlers.saveFile.postMessage({filename:filename,dataUrl:dataUrl})},saveFileStart:function(id,filename){window.webkit.messageHandlers.saveFileStart.postMessage({id:id,filename:filename})},saveFileChunk:function(id,data){window.webkit.messageHandlers.saveFileChunk.postMessage({id:id,data:data})},saveFileFinish:function(id){window.webkit.messageHandlers.saveFileFinish.postMessage({id:id})}};";
+    [configuration.userContentController addScriptMessageHandler:self name:@"reportSessionToken"];
+    NSString *bridge = [NSString stringWithFormat:@"window.MacApp={getSessionInstanceId:function(){return '%@'},setReportSessionToken:function(token){window.webkit.messageHandlers.reportSessionToken.postMessage(token)},isSurfaceReady:function(){return true},refreshIntro:function(){window.webkit.messageHandlers.refreshIntro.postMessage(null)},installUpdate:function(url){window.webkit.messageHandlers.installUpdate.postMessage(url)},saveFile:function(filename,dataUrl){window.webkit.messageHandlers.saveFile.postMessage({filename:filename,dataUrl:dataUrl})},saveFileStart:function(id,filename){window.webkit.messageHandlers.saveFileStart.postMessage({id:id,filename:filename})},saveFileChunk:function(id,data){window.webkit.messageHandlers.saveFileChunk.postMessage({id:id,data:data})},saveFileFinish:function(id){window.webkit.messageHandlers.saveFileFinish.postMessage({id:id})}};", [[NSUUID UUID] UUIDString]];
     [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:bridge injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
 
     self.webView = [[WKWebView alloc] initWithFrame:NSZeroRect configuration:configuration];
@@ -48,8 +50,28 @@ static NSString * const WebsiteURL = @"https://charavision.github.io/Sonntagsfra
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { return YES; }
 
+- (void)applicationWillTerminate:(NSNotification *)notification {
+    NSString *token = self.reportSessionToken;
+    if (token.length != 43) return;
+    NSURL *url = [NSURL URLWithString:@"https://sonntagsfragen-report.charavisionj5.workers.dev/session/logout"];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    request.HTTPMethod = @"POST";
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [request setValue:token forHTTPHeaderField:@"X-Report-Session"];
+    request.HTTPBody = [@"{}" dataUsingEncoding:NSUTF8StringEncoding];
+    dispatch_semaphore_t done = dispatch_semaphore_create(0);
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        dispatch_semaphore_signal(done);
+    }];
+    [task resume];
+    dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)));
+}
+
 - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
-    if ([message.name isEqualToString:@"refreshIntro"]) {
+    if ([message.name isEqualToString:@"reportSessionToken"] && [message.body isKindOfClass:NSString.class]) {
+        NSString *token = (NSString *)message.body;
+        self.reportSessionToken = token.length == 43 ? token : nil;
+    } else if ([message.name isEqualToString:@"refreshIntro"]) {
         [self refreshWebContent];
     } else if ([message.name isEqualToString:@"installUpdate"] && [message.body isKindOfClass:NSString.class]) {
         NSString *address = (NSString *)message.body;

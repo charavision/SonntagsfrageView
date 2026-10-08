@@ -108,6 +108,10 @@ const lengths = [
 const existingCode = "2Lx3Nt6efwf47CiSz";
 context.applyConfigurationCode(existingCode);
 assert.equal(context.configurationCode(), existingCode, "Ein bisheriger Code muss unverändert lesbar bleiben");
+state.a4Mode = false;
+context.applyConfigurationCode(context.configurationCode());
+assert.equal(state.a4Mode, true, "Auch alte Schlauch-Einstellungen werden als A4 geöffnet");
+assert.equal(context.sanitizeSettingsSnapshot({ output: { a4Mode: false } }).output.a4Mode, true, "Gespeicherte Einstellungen können Schlauch nicht wieder aktivieren");
 state.outputBarWidth = "standard";
 const standardWidth = context.a4BarWidthForSlot(120);
 state.outputBarWidth = "adapted";

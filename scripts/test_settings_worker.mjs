@@ -3,6 +3,7 @@ import worker from "../report-worker/src/index.js";
 const slots = new Map();
 const settings = new Map();
 const preferences = new Map();
+const sessions = new Map();
 const database = {
   prepare(sql) {
     let params = [];
@@ -18,9 +19,15 @@ const database = {
         }
         if (sql.startsWith("INSERT INTO app_settings") && sql.includes("standard_settings_slot")) settings.set("standard_settings_slot", params[0]);
         if (sql.startsWith("DELETE FROM app_settings") && sql.includes("standard_settings_slot")) settings.delete("standard_settings_slot");
+        if (sql.startsWith("INSERT INTO passkey_sessions")) sessions.set(params[0], { user_id: params[1], expires_at: params[2], auth_method: params[3] });
+        if (sql.startsWith("DELETE FROM passkey_sessions WHERE token_hash")) sessions.delete(params[0]);
         return { meta: { changes: 1 } };
       },
       async first() {
+        if (sql.includes("FROM passkey_sessions s JOIN report_users")) {
+          const session = sessions.get(params[0]);
+          return session?.expires_at > params[1] ? { id: "builtin-admin", person_name: "Test", work_name: "Admin", role: "Admin", expires_at: session.expires_at, auth_method: session.auth_method } : null;
+        }
         if (sql.includes("FROM report_users")) return { id: "builtin-admin", person_name: "Test", work_name: "Admin", role: "Admin", pin_hash: "x" };
         if (sql.includes("FROM app_settings") && sql.includes("standard_settings_slot")) return settings.has("standard_settings_slot") ? { value: settings.get("standard_settings_slot") } : null;
         if (sql.includes("FROM settings_slots")) return slots.get(`${params[0]}:${params[1]}`) || null;
@@ -35,12 +42,17 @@ const database = {
   }
 };
 const env = { REPORTS: database, ALLOWED_ORIGIN: "https://charavision.github.io" };
+let sessionToken = "";
 const request = (path, method = "GET", body) => new Request(`https://worker.example${path}`, {
-  method, headers: { Origin: "https://charavision.github.io", "X-Report-Pin": "TEST1", "Content-Type": "application/json" },
+  method, headers: { Origin: "https://charavision.github.io", ...(sessionToken ? { "X-Report-Session": sessionToken } : { "X-Report-Pin": "TEST1" }), "Content-Type": "application/json" },
   ...(body ? { body: JSON.stringify(body) } : {})
 });
 const snapshot = { ui: { chartTheme: "purple", showLabels: false }, output: { outputBarWidth: "adapted" } };
-let response = await worker.fetch(request("/settings/slots/1", "PUT", { title: "Meine Ansicht", settings: snapshot }), env);
+let response = await worker.fetch(request("/session", "POST"), env);
+assert.equal(response.status, 200);
+sessionToken = (await response.json()).token;
+assert.ok(sessionToken);
+response = await worker.fetch(request("/settings/slots/1", "PUT", { title: "Meine Ansicht", settings: snapshot }), env);
 assert.equal(response.status, 200);
 response = await worker.fetch(request("/settings/slots"), env);
 let listing = await response.json();

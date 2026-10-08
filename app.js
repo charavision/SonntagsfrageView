@@ -68,6 +68,7 @@ function appendThemeGradientStops(gradient, theme) {
   gradient.append(...stops.map(([offset, color]) => svgEl("stop", { offset, "stop-color": color })));
 }
 function isLightChartTheme() { return state.chartTheme === "bright" || state.chartTheme === "sunshine"; }
+function chartHeadingColor() { return isLightChartTheme() ? "#20466a" : "#59d9ff"; }
 function applySvgTheme(svg) {
   if (!isLightChartTheme()) return svg;
   const muted = new Set(["#7f95b2", "#8fa6c1", "#91a4ba", "#9bb0c9", "#9bb4d0", "#a8bfd9", "#b9cbe0"]);
@@ -351,7 +352,7 @@ function configurationCode() {
   const diagramFormatBits = BigInt({ auto: 0, "1x1": 1, "1x2": 2, "1x3": 3, "2x2": 4, "2x3": 5 }[state.a4DiagramFormat] || 0) << 29n;
   const changeModeBits = (state.changeMode === "development" ? 1n : 0n) << 32n;
   const emptyClusterBits = (state.hideEmptyClusters ? 1n : 0n) << 33n;
-  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits + diagramFormatBits + changeModeBits + emptyClusterBits;
+  const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + 8n + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits + diagramFormatBits + changeModeBits + emptyClusterBits;
   const remainingPartyBits = (state.stackUnselected ? 1n : 0n) << 34n;
   const brightStyleBits = (state.barStyle === "hell" ? 1n : 0n) << 35n;
   const noPartiesBits = (state.parties.size ? 0n : 1n) << 36n;
@@ -978,21 +979,34 @@ function advanceCycleButton(button, options) {
 }
 
 function updateA4Controls() {
-  const disabled = !state.a4Mode;
   const orientationButton = document.querySelector("#a4-orientation-cycle");
   const formatButton = document.querySelector("#a4-diagram-format-cycle");
   const previewOrientation = document.querySelector("#preview-a4-orientation");
   const previewFormat = document.querySelector("#preview-a4-format");
   const previewWidth = document.querySelector("#preview-bar-width");
-  [orientationButton, formatButton, previewOrientation, previewFormat].forEach(button => { if (button) button.disabled = disabled; });
   setCycleButton(orientationButton, state.a4Orientation, a4OrientationOptions);
   setCycleButton(formatButton, state.a4DiagramFormat, a4DiagramFormatOptions);
-  if (previewOrientation) { previewOrientation.dataset.value = state.a4Orientation; previewOrientation.textContent = `A4: ${a4OrientationOptions.find(([value]) => value === state.a4Orientation)?.[1] || "Auto"}`; }
-  if (previewFormat) { previewFormat.dataset.value = state.a4DiagramFormat; previewFormat.textContent = `Format: ${a4DiagramFormatOptions.find(([value]) => value === state.a4DiagramFormat)?.[1] || "Auto"}`; }
+  if (previewOrientation) {
+    const value = a4OrientationOptions.find(([key]) => key === state.a4Orientation)?.[1] || "Auto";
+    previewOrientation.dataset.value = state.a4Orientation;
+    previewOrientation.querySelector(".preview-control-value").textContent = value;
+    previewOrientation.setAttribute("aria-label", `A4-Ausrichtung: ${value}`);
+  }
+  if (previewFormat) {
+    const value = a4DiagramFormatOptions.find(([key]) => key === state.a4DiagramFormat)?.[1] || "Auto";
+    previewFormat.dataset.value = state.a4DiagramFormat;
+    previewFormat.querySelector(".preview-control-value").textContent = value;
+    previewFormat.setAttribute("aria-label", `A4-Diagrammformat: ${value}`);
+  }
   setCycleButton(document.querySelector("#output-bar-width-cycle"), state.outputBarWidth, outputBarWidthOptions);
-  if (previewWidth) { previewWidth.dataset.value = state.outputBarWidth; previewWidth.textContent = `Breite: ${state.outputBarWidth === "adapted" ? "Angepasst" : "Standard"}`; }
-  document.querySelector("#a4-orientation-settings")?.classList.toggle("is-disabled", disabled);
-  document.querySelector("#a4-diagram-format-settings")?.classList.toggle("is-disabled", disabled);
+  if (previewWidth) {
+    const value = state.outputBarWidth === "adapted" ? "Angepasst" : "Standard";
+    previewWidth.dataset.value = state.outputBarWidth;
+    previewWidth.querySelector(".preview-control-value").textContent = value;
+    previewWidth.setAttribute("aria-label", `Balkenbreite: ${value}`);
+  }
+  const previewFileFormat = document.querySelector("#preview-export-format");
+  if (previewFileFormat) previewFileFormat.value = document.querySelector("#export-format").value;
 }
 
 function cycleOutputBarWidth() {
@@ -2089,7 +2103,7 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
-  state.a4Mode = Boolean(mode & 8);
+  state.a4Mode = true;
   state.fullRegionNames = Boolean(mode & 16);
   state.electionDates = !(mode & 32);
   state.a4Orientation = mode & 128 ? "landscape" : mode & 64 ? "portrait" : "auto";
@@ -2170,7 +2184,6 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   syncEmptyClusterControls();
   els.electionDates.checked = state.electionDates;
   document.querySelector("#a4-mode").checked = state.a4Mode;
-  document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
   updateA4Controls();
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
   els.parties.querySelectorAll('input[name="party"]').forEach(input => input.checked = state.parties.has(input.value));
@@ -2285,7 +2298,7 @@ async function exportChartImage(format = "jpeg") {
   documentSvg.append(clone);
 
   const addLegendSection = (x, width, title, items, columns = 1, swatches = false) => {
-    addHeaderText(title, { x, y: 27 + headerOffsetY, fill: "#59d9ff", "font-size": 11, "font-weight": 800, "letter-spacing": ".08em" });
+    addHeaderText(title, { x, y: 27 + headerOffsetY, fill: chartHeadingColor(), "font-size": 11, "font-weight": 800, "letter-spacing": ".08em" });
     const rows = Math.ceil(items.length / columns);
     const columnWidth = width / columns;
     items.forEach((item, index) => {
@@ -2405,11 +2418,9 @@ function fitA4ClustersToLayout(clusters, layout) {
 function updateExportSummary() {
   if (!state.data || !els.exportSummary) return;
   const clusters = a4ExportClusters();
-  const format = document.querySelector("#export-format")?.value || "pdf";
-  const usePages = state.a4Mode || format === "pdf";
   const layout = a4LayoutFor(clusters);
   const fittedClusters = fitA4ClustersToLayout(clusters, layout);
-  const pages = usePages ? Math.max(1, Math.ceil(fittedClusters.length / layout.capacity)) : 1;
+  const pages = Math.max(1, Math.ceil(fittedClusters.length / layout.capacity));
   els.exportSummary.textContent = `${fittedClusters.length} ${fittedClusters.length === 1 ? "Diagramm" : "Diagramme"} auf ${pages} ${pages === 1 ? "Seite" : "Seiten"}`;
 }
 
@@ -2459,7 +2470,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   text("Die aktuellen Sonntagsfragen von Bund & Ländern im Vergleich.", { x: 42, y: introY, fill: "#8fa6c1", "font-size": landscapeHeader ? 20 : 15, "font-weight": 400 });
   const selectedRegions = [...state.regions], selectedParties = [...state.parties];
   const headerLegend = (x, y, title, items, columns, columnWidth, colorItems = false) => {
-    text(title, { x, y, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
+    text(title, { x, y, fill: chartHeadingColor(), "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
     const rows = Math.ceil(items.length / columns);
     items.forEach((item, index) => {
       const column = Math.floor(index / rows), row = index % rows, itemX = x + column * columnWidth, itemY = y + 19 + row * 12;
@@ -2470,7 +2481,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const partyX = landscapeHeader ? 900 : 650;
   const rightLegendWidth = width - partyX - 42;
   const partyY = 54;
-  text("PARTEIEN", { x: partyX, y: partyY, fill: "#59d9ff", "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
+  text("PARTEIEN", { x: partyX, y: partyY, fill: chartHeadingColor(), "font-size": 12, "font-weight": 800, "letter-spacing": ".06em" });
   const partySlot = rightLegendWidth / Math.max(1, selectedParties.length);
   selectedParties.forEach((party, index) => {
     const itemX = partyX + index * partySlot;
@@ -2485,7 +2496,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const gapX = 18, gapY = 18, left = 42;
   const standardTop = Math.max(landscapeHeader ? 265 : 300, regionsY + 62 + regionLegendRows * 12);
   const top = layout.splitLargeCluster ? Math.max(245, standardTop - 42) : standardTop;
-  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: top - 24, fill: "#59d9ff", "font-size": 18, "font-weight": 800 });
+  text(`Gruppiert nach ${state.groupBy === "party" ? "Partei" : "Parlament"}${state.averageMode ? " · Durchschnitt" : ""}`, { x: 42, y: top - 24, fill: chartHeadingColor(), "font-size": 18, "font-weight": 800 });
   const tileWidth = (width - left * 2 - gapX * (columns - 1)) / columns;
   const naturalTileHeight = (height - top - 100 - gapY * (rows - 1)) / rows;
   const tileHeight = layout.splitLargeCluster ? naturalTileHeight * .92 : naturalTileHeight;
@@ -2825,7 +2836,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
         return poll ? `${REGION_CODES[region]} · ${poll.institute} · ${formatDate(poll.date)}` : null;
       }).filter(Boolean)
     })).filter(group => group.items.length);
-    text("UMFRAGEDATEN", { x: legendX, y: legendY, fill: "#59d9ff", "font-size": 14, "font-weight": 800, "letter-spacing": ".06em" });
+    text("UMFRAGEDATEN", { x: legendX, y: legendY, fill: chartHeadingColor(), "font-size": 14, "font-weight": 800, "letter-spacing": ".06em" });
     const groupWidth = legendWidth / Math.max(1, sharedGroups.length);
     sharedGroups.forEach((group, groupIndex) => {
       const groupX = legendX + groupIndex * groupWidth;
@@ -2902,13 +2913,32 @@ function createA4Pages() {
   return { layout, pages: pageGroups.map((pageClusters, index) => buildA4Page(pageClusters, index + 1, pageGroups.length, layout)) };
 }
 
+function previewBaseWidth() {
+  return document.body.classList.contains("preview-split-active") ? 920 : Math.min(920, Math.max(280, els.previewPages.clientWidth - 56));
+}
+
 function applyPreviewZoom() {
   const percent = Number(els.previewZoom.value);
-  const baseWidth = document.body.classList.contains("preview-split-active") ? 920 : Math.min(920, Math.max(280, els.previewPages.clientWidth - 56));
+  const baseWidth = previewBaseWidth();
   els.previewZoomValue.textContent = `${percent} %`;
   els.previewPages.querySelectorAll(".preview-sheet").forEach(sheet => {
     sheet.style.width = `${baseWidth * percent / 100}px`;
     sheet.style.maxWidth = "none";
+  });
+}
+
+function fitPreviewWidth() {
+  const surface = els.previewPages;
+  const pages = [...surface.querySelectorAll(".preview-sheet")];
+  const current = pages.find(page => page.getBoundingClientRect().bottom > surface.getBoundingClientRect().top + 12) || pages[0];
+  const style = getComputedStyle(surface);
+  const available = surface.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 4;
+  const percent = Math.max(Number(els.previewZoom.min), Math.min(Number(els.previewZoom.max), Math.floor(available / previewBaseWidth() * 100)));
+  els.previewZoom.value = String(percent);
+  applyPreviewZoom();
+  if (current) requestAnimationFrame(() => {
+    surface.scrollLeft = 0;
+    surface.scrollTop += current.getBoundingClientRect().top - surface.getBoundingClientRect().top - parseFloat(style.paddingTop);
   });
 }
 
@@ -2918,13 +2948,11 @@ function closePreviewOptions() {
 }
 
 function syncPreviewToolbarMode() {
-  const compact = state.mobileView || window.matchMedia("(max-width: 900px)").matches;
+  const width = els.previewDialog.getBoundingClientRect().width;
+  const compact = state.mobileView || width < 1080;
   els.previewDialog.classList.toggle("mobile-preview", compact);
+  els.previewDialog.classList.toggle("very-narrow-preview", width < 315);
   if (!compact) closePreviewOptions();
-}
-
-function syncPreviewPageStatus() {
-  document.querySelector("#preview-mobile-page-status").textContent = els.previewPageStatus.textContent;
 }
 
 function setPreviewSplitPosition(clientX) {
@@ -2932,6 +2960,7 @@ function setPreviewSplitPosition(clientX) {
   const maximum = Math.max(minimum, window.innerWidth - 320);
   const position = Math.max(minimum, Math.min(maximum, clientX));
   document.documentElement.style.setProperty("--preview-split-x", `${position}px`);
+  if (els.previewDialog.open) requestAnimationFrame(syncPreviewToolbarMode);
 }
 
 function setPreviewSplit(active) {
@@ -2950,7 +2979,7 @@ function setPreviewSplit(active) {
   } else {
     els.previewDialog.showModal();
   }
-  requestAnimationFrame(applyPreviewZoom);
+  requestAnimationFrame(() => { syncPreviewToolbarMode(); applyPreviewZoom(); });
 }
 
 function closeExportPreview() {
@@ -3128,26 +3157,15 @@ function buildExportPreview(preservePosition = false) {
   const scrollLeft = preservePosition ? els.previewPages.scrollLeft : 0;
   const scrollTop = preservePosition ? els.previewPages.scrollTop : 0;
   els.previewPages.replaceChildren();
-  if (state.a4Mode) {
-    const { layout, pages } = createA4Pages();
-    pages.forEach((page, index) => {
-      page.classList.add("preview-sheet");
-      page.style.aspectRatio = `${layout.width} / ${layout.height}`;
-      page.setAttribute("aria-label", `Vorschauseite ${index + 1}`);
-      els.previewPages.append(page);
-    });
-    els.previewPageStatus.textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"}`;
-  } else {
-    const chart = prepareChartExport3d(cloneChartForFileOutput());
-    chart.classList.add("preview-sheet");
-    chart.removeAttribute("width");
-    chart.removeAttribute("height");
-    chart.setAttribute("aria-label", "Vorschau der Schlauchausgabe");
-    els.previewPages.append(chart);
-    els.previewPageStatus.textContent = "Schlauchausgabe";
-  }
+  const { layout, pages } = createA4Pages();
+  pages.forEach((page, index) => {
+    page.classList.add("preview-sheet");
+    page.style.aspectRatio = `${layout.width} / ${layout.height}`;
+    page.setAttribute("aria-label", `Vorschauseite ${index + 1}`);
+    els.previewPages.append(page);
+  });
+  els.previewPageStatus.textContent = `${pages.length} ${pages.length === 1 ? "Seite" : "Seiten"}`;
   syncUiColorControls();
-  syncPreviewPageStatus();
   if (els.previewDialog.open) applyPreviewZoom();
   if (preservePosition) {
     els.previewPages.scrollLeft = scrollLeft;
@@ -3162,16 +3180,16 @@ function scheduleOpenPreviewRefresh() {
   previewRefreshTimer = setTimeout(() => {
     if (!els.previewDialog.open) return;
     try { buildExportPreview(true); }
-    catch (error) { els.previewPageStatus.textContent = error.message; syncPreviewPageStatus(); }
+    catch (error) { els.previewPageStatus.textContent = error.message; }
   }, 200);
 }
 
 function showExportPreview() {
-  syncPreviewToolbarMode();
+  if (els.previewDialog.open) return;
   closePreviewOptions();
   buildExportPreview(false);
   els.previewDialog.showModal();
-  requestAnimationFrame(applyPreviewZoom);
+  requestAnimationFrame(() => { syncPreviewToolbarMode(); applyPreviewZoom(); });
 }
 
 async function exportA4(format) {
@@ -3226,8 +3244,14 @@ async function downloadBlob(blob, filename) {
 }
 
 const reportApiUrl = String(window.REPORT_API_URL || "").replace(/\/$/, "");
+const REPORT_SESSION_KEY = "sonntagsfragen.reportSession.v1";
 let reportPin = "";
 let reportSessionToken = "";
+let reportSessionExpiresAt = 0;
+let reportSessionTimer = 0;
+let reportSessionClickCount = 0;
+let reportSessionTouchPending = false;
+let reportSessionExpiredHandler = null;
 let reportAuthMethod = "";
 let currentReportRole = "";
 let reportsNewestFirst = true;
@@ -3239,13 +3263,46 @@ const reportIdentities = {
 let currentReportIdentity = null;
 async function reportRequest(path, options = {}) {
   if (!reportApiUrl) throw new Error("Die Reportfunktion ist noch nicht mit dem Speicherdienst verbunden.");
+  const tokenAtRequest = reportSessionToken;
   const response = await fetch(`${reportApiUrl}${path}`, {
     ...options,
     headers: { "Content-Type": "application/json", ...(reportSessionToken ? { "X-Report-Session": reportSessionToken } : reportPin ? { "X-Report-Pin": reportPin } : {}), ...(options.headers || {}) }
   });
   const payload = await response.json().catch(() => ({}));
+  if (response.status === 401 && tokenAtRequest && tokenAtRequest === reportSessionToken) reportSessionExpiredHandler?.();
   if (!response.ok) throw new Error(payload.error || "Die Reportfunktion ist momentan nicht erreichbar.");
   return payload;
+}
+const runsInNativeReportApp = () => Boolean(window.MacApp || window.AndroidApp);
+const reportAppInstanceId = () => {
+  try { return window.MacApp?.getSessionInstanceId?.() || window.AndroidApp?.getSessionInstanceId?.() || ""; }
+  catch (error) { return ""; }
+};
+function clearReportSession() {
+  try { window.MacApp?.setReportSessionToken?.(""); window.AndroidApp?.setReportSessionToken?.(""); }
+  catch (error) { /* Der Web-Logout bleibt wirksam. */ }
+  reportSessionToken = "";
+  reportSessionExpiresAt = 0;
+  reportSessionClickCount = 0;
+  reportSessionTouchPending = false;
+  clearTimeout(reportSessionTimer);
+  try { sessionStorage.removeItem(REPORT_SESSION_KEY); } catch (error) { /* Sitzung bleibt im Speicher begrenzt. */ }
+}
+function setReportSession(session, method = session.authMethod) {
+  reportSessionToken = session.token || reportSessionToken;
+  reportSessionExpiresAt = Number(session.expiresAt) || 0;
+  try { window.MacApp?.setReportSessionToken?.(reportSessionToken); window.AndroidApp?.setReportSessionToken?.(reportSessionToken); }
+  catch (error) { /* Die Sitzung im Web bleibt unabhängig von der App-Brücke aktiv. */ }
+  reportAuthMethod = method || "pin";
+  reportPin = "";
+  reportSessionClickCount = 0;
+  clearTimeout(reportSessionTimer);
+  if (reportSessionExpiresAt) reportSessionTimer = setTimeout(() => reportSessionExpiredHandler?.(), Math.max(0, reportSessionExpiresAt - Date.now()) + 50);
+  try {
+    const instanceId = reportAppInstanceId();
+    if (runsInNativeReportApp() && !instanceId) sessionStorage.removeItem(REPORT_SESSION_KEY);
+    else sessionStorage.setItem(REPORT_SESSION_KEY, JSON.stringify({ token: reportSessionToken, expiresAt: reportSessionExpiresAt, authMethod: reportAuthMethod, instanceId }));
+  } catch (error) { /* Ohne Sitzungsspeicher gilt die Anmeldung nur bis zum Reload. */ }
 }
 
 const passkeyAvailable = () => window.location.origin === "https://charavision.github.io" && window.isSecureContext && !!window.PublicKeyCredential && !!navigator.credentials;
@@ -3328,6 +3385,7 @@ function sanitizeSettingsSnapshot(value) {
   if (result.ui.barStyle && !barStyleOptions.some(([key]) => key === result.ui.barStyle)) throw new Error("Ungültiger Balkenstil im Code.");
   for (const key of ["uiBrightness", "uiSaturation"]) if (key in result.ui && (!Number.isInteger(result.ui[key]) || result.ui[key] < -50 || result.ui[key] > 50 || result.ui[key] % 5)) throw new Error("Ungültiger Farbwert im Code.");
   if (result.output.outputBarWidth && !outputBarWidthOptions.some(([key]) => key === result.output.outputBarWidth)) throw new Error("Ungültige Balkenbreite im Code.");
+  if ("a4Mode" in result.output) result.output.a4Mode = true;
   return result;
 }
 function settingsCode(snapshot = captureSettingsSnapshot()) {
@@ -3378,7 +3436,7 @@ function decodeProjectSettingsCode(code) {
       yAxisMode: ["dynamic", "static", "off", "dynamic"][(mode >> 24) & 3]
     },
     output: {
-      a4Mode: Boolean(mode & 8),
+      a4Mode: true,
       a4Orientation: mode & 128 ? "landscape" : mode & 64 ? "portrait" : "auto",
       a4DiagramFormat: ["auto", "1x1", "1x2", "1x3", "2x2", "2x3", "auto", "auto"][(mode >>> 29) & 7],
       outputBarWidth: modeValue & (1n << 53n) ? "adapted" : "standard",
@@ -3397,6 +3455,7 @@ function applySettingsSnapshot(snapshot, { ui = true, output = true } = {}) {
     if (key === "exportFormat") document.querySelector("#export-format").value = value;
     else state[key] = value;
   }
+  state.a4Mode = true;
   els.fullRegionNames.checked = !state.fullRegionNames;
   els.showSinceElection.checked = state.showSinceElection;
   els.showBrackets.checked = state.showBrackets;
@@ -3407,7 +3466,6 @@ function applySettingsSnapshot(snapshot, { ui = true, output = true } = {}) {
   els.showBackground.checked = state.showBackground;
   document.querySelector("#export-3d").checked = state.export3d;
   document.querySelector("#a4-mode").checked = state.a4Mode;
-  document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
   setCycleButton(els.abbreviationMode, state.fullRegionNames ? "off" : "on", [["on", "An"], ["off", "Aus"]]);
   setCycleButton(els.regionLabelMode, state.regionLabelMode, labelModeOptions.rotation);
   setCycleButton(els.partyLabelMode, state.partyLabelMode, labelModeOptions.rotation);
@@ -3426,8 +3484,9 @@ function selectedPersonalSettings() {
 }
 function personalSettingsDiffer(snapshot) {
   if (!snapshot) return false;
+  const normalized = sanitizeSettingsSnapshot(snapshot);
   const current = captureSettingsSnapshot();
-  return ["ui", "output"].some(section => Object.entries(snapshot[section] || {}).some(([key, value]) => current[section][key] !== value));
+  return ["ui", "output"].some(section => Object.entries(normalized[section] || {}).some(([key, value]) => current[section][key] !== value));
 }
 async function savePersonalSettingsPreferences(slot = personalSettingsSlot, alwaysUse = alwaysUsePersonalSettings) {
   await reportRequest("/settings/preferences", { method: "PUT", body: JSON.stringify({ personalSlot: slot, alwaysUse }) });
@@ -3460,7 +3519,7 @@ function renderSettingsSlots() {
   const guest = !currentReportRole;
   const list = document.querySelector(guest ? "#guest-settings-slot-list" : "#settings-slot-list");
   list.replaceChildren();
-  document.querySelector("#settings-slot-legend").textContent = currentReportRole === "Admin" ? "□ Mein Start · ○ Global" : "□ Mein Start";
+  document.querySelector("#settings-slot-legend").textContent = currentReportRole === "Admin" ? "○ Mein Start · ○ Global" : "○ Mein Start";
   const addRow = (label, snapshot, { slot = 0, removable = false, global = false, personal = false } = {}) => {
     const row = document.createElement("div"); row.className = "settings-slot-row";
     const use = document.createElement("button"); use.type = "button"; use.textContent = label; use.title = snapshot ? label : `${label} (überschreibbar)`;
@@ -3468,19 +3527,15 @@ function renderSettingsSlots() {
     use.addEventListener("click", () => { applySettingsSnapshot(snapshot); document.querySelector("#settings-message").textContent = `${label} übernommen.`; });
     row.append(use);
     if (personal) {
-      const choice = document.createElement("input"); choice.type = "checkbox"; choice.className = "settings-personal-check";
+      const choice = document.createElement("input"); choice.type = "radio"; choice.name = "settings-personal-slot"; choice.className = "settings-personal-check";
       choice.checked = slot === personalSettingsSlot; choice.disabled = !snapshot;
       choice.title = "Als persönliche Starteinstellung wählen";
       choice.setAttribute("aria-label", `${label} als persönliche Starteinstellung wählen`);
-      choice.addEventListener("click", event => {
-        if (personalSettingsChoicePending || slot === personalSettingsSlot) event.preventDefault();
-      });
       choice.addEventListener("change", async () => {
-        if (personalSettingsChoicePending) return;
-        if (slot === personalSettingsSlot) { choice.checked = true; return; }
+        if (personalSettingsChoicePending) { renderSettingsSlots(); return; }
+        if (slot === personalSettingsSlot) return;
         personalSettingsChoicePending = true;
-        const selectedSlot = choice.checked ? slot : 0;
-        try { await savePersonalSettingsPreferences(selectedSlot); document.querySelector("#settings-message").textContent = `${selectedSlot ? label : "Standard"} ist jetzt deine Starteinstellung.`; }
+        try { await savePersonalSettingsPreferences(slot); document.querySelector("#settings-message").textContent = `${label} ist jetzt deine Starteinstellung.`; }
         catch (error) { renderSettingsSlots(); document.querySelector("#settings-message").textContent = error.message; }
         finally { personalSettingsChoicePending = false; }
       }); row.append(choice);
@@ -3813,7 +3868,7 @@ function applyDeveloperSettings() {
   state.fullscreenEnabled = true;
   els.fullscreenEnabled.checked = state.fullscreenEnabled;
   state.fullscreenDefault = true;
-  state.a4Mode = Boolean(settings.a4Output.value);
+  state.a4Mode = true;
   state.export3d = Boolean(settings.export3d.value);
   state.tabMode = Boolean(settings.tabMode?.value);
   document.querySelector("#header-tab-mode-setting").hidden = !settings.tabMode?.visible;
@@ -3847,9 +3902,9 @@ function applyDeveloperSettings() {
   setVisible(".fullscreen-choice", settings.fullscreen.visible);
   els.fullscreenEnter.hidden = !settings.fullscreen.visible || !state.fullscreenEnabled;
   setVisible("#preview-export", settings.preview.visible);
-  const a4Choice = document.querySelector('input[name="output-shape"][value="a4"]')?.closest("label");
-  if (a4Choice) a4Choice.hidden = !settings.a4Output.visible;
+  setVisible("#fullscreen-output-toggle", settings.preview.visible);
   document.querySelector("#a4-diagram-format-settings").hidden = !settings.a4DiagramFormat.visible;
+  document.querySelector("#preview-a4-format").hidden = !settings.a4DiagramFormat.visible;
   const export3dChoice = document.querySelector("#export-3d")?.closest(".ui-3d-option");
   if (export3dChoice) export3dChoice.hidden = !settings.export3d.visible;
   els.updateData.disabled = !settings.dataUpdate.value;
@@ -4473,7 +4528,6 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     els.showBackground.checked = state.showBackground;
     document.querySelector("#export-3d").checked = state.export3d;
     document.querySelector("#a4-mode").checked = state.a4Mode;
-    document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
     updateA4Controls();
     if (startsMobile) document.querySelector("#chart-view-settings").hidden = true;
     updateHeaderTimestamp(data);
@@ -4767,10 +4821,9 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       els.fullscreenSelection.setAttribute("aria-expanded", String(open));
     });
     els.fullscreenOutput.addEventListener("click", () => {
-      const open = !document.body.classList.contains("fullscreen-output-open");
       closeFullscreenOverlays();
-      document.body.classList.toggle("fullscreen-output-open", open);
-      els.fullscreenOutput.setAttribute("aria-expanded", String(open));
+      try { showExportPreview(); }
+      catch (error) { els.exportMessage.textContent = `Vorschau fehlgeschlagen: ${error.message}`; }
     });
     els.fullscreenHelp.addEventListener("click", () => {
       els.reportMobileView.checked = state.mobileView;
@@ -4868,7 +4921,6 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         if (!outputPanel.contains(event.target) && !els.fullscreenOutput.contains(event.target)) closeFullscreenOverlays();
       }
     });
-    togglePanel(document.querySelector("#export-settings-toggle"), document.querySelector("#export-settings"));
     document.querySelector("#preview-export").addEventListener("click", () => {
       try { showExportPreview(); }
       catch (error) { els.exportMessage.textContent = `Vorschau fehlgeschlagen: ${error.message}`; }
@@ -4883,6 +4935,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       if (!event.target.closest("#preview-extra-options, #preview-options-toggle")) closePreviewOptions();
     });
     window.addEventListener("resize", () => { if (els.previewDialog.open) syncPreviewToolbarMode(); });
+    new ResizeObserver(() => { if (els.previewDialog.open) syncPreviewToolbarMode(); }).observe(els.previewDialog);
     document.querySelector("#preview-split-toggle").addEventListener("click", () => setPreviewSplit(!document.body.classList.contains("preview-split-active")));
     els.previewDialog.addEventListener("click", event => { if (event.target === els.previewDialog && !document.body.classList.contains("preview-split-active")) closeExportPreview(); });
     els.previewZoom.addEventListener("input", applyPreviewZoom);
@@ -4894,6 +4947,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     };
     document.querySelector("#preview-zoom-out").addEventListener("click", () => changePreviewZoom(-1));
     document.querySelector("#preview-zoom-in").addEventListener("click", () => changePreviewZoom(1));
+    document.querySelector("#preview-fit-width").addEventListener("click", fitPreviewWidth);
     const reportDialog = document.querySelector("#report-dialog");
     let startupPending = true;
     const reportTabs = {
@@ -5093,13 +5147,14 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#report-login").addEventListener("submit", async event => {
       event.preventDefault();
       const message = document.querySelector("#report-login-message");
-      reportSessionToken = "";
+      clearReportSession();
       reportPin = readReportPin();
       message.textContent = "PIN wird geprüft …";
       try {
         const session = await reportRequest("/session", { method: "POST", body: "{}" });
+        setReportSession(session, "pin");
         await finishReportLogin(session, "pin");
-      } catch (error) { reportPin = ""; currentReportRole = ""; currentReportIdentity = null; pinFields.forEach(field => { field.value = ""; }); renderSettingsSlots(); pinFields[0].focus(); message.textContent = error.message; }
+      } catch (error) { clearReportSession(); reportPin = ""; currentReportRole = ""; currentReportIdentity = null; pinFields.forEach(field => { field.value = ""; }); renderSettingsSlots(); pinFields[0].focus(); message.textContent = error.message; }
     });
     document.querySelector("#report-passkey-login").hidden = !passkeyAvailable();
     document.querySelector("#report-passkey-login").addEventListener("click", async event => {
@@ -5114,16 +5169,18 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         const credential = await navigator.credentials.get({ publicKey });
         if (!credential) throw new Error("Passkey-Anmeldung abgebrochen.");
         const session = await reportRequest("/passkey/login/verify", { method: "POST", body: JSON.stringify({ flowId, response: passkeyResponse(credential, false) }) });
-        reportSessionToken = session.token;
+        setReportSession(session, "passkey");
         await finishReportLogin(session, "passkey");
       } catch (error) {
-        reportSessionToken = ""; currentReportRole = ""; currentReportIdentity = null;
+        clearReportSession(); currentReportRole = ""; currentReportIdentity = null;
         message.textContent = error.name === "NotAllowedError" ? "Passkey-Anmeldung abgebrochen oder nicht erlaubt." : error.message;
       } finally { button.disabled = false; }
     });
-    document.querySelector("#report-logout").addEventListener("click", async () => {
-      if (reportSessionToken) { try { await reportRequest("/passkey/logout", { method: "POST", body: "{}" }); } catch (error) { /* Lokalen Zugang dennoch beenden. */ } }
-      reportPin = ""; reportSessionToken = ""; reportAuthMethod = ""; currentReportRole = ""; currentReportIdentity = null;
+    const leaveReportSession = (expired = false) => {
+      const token = reportSessionToken;
+      clearReportSession();
+      reportPin = ""; reportAuthMethod = ""; currentReportRole = ""; currentReportIdentity = null;
+      if (token && !expired) fetch(`${reportApiUrl}/session/logout`, { method: "POST", headers: { "Content-Type": "application/json", "X-Report-Session": token }, body: "{}", keepalive: true }).catch(() => {});
       pinFields.forEach(field => { field.value = ""; });
       document.querySelector("#report-session").hidden = true;
       document.querySelector("#report-accounts").hidden = true;
@@ -5140,12 +5197,34 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#project-picker-toggle").hidden = true;
       document.querySelector("#report-login").hidden = false;
       document.querySelector("#guest-default-settings").hidden = false;
-      reportDialog.classList.remove("settings-panel-open");
+      reportDialog.classList.remove("settings-panel-open", "project-picker-dialog", "startup-project-dialog", "guest-project-dialog");
       document.querySelectorAll(".report-tab.active").forEach(tab => tab.classList.remove("active"));
       refreshSettingsSlots().catch(error => { document.querySelector("#settings-message").textContent = error.message; });
-      document.querySelector("#report-login-message").textContent = "";
+      document.querySelector("#report-login-message").textContent = expired ? "Sitzung nach 15 Minuten abgelaufen. Bitte neu anmelden." : "";
+      if (expired) {
+        document.querySelector("#report-title").textContent = "Log in";
+        if (!reportDialog.open) reportDialog.showModal();
+      }
       focusFirstReportPin();
-    });
+    };
+    reportSessionExpiredHandler = () => leaveReportSession(true);
+    document.querySelector("#report-logout").addEventListener("click", () => leaveReportSession());
+    document.addEventListener("click", event => {
+      if (!event.isTrusted || !reportSessionToken || !currentReportRole || document.hidden) return;
+      if (Date.now() >= reportSessionExpiresAt) { leaveReportSession(true); return; }
+      if (reportSessionTouchPending || ++reportSessionClickCount < 2) return;
+      reportSessionTouchPending = true;
+      const token = reportSessionToken;
+      reportRequest("/session/touch", { method: "POST", body: "{}" })
+        .then(session => { if (reportSessionToken === token) setReportSession({ ...session, token }, reportAuthMethod); })
+        .catch(() => {})
+        .finally(() => { reportSessionTouchPending = false; });
+    }, true);
+    const expireReportSessionIfNeeded = () => {
+      if (reportSessionToken && Date.now() >= reportSessionExpiresAt) leaveReportSession(true);
+    };
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) expireReportSessionIfNeeded(); });
+    window.addEventListener("focus", expireReportSessionIfNeeded);
     document.querySelector("#report-accounts-open").addEventListener("click", async () => {
       if (!toggleReportTab(document.querySelector("#report-accounts-open"))) return;
       try { await loadReportAccounts(); }
@@ -5310,7 +5389,6 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       } catch (error) { message.textContent = error.message; }
     });
     const exportFormat = document.querySelector("#export-format");
-    const a4Mode = document.querySelector("#a4-mode");
     const export3d = document.querySelector("#export-3d");
     document.querySelector("#ui-menu-toggle").addEventListener("click", event => {
       const choice = event.currentTarget.closest(".ui-choice");
@@ -5334,20 +5412,14 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     document.querySelector("#hide-empty-clusters").addEventListener("change", event => setHideEmptyClusters(event.currentTarget.checked));
     document.querySelector("#preview-hide-empty-clusters").addEventListener("change", event => setHideEmptyClusters(event.currentTarget.checked));
-    a4Mode.addEventListener("change", event => { state.a4Mode = event.currentTarget.checked; updateA4Controls(); render(false); });
     exportFormat.addEventListener("change", event => {
-      if (event.currentTarget.value === "pdf" && !state.a4Mode) {
-        state.a4Mode = true; a4Mode.checked = true; updateA4Controls(); render(false);
-        return;
-      }
+      updateA4Controls();
       updateExportSummary();
     });
-    document.querySelectorAll('input[name="output-shape"]').forEach(input => input.addEventListener("change", event => {
-      state.a4Mode = event.currentTarget.value === "a4";
-      a4Mode.checked = state.a4Mode;
-      updateA4Controls();
-      render(false);
-    }));
+    document.querySelector("#preview-export-format").addEventListener("change", event => {
+      exportFormat.value = event.currentTarget.value;
+      exportFormat.dispatchEvent(new Event("change"));
+    });
     document.querySelector("#a4-orientation-cycle").addEventListener("click", cycleA4Orientation);
     document.querySelector("#a4-diagram-format-cycle").addEventListener("click", cycleA4DiagramFormat);
     document.querySelector("#output-bar-width-cycle").addEventListener("click", cycleOutputBarWidth);
@@ -5355,6 +5427,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#preview-a4-format").addEventListener("click", cycleA4DiagramFormat);
     document.querySelector("#preview-bar-width").addEventListener("click", cycleOutputBarWidth);
     document.querySelector("#preview-download").addEventListener("click", () => document.querySelector("#export-file").click());
+    document.querySelector("#preview-copy-link").addEventListener("click", async () => {
+      const message = document.querySelector("#preview-action-message");
+      try { await navigator.clipboard.writeText(configurationShareUrl()); message.textContent = "Link kopiert."; }
+      catch (error) { message.textContent = "Link konnte nicht kopiert werden."; }
+    });
     document.querySelector("#copy-config-link").addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(configurationShareUrl());
@@ -5365,10 +5442,33 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     });
     document.querySelector("#export-file").addEventListener("click", () => {
       const format = exportFormat.value;
-      if (format === "pdf" && !state.a4Mode) { state.a4Mode = true; a4Mode.checked = true; updateA4Controls(); render(false); }
-      const operation = state.a4Mode || format === "pdf" ? exportA4(format) : exportChartImage(format);
+      const operation = exportA4(format);
       operation.catch(error => { els.exportMessage.textContent = `Export fehlgeschlagen: ${error.message}`; });
     });
+    const restoreReportSession = async () => {
+      let stored;
+      try { stored = JSON.parse(sessionStorage.getItem(REPORT_SESSION_KEY) || "null"); }
+      catch (error) { clearReportSession(); return false; }
+      const instanceId = reportAppInstanceId();
+      if (runsInNativeReportApp() && (!instanceId || stored?.instanceId !== instanceId)) {
+        if (stored?.token && reportApiUrl) navigator.sendBeacon?.(`${reportApiUrl}/session/logout`, new Blob([JSON.stringify({ token: stored.token })], { type: "text/plain" }));
+        clearReportSession();
+        return false;
+      }
+      if (!stored || !/^[A-Za-z0-9_-]{43}$/.test(stored.token || "") || Number(stored.expiresAt) <= Date.now()) { clearReportSession(); return false; }
+      reportSessionToken = stored.token;
+      reportSessionExpiresAt = Number(stored.expiresAt);
+      try {
+        const session = await reportRequest("/session", { cache: "no-store" });
+        setReportSession(session, session.authMethod || stored.authMethod);
+        await finishReportLogin(session, reportAuthMethod);
+        return true;
+      } catch (error) {
+        clearReportSession();
+        document.querySelector("#report-login-message").textContent = "Die Sitzung konnte nicht wiederhergestellt werden. Bitte neu anmelden.";
+        return false;
+      }
+    };
     window.addEventListener("resize", () => render(false));
     let perspectiveFrame = 0;
     els.scroll.addEventListener("scroll", () => {
@@ -5380,7 +5480,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#report-title").textContent = "Log in";
     reportDialog.classList.add("startup-login-dialog");
     reportDialog.showModal();
-    focusFirstReportPin();
+    restoreReportSession().then(restored => { if (!restored) focusFirstReportPin(); });
   })
   .catch(error => { els.updated.textContent = "nicht verfügbar"; els.empty.hidden = false; els.empty.textContent = error.message; els.scroll.hidden = true; });
 

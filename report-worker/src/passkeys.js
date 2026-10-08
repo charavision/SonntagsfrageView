@@ -7,7 +7,7 @@ import {
 
 const ADMIN_ID = "builtin-admin";
 const CHALLENGE_LIFETIME_MS = 60_000;
-const SESSION_LIFETIME_MS = 12 * 60 * 60 * 1000;
+const SESSION_LIFETIME_MS = 15 * 60 * 1000;
 const ALGORITHMS = [-7, -257];
 
 const encode = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -36,8 +36,14 @@ async function ensurePasskeyTables(env) {
   )`).run();
   await env.REPORTS.prepare(`CREATE TABLE IF NOT EXISTS passkey_sessions (
     token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL,
+    auth_method TEXT NOT NULL DEFAULT 'passkey',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   )`).run();
+  const columns = await env.REPORTS.prepare("PRAGMA table_info(passkey_sessions)").all();
+  if (!(columns.results || []).some(column => column.name === "auth_method")) {
+    await env.REPORTS.prepare("ALTER TABLE passkey_sessions ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'passkey'").run();
+    await env.REPORTS.prepare("DELETE FROM passkey_sessions").run();
+  }
 }
 
 async function issueChallenge(env, request, kind, challenge) {
@@ -59,22 +65,39 @@ async function consumeChallenge(env, flowId, kind) {
   return removed.meta?.changes === 1 ? row.challenge : null;
 }
 
-async function issueSession(env) {
+export async function issueReportSession(env, userId, authMethod) {
+  await ensurePasskeyTables(env);
   const token = randomToken(32);
   const tokenHash = await digest(token);
+  const expiresAt = Date.now() + SESSION_LIFETIME_MS;
   await env.REPORTS.prepare("DELETE FROM passkey_sessions WHERE expires_at <= ?").bind(Date.now()).run();
-  await env.REPORTS.prepare("INSERT INTO passkey_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").bind(tokenHash, ADMIN_ID, Date.now() + SESSION_LIFETIME_MS).run();
-  return token;
+  await env.REPORTS.prepare("INSERT INTO passkey_sessions (token_hash, user_id, expires_at, auth_method) VALUES (?, ?, ?, ?)").bind(tokenHash, userId, expiresAt, authMethod).run();
+  return { token, expiresAt };
 }
 
-export async function authenticatePasskeySession(env, token) {
+export async function authenticateReportSession(env, token) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token || "")) return null;
   await ensurePasskeyTables(env);
-  const row = await env.REPORTS.prepare("SELECT u.id, u.person_name, u.work_name, u.role FROM passkey_sessions s JOIN report_users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND u.active = 1 AND u.id = ? AND u.role = 'Admin'").bind(await digest(token), Date.now(), ADMIN_ID).first();
-  return row ? { id: row.id, personName: row.person_name, workName: row.work_name, role: row.role } : null;
+  const row = await env.REPORTS.prepare("SELECT u.id, u.person_name, u.work_name, u.role, s.expires_at, s.auth_method FROM passkey_sessions s JOIN report_users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND u.active = 1").bind(await digest(token), Date.now()).first();
+  return row ? { id: row.id, personName: row.person_name, workName: row.work_name, role: row.role, expiresAt: row.expires_at, authMethod: row.auth_method } : null;
 }
 
-export async function handlePasskeyRoute({ request, env, origin, pinReporter, json }) {
+export async function touchReportSession(env, token) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token || "")) return null;
+  await ensurePasskeyTables(env);
+  const now = Date.now();
+  const expiresAt = now + SESSION_LIFETIME_MS;
+  const updated = await env.REPORTS.prepare("UPDATE passkey_sessions SET expires_at = ? WHERE token_hash = ? AND expires_at > ?").bind(expiresAt, await digest(token), now).run();
+  return updated.meta?.changes === 1 ? expiresAt : null;
+}
+
+export async function revokeReportSession(env, token) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token || "")) return;
+  await ensurePasskeyTables(env);
+  await env.REPORTS.prepare("DELETE FROM passkey_sessions WHERE token_hash = ?").bind(await digest(token)).run();
+}
+
+export async function handlePasskeyRoute({ request, env, origin, pinReporter, sessionReporter, json }) {
   const path = new URL(request.url).pathname;
   if (!path.startsWith("/passkey/")) return null;
   if (!isPasskeyOrigin(request, env)) return json({ error: "Passkeys sind nur auf der veröffentlichten HTTPS-Seite verfügbar." }, 403, origin);
@@ -83,7 +106,7 @@ export async function handlePasskeyRoute({ request, env, origin, pinReporter, js
   await ensurePasskeyTables(env);
 
   if (path === "/passkey/register/options" && request.method === "POST") {
-    if (!adminByPin(pinReporter)) return json({ error: "Passkey-Einrichtung erfordert Sebastians Admin-PIN." }, 403, origin);
+    if (!adminByPin(pinReporter) && !(adminByPin(sessionReporter) && sessionReporter.authMethod === "pin")) return json({ error: "Passkey-Einrichtung erfordert Sebastians Admin-PIN." }, 403, origin);
     const existing = await env.REPORTS.prepare("SELECT id, transports FROM admin_passkeys WHERE user_id = ?").bind(ADMIN_ID).all();
     const options = await generateRegistrationOptions({
       rpName: "Sonntagsfragen", rpID, userID: new TextEncoder().encode(ADMIN_ID),
@@ -97,7 +120,7 @@ export async function handlePasskeyRoute({ request, env, origin, pinReporter, js
   }
 
   if (path === "/passkey/register/verify" && request.method === "POST") {
-    if (!adminByPin(pinReporter)) return json({ error: "Passkey-Einrichtung erfordert Sebastians Admin-PIN." }, 403, origin);
+    if (!adminByPin(pinReporter) && !(adminByPin(sessionReporter) && sessionReporter.authMethod === "pin")) return json({ error: "Passkey-Einrichtung erfordert Sebastians Admin-PIN." }, 403, origin);
     const payload = await request.json().catch(() => ({}));
     const challenge = await consumeChallenge(env, payload.flowId, "register");
     if (!challenge) return json({ error: "Die Passkey-Anfrage ist abgelaufen. Bitte erneut beginnen." }, 400, origin);
@@ -143,14 +166,14 @@ export async function handlePasskeyRoute({ request, env, origin, pinReporter, js
       });
       if (!verified.verified) throw new Error("not verified");
       await env.REPORTS.prepare("UPDATE admin_passkeys SET counter = ? WHERE id = ? AND user_id = ?").bind(verified.authenticationInfo.newCounter, row.id, ADMIN_ID).run();
-      const token = await issueSession(env);
-      return json({ ok: true, token, role: "Admin", reporter: "Admin", personName: "Sebastian", workName: "Admin" }, 200, origin);
+      const session = await issueReportSession(env, ADMIN_ID, "passkey");
+      return json({ ok: true, ...session, authMethod: "passkey", role: "Admin", reporter: "Admin", personName: "Sebastian", workName: "Admin" }, 200, origin);
     } catch (error) { return json({ error: "Passkey-Anmeldung fehlgeschlagen." }, 400, origin); }
   }
 
   if (path === "/passkey/logout" && request.method === "POST") {
     const token = request.headers.get("X-Report-Session") || "";
-    if (token) await env.REPORTS.prepare("DELETE FROM passkey_sessions WHERE token_hash = ?").bind(await digest(token)).run();
+    if (token) await revokeReportSession(env, token);
     return json({ ok: true }, 200, origin);
   }
 

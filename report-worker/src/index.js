@@ -1,9 +1,10 @@
-import { authenticatePasskeySession, handlePasskeyRoute } from "./passkeys.js";
+import { authenticateReportSession, handlePasskeyRoute, issueReportSession, revokeReportSession, touchReportSession } from "./passkeys.js";
 
 const json = (body, status, origin) => new Response(JSON.stringify(body), {
   status,
   headers: {
     "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": "Content-Type, X-Report-Pin, X-Report-Session",
     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
@@ -224,11 +225,27 @@ export default {
     const suppliedPin = request.headers.get("X-Report-Pin") || "";
     const suppliedHash = suppliedPin ? await hexDigest(suppliedPin) : "";
     const pinReporter = suppliedPin ? await authenticate(env, suppliedHash) : null;
-    const passkeyResponse = await handlePasskeyRoute({ request, env, origin, pinReporter, json });
-    if (passkeyResponse) return passkeyResponse;
     const sessionToken = request.headers.get("X-Report-Session") || "";
-    const reporter = pinReporter || (sessionToken ? await authenticatePasskeySession(env, sessionToken) : null);
-    if (!reporter) return json({ error: "PIN nicht gültig." }, 401, origin);
+    const sessionReporter = sessionToken ? await authenticateReportSession(env, sessionToken) : null;
+    const passkeyResponse = await handlePasskeyRoute({ request, env, origin, pinReporter, sessionReporter, json });
+    if (passkeyResponse) return passkeyResponse;
+    if (url.pathname === "/session" && request.method === "POST") {
+      if (!pinReporter) return json({ error: "PIN nicht gültig." }, 401, origin);
+      const session = await issueReportSession(env, pinReporter.id, "pin");
+      return json({ ok: true, ...session, authMethod: "pin", reporter: pinReporter.workName, personName: pinReporter.personName, workName: pinReporter.workName, role: pinReporter.role }, 200, origin);
+    }
+    if (url.pathname === "/session/logout" && request.method === "POST") {
+      const body = sessionToken ? {} : await request.json().catch(() => ({}));
+      await revokeReportSession(env, sessionToken || body.token || "");
+      return json({ ok: true }, 200, origin);
+    }
+    if (!sessionReporter) return json({ error: "Sitzung abgelaufen. Bitte erneut anmelden." }, 401, origin);
+    if (url.pathname === "/session" && request.method === "GET") return json({ ok: true, expiresAt: sessionReporter.expiresAt, authMethod: sessionReporter.authMethod, reporter: sessionReporter.workName, personName: sessionReporter.personName, workName: sessionReporter.workName, role: sessionReporter.role }, 200, origin);
+    if (url.pathname === "/session/touch" && request.method === "POST") {
+      const expiresAt = await touchReportSession(env, sessionToken);
+      return expiresAt ? json({ ok: true, expiresAt }, 200, origin) : json({ error: "Sitzung abgelaufen. Bitte erneut anmelden." }, 401, origin);
+    }
+    const reporter = sessionReporter;
 
     if (url.pathname === "/settings/slots" && request.method === "GET") {
       await ensureSettingsSlotsTable(env);
@@ -310,8 +327,6 @@ export default {
       await env.REPORTS.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('notification_interval_minutes', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(String(intervalMinutes)).run();
       return json({ ok: true, intervalMinutes }, 200, origin);
     }
-
-    if (url.pathname === "/session" && request.method === "POST") return json({ ok: true, reporter: reporter.workName, personName: reporter.personName, workName: reporter.workName, role: reporter.role }, 200, origin);
 
     if (url.pathname === "/notifications/system" && request.method === "POST") {
       if (reporter.role !== "Admin") return json({ error: "Nur Admins dürfen Systemnachrichten senden." }, 403, origin);

@@ -26,13 +26,21 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.io.OutputStream;
 
 public class MainActivity extends Activity {
     private static final String APP_VERSION = "1.0.26";
     private static final String WEB_URL = "https://charavision.github.io/SonntagsfrageView/";
+    private static final String SESSION_LOGOUT_URL = "https://sonntagsfragen-report.charavisionj5.workers.dev/session/logout";
     private static final String[] NOTIFICATION_REGIONS = {"Bundestag", "Baden-Württemberg", "Bayern", "Berlin", "Brandenburg", "Bremen", "Hamburg", "Hessen", "Mecklenburg-Vorpommern", "Niedersachsen", "Nordrhein-Westfalen", "Rheinland-Pfalz", "Saarland", "Sachsen", "Sachsen-Anhalt", "Schleswig-Holstein", "Thüringen"};
     private WebView webView;
     private volatile boolean webSurfaceReady = false;
+    private final String sessionInstanceId = UUID.randomUUID().toString();
+    private volatile String reportSessionToken = "";
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -103,6 +111,16 @@ public class MainActivity extends Activity {
     }
 
     public class AppBridge {
+        @JavascriptInterface
+        public String getSessionInstanceId() {
+            return sessionInstanceId;
+        }
+
+        @JavascriptInterface
+        public void setReportSessionToken(String token) {
+            reportSessionToken = token != null && token.matches("[A-Za-z0-9_-]{43}") ? token : "";
+        }
+
         @JavascriptInterface
         public void installUpdate(String url) {
             if (url == null || !url.startsWith("https://github.com/charavision/SonntagsfrageView/")) return;
@@ -205,5 +223,33 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (webView.canGoBack()) webView.goBack();
         else super.onBackPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        String token = reportSessionToken;
+        reportSessionToken = "";
+        if (!token.isEmpty()) {
+            Thread revoke = new Thread(() -> {
+                HttpURLConnection connection = null;
+                try {
+                    connection = (HttpURLConnection) new URL(SESSION_LOGOUT_URL).openConnection();
+                    connection.setRequestMethod("POST");
+                    connection.setConnectTimeout(1000);
+                    connection.setReadTimeout(1000);
+                    connection.setRequestProperty("Content-Type", "application/json");
+                    connection.setRequestProperty("X-Report-Session", token);
+                    connection.setDoOutput(true);
+                    try (OutputStream output = connection.getOutputStream()) {
+                        output.write("{}".getBytes(StandardCharsets.UTF_8));
+                    }
+                    connection.getInputStream().close();
+                } catch (Exception ignored) { }
+                finally { if (connection != null) connection.disconnect(); }
+            });
+            revoke.start();
+            try { revoke.join(1200); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        }
+        super.onDestroy();
     }
 }
