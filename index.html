@@ -7,7 +7,7 @@
   <title>Sonntagsfragen – Bund & Länder</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="shortcut icon" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=settings-slots-20261008">
+  <link rel="stylesheet" href="styles.css?v=settings-code-visible-20261008">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -235,7 +235,7 @@
       <h1>Sonntagsfragen</h1>
       <p class="creator">visualizer by <b>charavision</b></p>
     </div>
-    <div class="preview-header"><strong id="report-title">Info</strong><div class="report-header-actions"><button id="guest-settings-open" class="report-settings-gear" type="button" aria-label="Grundeinstellungen" title="Grundeinstellungen">⚙</button><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Info schließen">×</button></div></div>
+    <div class="preview-header"><strong id="report-title">Info</strong><div class="report-header-actions"><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Info schließen">×</button></div></div>
     <div class="report-content">
       <form id="report-login" class="report-login">
         <fieldset class="report-pin-group">
@@ -249,6 +249,7 @@
           </div>
         </fieldset>
         <button type="submit">Log in</button>
+        <button id="report-passkey-login" class="report-passkey-button" type="button" hidden>Mit Passkey anmelden</button>
         <button id="start-without-login" class="start-without-login" type="button">Ohne Login</button>
         <small id="report-login-message" aria-live="polite"></small>
       </form>
@@ -269,6 +270,10 @@
         </div>
       </section>
       <section id="report-info" class="report-info" aria-label="Informationen und Datenupdate">
+        <div id="guest-default-settings" class="guest-default-settings">
+          <h2>Grundeinstellungen</h2>
+          <div id="guest-settings-slot-list" class="settings-slot-list"></div>
+        </div>
         <div id="fullscreen-report-tools" class="fullscreen-report-tools">
           <button id="report-update-data" type="button">Datenupdate</button>
           <small id="report-data-stand"></small>
@@ -333,12 +338,13 @@
           <small id="project-save-message" aria-live="polite"></small>
         </div>
       </section>
-      <section id="report-settings" class="report-settings" hidden aria-labelledby="report-settings-title">
-        <div class="report-list-heading"><h2 id="report-settings-title">Grundeinstellungen</h2></div>
+      <section id="report-settings" class="report-settings" hidden aria-labelledby="report-title">
+        <small id="settings-slot-legend" class="settings-slot-legend"></small>
         <div id="settings-slot-list" class="settings-slot-list"></div>
+        <label class="settings-always-use"><input id="settings-always-use" type="checkbox"> Einstellung immer verwenden</label>
         <div id="settings-editor" class="settings-editor" hidden>
           <div class="settings-source"><label><input type="radio" name="settings-source" value="current" checked> Aktuelle Einstellungen</label><label><input type="radio" name="settings-source" value="code"> Code eingeben</label></div>
-          <input id="settings-input-code" type="text" maxlength="2048" autocomplete="off" spellcheck="false" placeholder="Einstellungscode" hidden>
+          <input id="settings-input-code" type="text" maxlength="2048" autocomplete="off" spellcheck="false" aria-label="Einstellungs- oder Projektcode eingeben" placeholder="Einstellungs- oder Projektcode">
           <div class="settings-checks"><label><input id="settings-save-ui" type="checkbox" checked> UI speichern</label><label><input id="settings-save-output" type="checkbox" checked> Ausgabe übernehmen</label></div>
           <button id="settings-save-open" type="button">Einstellungen speichern</button>
           <button id="settings-copy-code" type="button">Einstellungscode kopieren</button>
@@ -393,7 +399,7 @@
     </form>
   </dialog>
   <dialog id="settings-name-dialog" class="project-name-dialog" aria-labelledby="settings-name-title">
-    <form method="dialog"><strong id="settings-name-title">Einstellungen speichern</strong><label for="settings-name-input">Bezeichnung</label><input id="settings-name-input" maxlength="100" autocomplete="off"><label for="settings-save-slot">Slot</label><select id="settings-save-slot"></select><div><button value="cancel" type="submit">Abbrechen</button><button value="save" type="submit">Speichern</button></div></form>
+    <form method="dialog"><strong id="settings-name-title">Einstellungen speichern</strong><label for="settings-name-input">Bezeichnung</label><input id="settings-name-input" maxlength="100" autocomplete="off"><span id="settings-save-slot-label" class="settings-save-slot-label">Slot</span><div id="settings-save-slot" class="settings-save-slot-list" role="group" aria-labelledby="settings-save-slot-label"></div><div><button value="cancel" type="submit">Abbrechen</button><button value="save" type="submit">Speichern</button></div></form>
   </dialog>
   <dialog id="edda-thanks" class="edda-thanks" aria-live="polite">
     <div id="edda-fireworks" class="edda-fireworks" aria-hidden="true"></div>
@@ -428,6 +434,6 @@
   <div id="preview-splitter" class="preview-splitter" role="separator" aria-label="Breite von Ansicht und Vorschau ändern" aria-orientation="vertical" tabindex="0" hidden><span></span></div>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=settings-slots-20261008b" defer></script>
+  <script src="app.js?v=projects-recent-20261008" defer></script>
 </body>
 </html>

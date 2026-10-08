@@ -1799,11 +1799,17 @@ function dataRetrievalStamp() {
   return state.data?.updatedAt ? formatTimestamp(state.data.updatedAt) : `${formatDate(state.data.updated)} · Uhrzeit nicht verfügbar`;
 }
 
+function newestProjectsFirst(projects) {
+  const timestamp = project => Date.parse(project.updated_at || project.created_at || "") || 0;
+  return [...projects].sort((left, right) => timestamp(right) - timestamp(left) || (left.slot || 0) - (right.slot || 0));
+}
+
 async function loadProjects() {
   const list = document.querySelector("#report-project-list");
   if (!list) return;
   list.replaceChildren();
-  const { projects } = await reportRequest("/projects");
+  const result = await reportRequest("/projects");
+  const projects = newestProjectsFirst(result.projects || []);
   if (!projects.length) {
     const empty = document.createElement("p");
     empty.className = "report-empty";
@@ -1818,7 +1824,7 @@ async function loadProjects() {
     button.type = "button";
     button.className = "report-project-button";
     const title = document.createElement("strong");
-    title.textContent = `${project.slot || "–"}. ${project.title}`;
+    title.textContent = project.title;
     const detail = document.createElement("span");
     detail.textContent = project.detail;
     const meta = document.createElement("small");
@@ -1918,6 +1924,95 @@ function openProjectActionDialog({ title, message, choices = [], danger = false,
   }, { once: true }));
 }
 
+function confirmGlobalSettingsOverwrite() {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-action-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("strong");
+  heading.textContent = "Globales UI wirklich überschreiben?";
+  const steps = document.createElement("div");
+  steps.className = "settings-confirm-steps";
+  const options = document.createElement("div");
+  options.className = "project-action-options";
+  const overwrite = document.createElement("button");
+  overwrite.type = "submit"; overwrite.value = "overwrite"; overwrite.className = "danger";
+  const cancel = document.createElement("button");
+  cancel.type = "submit"; cancel.value = ""; cancel.textContent = "Abbrechen";
+  let step = 0;
+  let timer = null;
+  let deadline = 0;
+  const reset = () => {
+    step = 0;
+    clearInterval(timer);
+    options.replaceChildren();
+    steps.replaceChildren();
+    for (let digit = 1; digit <= 3; digit += 1) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = String(digit);
+      button.disabled = digit !== 1;
+      button.addEventListener("click", () => {
+        if (digit !== step + 1) return;
+        step = digit;
+        if (digit < 3) {
+          button.disabled = true;
+          steps.children[digit].disabled = false;
+          return;
+        }
+        steps.replaceChildren();
+        deadline = Date.now() + 10000;
+        options.append(overwrite, cancel);
+        const tick = () => {
+          const remaining = Math.ceil((deadline - Date.now()) / 1000);
+          if (remaining <= 0) { reset(); return; }
+          overwrite.textContent = `Global überschreiben (${remaining})`;
+        };
+        tick();
+        timer = setInterval(tick, 200);
+      });
+      steps.append(button);
+    }
+  };
+  form.append(heading, steps, options);
+  dialog.append(form);
+  document.body.append(dialog);
+  reset();
+  dialog.showModal();
+  return new Promise(resolve => dialog.addEventListener("close", () => {
+    clearInterval(timer);
+    const result = dialog.returnValue === "overwrite" && Date.now() < deadline;
+    dialog.remove();
+    resolve(result);
+  }, { once: true }));
+}
+
+function askPersonalSettingsOnLogin() {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-action-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("strong");
+  heading.textContent = "Eigene Einstellungen verwenden?";
+  const options = document.createElement("div");
+  options.className = "project-action-options";
+  const own = document.createElement("button"); own.type = "submit"; own.value = "own"; own.textContent = "Eigene verwenden";
+  const current = document.createElement("button"); current.type = "submit"; current.value = "current"; current.textContent = "Aktuelle belassen";
+  const remember = document.createElement("label");
+  const checkbox = document.createElement("input"); checkbox.type = "checkbox";
+  remember.append(checkbox, " Nicht erneut fragen");
+  options.append(own, current);
+  form.append(heading, options, remember);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+  return new Promise(resolve => dialog.addEventListener("close", () => {
+    const result = { own: dialog.returnValue === "own", remember: checkbox.checked };
+    dialog.remove();
+    resolve(result);
+  }, { once: true }));
+}
+
 function chooseProjectToOverwrite(projects) {
   return openProjectActionDialog({
     title: "Projekt überschreiben",
@@ -1941,7 +2036,7 @@ async function askProjectName() {
   select.replaceChildren();
   for (let slot = 1; slot <= 5; slot += 1) {
     const option = document.createElement("option"); option.value = String(slot);
-    option.textContent = `${slot}. ${projects.find(project => project.slot === slot)?.title || "Leer"}`;
+    option.textContent = projects.find(project => project.slot === slot)?.title || `Freier Platz ${slot}`;
     select.append(option);
   }
   select.value = String([1, 2, 3, 4, 5].find(slot => !projects.some(project => project.slot === slot)) || 1);
@@ -3132,6 +3227,8 @@ async function downloadBlob(blob, filename) {
 
 const reportApiUrl = String(window.REPORT_API_URL || "").replace(/\/$/, "");
 let reportPin = "";
+let reportSessionToken = "";
+let reportAuthMethod = "";
 let currentReportRole = "";
 let reportsNewestFirst = true;
 const reportIdentities = {
@@ -3144,11 +3241,50 @@ async function reportRequest(path, options = {}) {
   if (!reportApiUrl) throw new Error("Die Reportfunktion ist noch nicht mit dem Speicherdienst verbunden.");
   const response = await fetch(`${reportApiUrl}${path}`, {
     ...options,
-    headers: { "Content-Type": "application/json", "X-Report-Pin": reportPin, ...(options.headers || {}) }
+    headers: { "Content-Type": "application/json", ...(reportSessionToken ? { "X-Report-Session": reportSessionToken } : reportPin ? { "X-Report-Pin": reportPin } : {}), ...(options.headers || {}) }
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || "Die Reportfunktion ist momentan nicht erreichbar.");
   return payload;
+}
+
+const passkeyAvailable = () => window.location.origin === "https://charavision.github.io" && window.isSecureContext && !!window.PublicKeyCredential && !!navigator.credentials;
+function passkeyBytes(value) {
+  const base64 = String(value).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")), character => character.charCodeAt(0));
+}
+function passkeyBase64(bytes) {
+  if (!bytes) return null;
+  const data = new Uint8Array(bytes);
+  let result = "";
+  for (const byte of data) result += String.fromCharCode(byte);
+  return btoa(result).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function passkeyResponse(credential, registration) {
+  const response = credential.response;
+  return {
+    id: credential.id, rawId: passkeyBase64(credential.rawId), type: credential.type,
+    response: registration
+      ? { clientDataJSON: passkeyBase64(response.clientDataJSON), attestationObject: passkeyBase64(response.attestationObject), transports: response.getTransports?.() || [] }
+      : { clientDataJSON: passkeyBase64(response.clientDataJSON), authenticatorData: passkeyBase64(response.authenticatorData), signature: passkeyBase64(response.signature), userHandle: passkeyBase64(response.userHandle) },
+    clientExtensionResults: credential.getClientExtensionResults?.() || {},
+    authenticatorAttachment: credential.authenticatorAttachment || undefined
+  };
+}
+async function registerAdminPasskey(button, message) {
+  button.disabled = true;
+  message.textContent = "Passkey wird eingerichtet …";
+  try {
+    if (!passkeyAvailable()) throw new Error("Passkeys können nur auf der veröffentlichten HTTPS-Seite eingerichtet werden.");
+    if (reportAuthMethod !== "pin" || currentReportRole !== "Admin" || currentReportIdentity?.person !== "Sebastian") throw new Error("Bitte zuerst mit Sebastians Admin-PIN anmelden.");
+    const { flowId, options } = await reportRequest("/passkey/register/options", { method: "POST", body: "{}" });
+    const publicKey = { ...options, challenge: passkeyBytes(options.challenge), user: { ...options.user, id: passkeyBytes(options.user.id) }, excludeCredentials: (options.excludeCredentials || []).map(item => ({ ...item, id: passkeyBytes(item.id) })) };
+    const credential = await navigator.credentials.create({ publicKey });
+    if (!credential) throw new Error("Passkey-Einrichtung abgebrochen.");
+    await reportRequest("/passkey/register/verify", { method: "POST", body: JSON.stringify({ flowId, response: passkeyResponse(credential, true) }) });
+    message.textContent = "Passkey eingerichtet. Du kannst dich beim nächsten Mal damit anmelden.";
+  } catch (error) { message.textContent = error.name === "NotAllowedError" ? "Passkey-Einrichtung abgebrochen oder nicht erlaubt." : error.message; }
+  finally { button.disabled = false; }
 }
 
 const UI_SETTING_KEYS = ["fullRegionNames", "showSinceElection", "changeMode", "sinceElectionMode", "showBrackets", "showLabels", "regionLabelMode", "partyLabelMode", "barColors", "barColorMode", "barStyle", "showPercentValues", "percentLabelMode", "showLut", "showBackground", "export3d", "chartTheme", "uiBrightness", "uiSaturation", "yAxisMode"];
@@ -3166,6 +3302,9 @@ let projectSettingsSnapshot = null;
 let settingsSlots = [];
 let settingsSlotLimit = 2;
 let standardSettingsSlot = 0;
+let personalSettingsSlot = 0;
+let alwaysUsePersonalSettings = false;
+let personalSettingsChoicePending = false;
 function captureSettingsSnapshot() {
   const ui = Object.fromEntries(UI_SETTING_KEYS.map(key => [key, key === "yAxisMode" ? yAxisMode : state[key]]));
   const output = Object.fromEntries(OUTPUT_SETTING_KEYS.map(key => [key, key === "exportFormat" ? document.querySelector("#export-format").value : state[key]]));
@@ -3196,12 +3335,56 @@ function settingsCode(snapshot = captureSettingsSnapshot()) {
   return `S1.${btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
 }
 function decodeSettingsCode(code) {
-  if (!/^S1\.[A-Za-z0-9_-]{8,2048}$/.test(code)) throw new Error("Bitte einen gültigen Einstellungscode eingeben.");
+  if (/^[0-9A-Za-z]{13,32}$/.test(code)) return decodeProjectSettingsCode(code);
+  if (!/^S1\.[A-Za-z0-9_-]{8,2048}$/.test(code)) throw new Error("Bitte einen gültigen Einstellungs- oder Projektcode eingeben.");
   const encoded = code.slice(3).replace(/-/g, "+").replace(/_/g, "/");
   try {
     const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0));
     return sanitizeSettingsSnapshot(JSON.parse(new TextDecoder().decode(bytes)));
   } catch (error) { throw new Error("Der Einstellungscode ist beschädigt."); }
+}
+function decodeProjectSettingsCode(code) {
+  // Read the settings bits without applying the project's polls, parties or regions.
+  const baseCode = code.length >= 21 ? code.slice(0, -8) : code;
+  const partyCount = orderedChoiceCount(Object.keys(PARTY_META).length);
+  const regionCount = orderedChoiceCount(state.data.regions.length);
+  const legacySpace = regionCount * partyCount * 7n;
+  const value = base62Decode(baseCode);
+  const modeValue = value / legacySpace;
+  if (modeValue >= (1n << 54n) || (value % legacySpace) / (7n * partyCount) >= regionCount) {
+    throw new Error("Dieser Projektcode gehört nicht zu einer gültigen Konfiguration.");
+  }
+  const mode = Number(modeValue & 0xffffffffn);
+  const decodeTone = shift => {
+    const encoded = Number((modeValue >> shift) & 31n);
+    return (encoded >= 22 ? encoded - 32 : encoded <= 10 ? encoded : 0) * 5;
+  };
+  return sanitizeSettingsSnapshot({
+    ui: {
+      fullRegionNames: Boolean(mode & 16), showSinceElection: !(mode & 256),
+      changeMode: modeValue & (1n << 32n) ? "development" : "election",
+      sinceElectionMode: ["color", "gray", "off", "color"][(mode >> 22) & 3],
+      showBrackets: !(mode & 512), showLabels: !(mode & 1024),
+      regionLabelMode: ["auto", "0", "90", "off"][(mode >> 16) & 3],
+      partyLabelMode: ["auto", "0", "90", "off"][(mode >> 18) & 3],
+      barColors: !(mode & 2048),
+      barColorMode: ["party", "lightblue", "gray", "party"][(mode >> 26) & 3],
+      barStyle: modeValue & (1n << 35n) ? "hell" : mode & 268435456 ? "matt" : "neon",
+      showPercentValues: !(mode & 4096),
+      percentLabelMode: ["without", "with", "off", "without"][(mode >> 20) & 3],
+      showLut: !(mode & 8192), showBackground: !(mode & 16384), export3d: !(mode & 32768),
+      chartTheme: chartThemeOptions[Number((modeValue >> 51n) & 3n)][0],
+      uiBrightness: decodeTone(41n), uiSaturation: decodeTone(46n),
+      yAxisMode: ["dynamic", "static", "off", "dynamic"][(mode >> 24) & 3]
+    },
+    output: {
+      a4Mode: Boolean(mode & 8),
+      a4Orientation: mode & 128 ? "landscape" : mode & 64 ? "portrait" : "auto",
+      a4DiagramFormat: ["auto", "1x1", "1x2", "1x3", "2x2", "2x3", "auto", "auto"][(mode >>> 29) & 7],
+      outputBarWidth: modeValue & (1n << 53n) ? "adapted" : "standard",
+      hideEmptyClusters: Boolean(modeValue & (1n << 33n))
+    }
+  });
 }
 function applySettingsSnapshot(snapshot, { ui = true, output = true } = {}) {
   const clean = sanitizeSettingsSnapshot(snapshot);
@@ -3238,6 +3421,22 @@ function applySettingsSnapshot(snapshot, { ui = true, output = true } = {}) {
   render(false);
 }
 function settingsDiffer(left, right) { return JSON.stringify(left) !== JSON.stringify(right); }
+function selectedPersonalSettings() {
+  return personalSettingsSlot ? settingsSlots.find(item => item.slot === personalSettingsSlot)?.settings || null : standardSettingsSnapshot;
+}
+function personalSettingsDiffer(snapshot) {
+  if (!snapshot) return false;
+  const current = captureSettingsSnapshot();
+  return ["ui", "output"].some(section => Object.entries(snapshot[section] || {}).some(([key, value]) => current[section][key] !== value));
+}
+async function savePersonalSettingsPreferences(slot = personalSettingsSlot, alwaysUse = alwaysUsePersonalSettings) {
+  await reportRequest("/settings/preferences", { method: "PUT", body: JSON.stringify({ personalSlot: slot, alwaysUse }) });
+  const saved = await reportRequest("/settings/slots", { cache: "no-store" });
+  if (Number(saved.personalSlot || 0) !== slot || Boolean(saved.alwaysUse) !== alwaysUse) throw new Error("Die persönliche Starteinstellung wurde nicht übernommen. Bitte erneut versuchen.");
+  personalSettingsSlot = slot;
+  alwaysUsePersonalSettings = alwaysUse;
+  renderSettingsSlots();
+}
 async function loadStandardSettings() {
   if (!reportApiUrl) return;
   const response = await fetch(`${reportApiUrl}/settings/slots/public`, { cache: "no-store" });
@@ -3248,26 +3447,52 @@ async function loadStandardSettings() {
 async function refreshSettingsSlots() {
   if (currentReportRole) {
     const result = await reportRequest("/settings/slots");
+    if (personalSettingsChoicePending) return;
     settingsSlots = result.slots || [];
     settingsSlotLimit = result.limit;
     standardSettingsSlot = result.standardSlot;
-  } else { settingsSlots = []; settingsSlotLimit = 0; standardSettingsSlot = 0; }
+    personalSettingsSlot = result.personalSlot || 0;
+    alwaysUsePersonalSettings = Boolean(result.alwaysUse);
+  } else { settingsSlots = []; settingsSlotLimit = 0; standardSettingsSlot = 0; personalSettingsSlot = 0; alwaysUsePersonalSettings = false; }
   renderSettingsSlots();
 }
 function renderSettingsSlots() {
-  const list = document.querySelector("#settings-slot-list");
+  const guest = !currentReportRole;
+  const list = document.querySelector(guest ? "#guest-settings-slot-list" : "#settings-slot-list");
   list.replaceChildren();
-  const addRow = (label, snapshot, { slot = 0, removable = false, global = false } = {}) => {
+  document.querySelector("#settings-slot-legend").textContent = currentReportRole === "Admin" ? "□ Mein Start · ○ Global" : "□ Mein Start";
+  const addRow = (label, snapshot, { slot = 0, removable = false, global = false, personal = false } = {}) => {
     const row = document.createElement("div"); row.className = "settings-slot-row";
-    const use = document.createElement("button"); use.type = "button"; use.textContent = label;
+    const use = document.createElement("button"); use.type = "button"; use.textContent = label; use.title = snapshot ? label : `${label} (überschreibbar)`;
     use.disabled = !snapshot;
     use.addEventListener("click", () => { applySettingsSnapshot(snapshot); document.querySelector("#settings-message").textContent = `${label} übernommen.`; });
     row.append(use);
+    if (personal) {
+      const choice = document.createElement("input"); choice.type = "checkbox"; choice.className = "settings-personal-check";
+      choice.checked = slot === personalSettingsSlot; choice.disabled = !snapshot;
+      choice.title = "Als persönliche Starteinstellung wählen";
+      choice.setAttribute("aria-label", `${label} als persönliche Starteinstellung wählen`);
+      choice.addEventListener("click", event => {
+        if (personalSettingsChoicePending || slot === personalSettingsSlot) event.preventDefault();
+      });
+      choice.addEventListener("change", async () => {
+        if (personalSettingsChoicePending) return;
+        if (slot === personalSettingsSlot) { choice.checked = true; return; }
+        personalSettingsChoicePending = true;
+        const selectedSlot = choice.checked ? slot : 0;
+        try { await savePersonalSettingsPreferences(selectedSlot); document.querySelector("#settings-message").textContent = `${selectedSlot ? label : "Standard"} ist jetzt deine Starteinstellung.`; }
+        catch (error) { renderSettingsSlots(); document.querySelector("#settings-message").textContent = error.message; }
+        finally { personalSettingsChoicePending = false; }
+      }); row.append(choice);
+    }
     if (global) {
-      const mark = document.createElement("input"); mark.type = "checkbox"; mark.className = "settings-global-check"; mark.checked = slot === standardSettingsSlot; mark.disabled = !snapshot; mark.title = "Als globalen Standard festlegen";
+      const mark = document.createElement("input"); mark.type = "radio"; mark.name = "settings-global-slot"; mark.className = "settings-global-check"; mark.checked = slot === standardSettingsSlot; mark.disabled = !snapshot; mark.title = "Als globalen Standard festlegen"; mark.setAttribute("aria-label", `${label} als globalen Standard festlegen`);
       mark.addEventListener("change", async () => {
+        if (slot === standardSettingsSlot) return;
+        const confirmed = await openProjectActionDialog({ title: "UI global ändern?", choices: [{ value: "change", label: "Global ändern", danger: true }] });
+        if (confirmed !== "change") { renderSettingsSlots(); return; }
         try { await reportRequest("/settings/slots/standard", { method: "PUT", body: JSON.stringify({ slot }) }); await loadStandardSettings(); await refreshSettingsSlots(); }
-        catch (error) { mark.checked = !mark.checked; document.querySelector("#settings-message").textContent = error.message; }
+        catch (error) { renderSettingsSlots(); document.querySelector("#settings-message").textContent = error.message; }
       }); row.append(mark);
     }
     if (removable) {
@@ -3279,27 +3504,34 @@ function renderSettingsSlots() {
     }
     list.append(row);
   };
-  if (currentReportRole) for (let slot = 1; slot <= settingsSlotLimit; slot += 1) {
+  if (!guest) for (let slot = 1; slot <= settingsSlotLimit; slot += 1) {
     const saved = settingsSlots.find(item => item.slot === slot);
-    addRow(saved ? `${slot}. ${saved.title}` : `${slot}. Leer (überschreibbar)`, saved?.settings, { slot, removable: true, global: currentReportRole === "Admin" });
+    addRow(saved ? `${slot}. ${saved.title}` : `${slot}. Leer`, saved?.settings, { slot, removable: true, personal: true, global: currentReportRole === "Admin" });
   }
   if (projectSettingsSnapshot) addRow("Projektsettings", projectSettingsSnapshot);
-  addRow("Standard", standardSettingsSnapshot || initialSettingsSnapshot);
-  document.querySelector("#settings-editor").hidden = !currentReportRole;
+  addRow("Standard", standardSettingsSnapshot || initialSettingsSnapshot, { personal: !guest });
+  document.querySelector("#settings-editor").hidden = guest;
+  document.querySelector("#settings-always-use").checked = alwaysUsePersonalSettings;
 }
 function askSettingsName() {
   const dialog = document.querySelector("#settings-name-dialog");
   const name = document.querySelector("#settings-name-input");
   const slots = document.querySelector("#settings-save-slot");
   name.value = ""; slots.replaceChildren();
+  let selectedSlot = Array.from({ length: settingsSlotLimit }, (_, index) => index + 1).find(slot => !settingsSlots.some(item => item.slot === slot)) || 1;
   for (let slot = 1; slot <= settingsSlotLimit; slot += 1) {
     const saved = settingsSlots.find(item => item.slot === slot);
-    const option = document.createElement("option"); option.value = String(slot);
-    option.textContent = `${slot}. ${saved?.title || "Leer"}`; slots.append(option);
+    const button = document.createElement("button"); button.type = "button"; button.className = "settings-save-slot-button";
+    button.textContent = `${slot}. ${saved?.title || "Leer"}`;
+    button.setAttribute("aria-pressed", String(slot === selectedSlot));
+    button.addEventListener("click", () => {
+      selectedSlot = slot;
+      slots.querySelectorAll(".settings-save-slot-button").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+    });
+    slots.append(button);
   }
-  slots.value = String(Array.from({ length: settingsSlotLimit }, (_, index) => index + 1).find(slot => !settingsSlots.some(item => item.slot === slot)) || 1);
   dialog.showModal(); requestAnimationFrame(() => name.focus());
-  return new Promise(resolve => dialog.addEventListener("close", () => resolve(dialog.returnValue === "save" ? { title: name.value.trim(), slot: Number(slots.value) } : null), { once: true }));
+  return new Promise(resolve => dialog.addEventListener("close", () => resolve(dialog.returnValue === "save" ? { title: name.value.trim(), slot: selectedSlot } : null), { once: true }));
 }
 async function saveSettingsSlot() {
   const message = document.querySelector("#settings-message");
@@ -3313,10 +3545,15 @@ async function saveSettingsSlot() {
   if (!choice) return;
   if (!choice.title) throw new Error("Bitte eine Bezeichnung eingeben.");
   if (settingsSlots.some(item => item.slot === choice.slot)) {
-    const confirmed = await openProjectActionDialog({ title: "Einstellungen überschreiben?", choices: [{ value: "overwrite", label: "Überschreiben", danger: true }] });
-    if (confirmed !== "overwrite") return;
+    if (currentReportRole === "Admin" && choice.slot === standardSettingsSlot) {
+      if (!await confirmGlobalSettingsOverwrite()) return;
+    } else {
+      const confirmed = await openProjectActionDialog({ title: "Einstellungen überschreiben?", choices: [{ value: "overwrite", label: "Überschreiben", danger: true }] });
+      if (confirmed !== "overwrite") return;
+    }
   }
   await reportRequest(`/settings/slots/${choice.slot}`, { method: "PUT", body: JSON.stringify({ title: choice.title, settings: selected }) });
+  if (currentReportRole === "Admin" && choice.slot === standardSettingsSlot) await loadStandardSettings();
   await refreshSettingsSlots();
   message.textContent = `${choice.title} gespeichert.`;
 }
@@ -3809,11 +4046,13 @@ async function loadReportAccounts() {
     const role = document.createElement("span"); role.textContent = account.role;
     const projectsButton = document.createElement("button"); projectsButton.type = "button"; projectsButton.className = "report-account-projects-button"; projectsButton.textContent = "P"; projectsButton.setAttribute("aria-label", `Projekte von ${account.personName} anzeigen`);
     const reset = document.createElement("button"); reset.type = "button"; reset.textContent = "Reset PIN";
+    reset.setAttribute("aria-expanded", "false");
     const trash = document.createElement("button"); trash.type = "button"; trash.className = "report-account-trash"; trash.textContent = "🗑"; trash.setAttribute("aria-label", `Account ${account.personName} löschen`);
     main.append(name, role, projectsButton, reset, trash); row.append(main);
 
     projectsButton.addEventListener("click", async () => {
       row.querySelector(".report-account-reset")?.remove();
+      reset.setAttribute("aria-expanded", "false");
       row.querySelector(".report-account-confirm")?.remove();
       const existing = row.querySelector(".report-account-projects");
       if (existing) { existing.remove(); projectsButton.classList.remove("active"); return; }
@@ -3838,7 +4077,7 @@ async function loadReportAccounts() {
         panel.replaceChildren();
         if (!projects.length) {
           const empty = document.createElement("p"); empty.className = "report-empty"; empty.textContent = "Keine gespeicherten Projekte."; panel.append(empty);
-        } else projects.forEach(project => {
+        } else newestProjectsFirst(projects).forEach(project => {
           const projectButton = document.createElement("button"); projectButton.type = "button"; projectButton.className = "report-account-project-button";
           const title = document.createElement("strong"); title.textContent = project.title;
           const detail = document.createElement("span"); detail.textContent = project.detail;
@@ -3862,19 +4101,34 @@ async function loadReportAccounts() {
       row.querySelector(".report-account-projects")?.remove();
       projectsButton.classList.remove("active");
       row.querySelector(".report-account-confirm")?.remove();
+      const existing = row.querySelector(".report-account-reset");
+      if (existing) { existing.remove(); reset.setAttribute("aria-expanded", "false"); return; }
       const panel = document.createElement("form"); panel.className = "report-account-reset";
       const label = document.createElement("label"); label.textContent = "Wie lautet der neue PIN?";
       const input = document.createElement("input"); input.maxLength = 5; input.minLength = 5; input.required = true; input.autocomplete = "new-password";
-      label.append(input);
+      input.id = `report-account-new-pin-${account.id}`; label.htmlFor = input.id;
+      const inputRow = document.createElement("div"); inputRow.className = "report-account-pin-row";
+      inputRow.append(input);
+      let passkeyMessage = null;
+      if (account.id === "builtin-admin" && currentReportIdentity?.person === "Sebastian" && reportAuthMethod === "pin") {
+        const key = document.createElement("button"); key.type = "button"; key.className = "report-account-passkey";
+        key.setAttribute("aria-label", "Passkey für Sebastian einrichten"); key.title = "Passkey für Sebastian einrichten";
+        key.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="4"/><path d="M11 12 21 22m-4-4 2-2m-5-1 2-2"/></svg>';
+        inputRow.append(key);
+        passkeyMessage = document.createElement("small"); passkeyMessage.className = "report-account-passkey-message"; passkeyMessage.setAttribute("aria-live", "polite");
+        key.addEventListener("click", () => registerAdminPasskey(key, passkeyMessage));
+      }
       const submit = document.createElement("button"); submit.type = "submit"; submit.textContent = "PIN speichern";
       const cancel = document.createElement("button"); cancel.type = "button"; cancel.textContent = "Abbrechen";
       const actions = document.createElement("div"); actions.className = "report-account-confirm-actions"; actions.append(submit, cancel);
-      panel.append(label, actions); row.append(panel); input.focus();
+      panel.append(label, inputRow);
+      if (passkeyMessage) panel.append(passkeyMessage);
+      panel.append(actions); row.append(panel); reset.setAttribute("aria-expanded", "true"); input.focus();
       input.addEventListener("input", () => { input.value = input.value.slice(0, 5).toUpperCase(); });
-      cancel.addEventListener("click", () => panel.remove());
+      cancel.addEventListener("click", () => { panel.remove(); reset.setAttribute("aria-expanded", "false"); });
       panel.addEventListener("submit", async event => {
         event.preventDefault(); submit.disabled = true;
-        try { await reportRequest(`/accounts/${encodeURIComponent(account.id)}/pin`, { method: "PATCH", body: JSON.stringify({ pin: input.value.trim().toUpperCase() }) }); panel.remove(); window.alert("PIN wurde geändert."); }
+        try { await reportRequest(`/accounts/${encodeURIComponent(account.id)}/pin`, { method: "PATCH", body: JSON.stringify({ pin: input.value.trim().toUpperCase() }) }); panel.remove(); reset.setAttribute("aria-expanded", "false"); window.alert("PIN wurde geändert."); }
         catch (error) { submit.disabled = false; window.alert(error.message); }
       });
     });
@@ -3883,6 +4137,7 @@ async function loadReportAccounts() {
       row.querySelector(".report-account-projects")?.remove();
       projectsButton.classList.remove("active");
       row.querySelector(".report-account-reset")?.remove();
+      reset.setAttribute("aria-expanded", "false");
       const confirm = document.createElement("div"); confirm.className = "report-account-confirm";
       const question = document.createElement("p"); question.textContent = "Account wirklich löschen?";
       const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger"; remove.textContent = "Ja, löschen";
@@ -4227,6 +4482,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     standardSettingsSnapshot = initialSettingsSnapshot;
     try { await loadStandardSettings(); if (standardSettingsSnapshot) applySettingsSnapshot(standardSettingsSnapshot); }
     catch (error) { /* Offline mit den eingebauten Standardeinstellungen weiterarbeiten. */ }
+    renderSettingsSlots();
     const sharedConfiguration = new URLSearchParams(window.location.search).get("config");
     if (sharedConfiguration) {
       try {
@@ -4663,6 +4919,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       return willOpen;
     };
     const openSettingsPanel = async () => {
+      if (!currentReportRole) return;
       reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog", "startup-login-dialog");
       document.body.classList.remove("startup-project-open");
       reportDialog.classList.add("settings-panel-open");
@@ -4766,34 +5023,48 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       }
     });
     document.querySelector("#report-close").addEventListener("click", () => { reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog"); reportDialog.close(); });
-    document.querySelector("#guest-settings-open").addEventListener("click", openSettingsPanel);
     document.querySelector("#report-settings-open").addEventListener("click", openSettingsPanel);
-    document.querySelectorAll('input[name="settings-source"]').forEach(input => input.addEventListener("change", () => {
-      document.querySelector("#settings-input-code").hidden = document.querySelector('input[name="settings-source"]:checked')?.value !== "code";
-    }));
+    document.querySelector("#settings-always-use").addEventListener("change", async event => {
+      const checkbox = event.currentTarget;
+      const checked = checkbox.checked;
+      try { await savePersonalSettingsPreferences(personalSettingsSlot, checked); }
+      catch (error) { checkbox.checked = !checked; document.querySelector("#settings-message").textContent = error.message; }
+    });
+    document.querySelector("#settings-input-code").addEventListener("input", event => {
+      if (event.currentTarget.value.trim()) document.querySelector('input[name="settings-source"][value="code"]').checked = true;
+    });
     document.querySelector("#settings-save-open").addEventListener("click", () => saveSettingsSlot().catch(error => { document.querySelector("#settings-message").textContent = error.message; }));
     document.querySelector("#settings-copy-code").addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(settingsCode()); document.querySelector("#settings-message").textContent = "Einstellungscode kopiert."; }
       catch (error) { document.querySelector("#settings-message").textContent = "Einstellungscode konnte nicht kopiert werden."; }
     });
-    document.querySelector("#report-login").addEventListener("submit", async event => {
-      event.preventDefault();
-      const message = document.querySelector("#report-login-message");
-      reportPin = readReportPin();
-      message.textContent = "PIN wird geprüft …";
-      try {
-        const session = await reportRequest("/session", { method: "POST", body: "{}" });
+    const finishReportLogin = async (session, method) => {
+        reportAuthMethod = method;
         currentReportRole = session.role || (session.reporter === "Admin" ? "Admin" : "Helper");
         const fallbackIdentity = reportIdentities[session.reporter] || { person: session.reporter || "Reporter", work: session.reporter || "Reporter" };
         const identity = { person: session.personName || fallbackIdentity.person, work: session.workName || fallbackIdentity.work };
         currentReportIdentity = identity;
+        try { await loadStandardSettings(); }
+        catch (error) { /* Die Anmeldung bleibt auch bei gestörtem öffentlichen Standard erreichbar. */ }
+        await refreshSettingsSlots();
+        const ownSettings = selectedPersonalSettings();
+        if (ownSettings) {
+          if (startupPending || alwaysUsePersonalSettings) applySettingsSnapshot(ownSettings);
+          else if (personalSettingsDiffer(ownSettings)) {
+            const decision = await askPersonalSettingsOnLogin();
+            if (decision.own) {
+              applySettingsSnapshot(ownSettings);
+              if (decision.remember) await savePersonalSettingsPreferences(personalSettingsSlot, true);
+            }
+          }
+        }
         document.querySelector("#report-session-person").textContent = identity.person;
         document.querySelector("#report-session-work").textContent = `(${identity.work})`;
         document.querySelector("#report-subject-field").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-login").hidden = true;
         document.querySelector("#report-info").hidden = true;
         document.querySelector("#report-session").hidden = false;
-        document.querySelector("#guest-settings-open").hidden = true;
+        document.querySelector("#guest-default-settings").hidden = true;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-notifications-open").hidden = currentReportRole !== "Admin" && !window.AndroidApp?.getNotificationSettings;
         document.querySelector("#report-app-open").hidden = false;
@@ -4806,7 +5077,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         const identityHeader = document.querySelector(".report-session-user");
         identityHeader.classList.remove("is-revealed");
         requestAnimationFrame(() => identityHeader.classList.add("is-revealed"));
-        message.textContent = "";
+        document.querySelector("#report-login-message").textContent = "";
         if (startupPending) {
           reportDialog.classList.remove("startup-login-dialog");
           reportDialog.close();
@@ -4818,10 +5089,41 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
           document.querySelector("#report-book-open").classList.add("active");
           await loadReports();
         }
-      } catch (error) { reportPin = ""; currentReportRole = ""; currentReportIdentity = null; pinFields.forEach(field => { field.value = ""; }); pinFields[0].focus(); message.textContent = error.message; }
+    };
+    document.querySelector("#report-login").addEventListener("submit", async event => {
+      event.preventDefault();
+      const message = document.querySelector("#report-login-message");
+      reportSessionToken = "";
+      reportPin = readReportPin();
+      message.textContent = "PIN wird geprüft …";
+      try {
+        const session = await reportRequest("/session", { method: "POST", body: "{}" });
+        await finishReportLogin(session, "pin");
+      } catch (error) { reportPin = ""; currentReportRole = ""; currentReportIdentity = null; pinFields.forEach(field => { field.value = ""; }); renderSettingsSlots(); pinFields[0].focus(); message.textContent = error.message; }
     });
-    document.querySelector("#report-logout").addEventListener("click", () => {
-      reportPin = ""; currentReportRole = ""; currentReportIdentity = null;
+    document.querySelector("#report-passkey-login").hidden = !passkeyAvailable();
+    document.querySelector("#report-passkey-login").addEventListener("click", async event => {
+      const button = event.currentTarget;
+      const message = document.querySelector("#report-login-message");
+      button.disabled = true;
+      message.textContent = "Passkey wird angefragt …";
+      try {
+        reportPin = "";
+        const { flowId, options } = await reportRequest("/passkey/login/options", { method: "POST", body: "{}" });
+        const publicKey = { ...options, challenge: passkeyBytes(options.challenge), allowCredentials: (options.allowCredentials || []).map(item => ({ ...item, id: passkeyBytes(item.id) })) };
+        const credential = await navigator.credentials.get({ publicKey });
+        if (!credential) throw new Error("Passkey-Anmeldung abgebrochen.");
+        const session = await reportRequest("/passkey/login/verify", { method: "POST", body: JSON.stringify({ flowId, response: passkeyResponse(credential, false) }) });
+        reportSessionToken = session.token;
+        await finishReportLogin(session, "passkey");
+      } catch (error) {
+        reportSessionToken = ""; currentReportRole = ""; currentReportIdentity = null;
+        message.textContent = error.name === "NotAllowedError" ? "Passkey-Anmeldung abgebrochen oder nicht erlaubt." : error.message;
+      } finally { button.disabled = false; }
+    });
+    document.querySelector("#report-logout").addEventListener("click", async () => {
+      if (reportSessionToken) { try { await reportRequest("/passkey/logout", { method: "POST", body: "{}" }); } catch (error) { /* Lokalen Zugang dennoch beenden. */ } }
+      reportPin = ""; reportSessionToken = ""; reportAuthMethod = ""; currentReportRole = ""; currentReportIdentity = null;
       pinFields.forEach(field => { field.value = ""; });
       document.querySelector("#report-session").hidden = true;
       document.querySelector("#report-accounts").hidden = true;
@@ -4830,13 +5132,17 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#report-notifications").hidden = true;
       document.querySelector("#report-projects").hidden = true;
       document.querySelector("#report-book").hidden = true;
+      document.querySelector("#report-settings").hidden = true;
       document.querySelector("#report-info").hidden = false;
+      document.querySelector("#report-title").textContent = "Info";
       document.querySelector("#report-logout").hidden = true;
       document.querySelector("#save-project").hidden = true;
       document.querySelector("#project-picker-toggle").hidden = true;
       document.querySelector("#report-login").hidden = false;
-      document.querySelector("#guest-settings-open").hidden = false;
+      document.querySelector("#guest-default-settings").hidden = false;
       reportDialog.classList.remove("settings-panel-open");
+      document.querySelectorAll(".report-tab.active").forEach(tab => tab.classList.remove("active"));
+      refreshSettingsSlots().catch(error => { document.querySelector("#settings-message").textContent = error.message; });
       document.querySelector("#report-login-message").textContent = "";
       focusFirstReportPin();
     });

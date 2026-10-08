@@ -60,6 +60,14 @@ vm.runInContext(source.slice(source.indexOf("function applyConfigurationCode"), 
 vm.runInContext(source.slice(source.indexOf("function calculateBarLayout"), source.indexOf("function render(")), context);
 vm.runInContext(source.slice(source.indexOf("function a4BarWidthForSlot"), source.indexOf("function buildA4Page")), context);
 vm.runInContext(source.slice(source.indexOf("const UI_SETTING_KEYS"), source.indexOf("const notificationRegions")), context);
+vm.runInContext(source.slice(source.indexOf("function newestProjectsFirst"), source.indexOf("async function loadProjects")), context);
+
+const projectOrder = context.newestProjectsFirst([
+  { title: "Alt", slot: 1, updated_at: "2026-09-12T12:00:00Z" },
+  { title: "Neu", slot: 2, updated_at: "2026-10-08T20:00:00Z" },
+  { title: "Mitte", slot: 3, updated_at: "2026-10-01T12:00:00Z" }
+]);
+assert.deepEqual(Array.from(projectOrder, project => project.title), ["Neu", "Mitte", "Alt"], "Projekte stehen nach letzter Änderung, nicht nach Slot");
 
 function roundTrip({ regions, parties, otherParties, style, dates, brightness = 0, saturation = 0, theme = "navy", width = "standard" }) {
   state.regions = new Set(regions);
@@ -119,5 +127,32 @@ state.outputBarWidth = "standard";
 context.applySettingsSnapshot(decodedSettings, { ui: false, output: true });
 assert.equal(state.outputBarWidth, "adapted", "Nur die Ausgabeeinstellungen werden angewandt");
 assert.deepEqual([...state.regions], unchangedRegion, "Das Anwenden verändert keine Umfrageauswahl");
+state.chartTheme = "sunshine";
+state.uiBrightness = -35;
+state.uiSaturation = 45;
+state.outputBarWidth = "adapted";
+const projectCode = context.configurationCode();
+const unchangedParties = [...state.parties];
+const unchangedPolls = [...state.selectedPollRanks];
+state.chartTheme = "navy";
+state.uiBrightness = 0;
+state.uiSaturation = 0;
+state.outputBarWidth = "standard";
+const projectSettings = context.decodeSettingsCode(projectCode);
+assert.equal(projectSettings.ui.chartTheme, "sunshine", "Ein Projektcode liefert die UI-Einstellungen");
+assert.equal(projectSettings.ui.uiBrightness, -35);
+assert.equal(projectSettings.ui.uiSaturation, 45);
+assert.equal(projectSettings.output.outputBarWidth, "adapted", "Ein Projektcode liefert auch Ausgabeeinstellungen");
+assert.equal(projectSettings.output.exportFormat, undefined, "Nicht codierte Ausgabeoptionen werden nicht erfunden");
+context.applySettingsSnapshot(projectSettings, { ui: true, output: false });
+assert.equal(state.chartTheme, "sunshine");
+assert.equal(state.outputBarWidth, "standard", "Ausgabe bleibt ohne Haken unverändert");
+assert.deepEqual([...state.regions], unchangedRegion, "Projektcode-Einstellungen ändern keine Parlamente");
+assert.deepEqual([...state.parties], unchangedParties, "Projektcode-Einstellungen ändern keine Parteien");
+assert.deepEqual([...state.selectedPollRanks], unchangedPolls, "Projektcode-Einstellungen ändern keine Umfragen");
+assert.equal(context.personalSettingsDiffer({ ui: { chartTheme: "sunshine" }, output: {} }), false, "Gleiche persönliche UI löst keine Rückfrage aus");
+assert.equal(context.personalSettingsDiffer({ ui: { chartTheme: "navy" }, output: {} }), true, "Abweichende persönliche UI löst eine Rückfrage aus");
+assert.equal(context.personalSettingsDiffer({ ui: {}, output: { outputBarWidth: "adapted" } }), true, "Abweichende Ausgabe löst eine Rückfrage aus");
+assert.ok(context.decodeSettingsCode(existingCode).ui, "Auch bisherige Projektcodes werden akzeptiert");
 assert.throws(() => context.decodeSettingsCode("S1.invalid"));
 console.log(`Konfigurationscodes: ${lengths.length} Rundläufe erfolgreich (${lengths.join(", ")} Zeichen).`);

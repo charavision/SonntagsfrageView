@@ -60,6 +60,37 @@ CREATE TABLE IF NOT EXISTS settings_slots (
   PRIMARY KEY (user_id, slot)
 );
 
+CREATE TABLE IF NOT EXISTS user_settings_preferences (
+  user_id TEXT PRIMARY KEY,
+  selected_slot INTEGER NOT NULL DEFAULT 0,
+  always_use INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS admin_passkeys (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  counter INTEGER NOT NULL DEFAULT 0,
+  transports TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS passkey_challenges (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  challenge TEXT NOT NULL,
+  ip_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS passkey_sessions (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE TABLE IF NOT EXISTS system_messages (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
