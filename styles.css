@@ -1345,11 +1345,19 @@ body.preview-link-only { overflow: hidden; background: #071326; }
 body.preview-link-only main, body.preview-link-only #app-intro, body.preview-link-only #preview-splitter { display: none !important; }
 body.preview-link-only .preview-dialog { position: fixed; inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
 body.preview-link-only .preview-dialog::backdrop { background: #071326; backdrop-filter: none; }
-body.preview-link-only .preview-dialog .preview-header { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; }
+body.preview-link-only .preview-dialog .preview-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; }
 body.preview-link-only .preview-dialog .preview-zoom { flex: 0 1 min(65vw, 420px); margin: 0; }
+body.preview-link-only .preview-dialog #preview-extra-options { display: flex !important; flex: 1 0 100%; flex-direction: column; align-items: stretch; gap: 7px; padding: 4px 8px 2px; }
+body.preview-link-only .preview-dialog .preview-options-line { width: 100%; justify-content: center; }
+body.preview-link-only .preview-dialog .preview-footer-line { flex-wrap: nowrap; }
+body.preview-link-only .preview-dialog .preview-empty-clusters-choice { flex: 0 1 auto; }
 body.preview-link-only .preview-dialog #preview-split-toggle,
 body.preview-link-only .preview-dialog #preview-options-toggle,
-body.preview-link-only .preview-dialog #preview-extra-options,
+body.preview-link-only .preview-dialog #preview-download,
+body.preview-link-only .preview-dialog .preview-format-choice,
+body.preview-link-only .preview-dialog #preview-copy-link,
+body.preview-link-only .preview-dialog #preview-copy-view-link,
+body.preview-link-only .preview-dialog .preview-status-line,
 body.preview-link-only .preview-dialog #close-preview { display: none !important; }
 body.preview-link-only .preview-dialog .preview-pages { width: 100%; box-sizing: border-box; }
 
