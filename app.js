@@ -4753,11 +4753,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#project-picker-output").hidden = true;
       reportDialog.showModal();
       loadAppRelease();
+      Object.entries(reportTabs).forEach(([buttonId, panelId]) => {
+        document.querySelector(`#${panelId}`).hidden = true;
+        document.querySelector(`#${buttonId}`).classList.remove("active");
+      });
       if (currentReportRole) {
-        Object.entries(reportTabs).forEach(([buttonId, panelId]) => {
-          document.querySelector(`#${panelId}`).hidden = true;
-          document.querySelector(`#${buttonId}`).classList.remove("active");
-        });
         document.querySelector("#report-info").hidden = false;
         document.querySelector("#report-info-open").classList.add("active");
       } else {
