@@ -7,7 +7,7 @@
   <title>Sonntagsfragen – Bund & Länder</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="shortcut icon" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=preview-toolbar-20261008">
+  <link rel="stylesheet" href="styles.css?v=preview-link-20261009">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -420,7 +420,7 @@
           <div class="preview-a4-controls" aria-label="A4-Einstellungen">
             <button id="preview-a4-orientation" type="button" data-value="auto" title="A4-Ausrichtung" aria-label="A4-Ausrichtung: Auto"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="12" y="2" width="9" height="14" rx="1.5"/><rect x="2" y="12" width="14" height="9" rx="1.5"/><path d="M9 4.5C5.5 5 4 7 4 10m0 0L2 8m2 2 2-2"/></svg><span class="preview-control-value">Auto</span></button>
             <button id="preview-a4-format" type="button" data-value="auto" title="A4-Diagrammformat" aria-label="A4-Diagrammformat: Auto"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M12 3v18M3 12h18"/></svg><span class="preview-control-value">Auto</span></button>
-            <button id="preview-bar-width" type="button" data-value="standard" title="Balkenbreite" aria-label="Balkenbreite: Standard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="10" y="4" width="4" height="16" rx="1"/><path d="M8 12H2m0 0 2.5-2.5M2 12l2.5 2.5M16 12h6m0 0-2.5-2.5M22 12l-2.5 2.5"/></svg><span class="preview-control-value">Standard</span></button>
+            <button id="preview-bar-width" type="button" data-value="standard" title="Balkenbreite" aria-label="Balkenbreite: Standard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="10" y="4" width="4" height="16" rx="1"/><path d="M7.5 21h9M8 12H2m0 0 2.5-2.5M2 12l2.5 2.5M16 12h6m0 0-2.5-2.5M22 12l-2.5 2.5"/></svg><span class="preview-control-value">Standard</span></button>
           </div>
         </div>
         <div class="preview-options-line preview-footer-line">
@@ -428,6 +428,7 @@
           <button id="preview-download" class="preview-download" type="button" aria-label="Aktuelle Vorschau herunterladen" title="Download"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg></button>
           <label class="preview-format-choice"><span>Datei</span><select id="preview-export-format"><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="pdf" selected>PDF</option></select></label>
           <button id="preview-copy-link" class="preview-copy-link" type="button" aria-label="Konfigurationslink kopieren" title="Link kopieren"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 14.5 14.5 9.5M7.2 16.8l-1.4 1.4a3.5 3.5 0 0 1-5-5l3.4-3.4a3.5 3.5 0 0 1 5 5l-3.4 3.4a3.5 3.5 0 0 1 5 0M16.8 7.2l1.4-1.4a3.5 3.5 0 0 1 5 5l-3.4 3.4a3.5 3.5 0 0 1-5 0"/></svg></button>
+          <button id="preview-copy-view-link" class="preview-copy-link preview-copy-view-link" type="button" aria-label="Link zur reinen Vorschau kopieren" title="Nur Vorschau verlinken"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 10.5 3-3m-2.2-2.2 1.6-1.6a3 3 0 0 1 4.2 4.2l-1.6 1.6M7.5 8.5 5.9 10.1a3 3 0 0 0 4.2 4.2l1.6-1.6M10 18s2.3-3 6-3 6 3 6 3-2.3 3-6 3-6-3-6-3Z"/><circle cx="16" cy="18" r="1.2"/></svg></button>
           <small id="preview-action-message" aria-live="polite"></small>
         </div>
         <div class="preview-options-line preview-status-line"><small id="preview-page-status" class="preview-page-status" aria-live="polite"></small></div>
@@ -439,6 +440,6 @@
   <div id="preview-splitter" class="preview-splitter" role="separator" aria-label="Breite von Ansicht und Vorschau ändern" aria-orientation="vertical" tabindex="0" hidden><span></span></div>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=preview-toolbar-20261008" defer></script>
+  <script src="app.js?v=preview-link-20261009" defer></script>
 </body>
 </html>

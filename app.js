@@ -160,11 +160,17 @@ const els = {
   exportMessage: document.querySelector("#export-message"), exportSummary: document.querySelector("#export-summary"), updatedTime: document.querySelector("#updated-time"), updateMessage: document.querySelector("#update-message"), updateData: document.querySelector("#update-data"), previewDialog: document.querySelector("#export-preview-dialog"), previewPages: document.querySelector("#preview-pages"), previewPageStatus: document.querySelector("#preview-page-status"), previewZoom: document.querySelector("#preview-zoom"), previewZoomValue: document.querySelector("#preview-zoom-value")
 };
 
+const previewOnlyRequested = new URLSearchParams(window.location.search).get("preview") === "1";
+if (previewOnlyRequested) {
+  document.body.classList.add("preview-link-only");
+  document.body.classList.remove("intro-running");
+  document.querySelector("#app-intro")?.remove();
+}
 document.body.classList.toggle("physical-mobile", startsMobile);
 function applyViewMode() {
   document.body.classList.toggle("mobile-mode", state.mobileView);
   const viewport = document.querySelector('meta[name="viewport"]');
-  const content = state.mobileView ? "width=device-width, initial-scale=1" : "width=1200";
+  const content = previewOnlyRequested || state.mobileView ? "width=device-width, initial-scale=1" : "width=1200";
   if (viewport.getAttribute("content") !== content) viewport.setAttribute("content", content);
   if (state.mobileView) {
     state.electionDates = false;
@@ -386,6 +392,12 @@ function configurationShareUrl() {
     ? new URL(window.location.origin + window.location.pathname)
     : new URL("https://charavision.github.io/SonntagsfrageView/");
   url.searchParams.set("config", configurationCode());
+  return url.toString();
+}
+
+function previewOnlyShareUrl() {
+  const url = new URL(configurationShareUrl());
+  url.searchParams.set("preview", "1");
   return url.toString();
 }
 
@@ -2951,7 +2963,7 @@ function syncPreviewToolbarMode() {
   const width = els.previewDialog.getBoundingClientRect().width;
   const compact = state.mobileView || width < 1080;
   els.previewDialog.classList.toggle("mobile-preview", compact);
-  els.previewDialog.classList.toggle("very-narrow-preview", width < 315);
+  els.previewDialog.classList.toggle("very-narrow-preview", width < 380);
   if (!compact) closePreviewOptions();
 }
 
@@ -3245,10 +3257,13 @@ async function downloadBlob(blob, filename) {
 
 const reportApiUrl = String(window.REPORT_API_URL || "").replace(/\/$/, "");
 const REPORT_SESSION_KEY = "sonntagsfragen.reportSession.v1";
+const REPORT_SESSION_IDLE_MS = 15 * 60_000;
+const REPORT_SESSION_HEARTBEAT_MS = 60_000;
 let reportPin = "";
 let reportSessionToken = "";
 let reportSessionExpiresAt = 0;
-let reportSessionTimer = 0;
+let reportSessionLastActionAt = 0;
+let reportSessionHeartbeatTimer = 0;
 let reportSessionClickCount = 0;
 let reportSessionTouchPending = false;
 let reportSessionExpiredHandler = null;
@@ -3283,26 +3298,55 @@ function clearReportSession() {
   catch (error) { /* Der Web-Logout bleibt wirksam. */ }
   reportSessionToken = "";
   reportSessionExpiresAt = 0;
+  reportSessionLastActionAt = 0;
   reportSessionClickCount = 0;
   reportSessionTouchPending = false;
-  clearTimeout(reportSessionTimer);
+  clearInterval(reportSessionHeartbeatTimer);
+  reportSessionHeartbeatTimer = 0;
   try { sessionStorage.removeItem(REPORT_SESSION_KEY); } catch (error) { /* Sitzung bleibt im Speicher begrenzt. */ }
 }
+function storeReportSession() {
+  try {
+    const instanceId = reportAppInstanceId();
+    if (runsInNativeReportApp() && !instanceId) sessionStorage.removeItem(REPORT_SESSION_KEY);
+    else sessionStorage.setItem(REPORT_SESSION_KEY, JSON.stringify({ token: reportSessionToken, expiresAt: reportSessionExpiresAt, lastActionAt: reportSessionLastActionAt, authMethod: reportAuthMethod, instanceId }));
+  } catch (error) { /* Ohne Sitzungsspeicher gilt die Anmeldung nur bis zum Reload. */ }
+}
+function keepReportSessionAlive() {
+  if (!reportSessionToken || reportSessionTouchPending) return;
+  reportSessionTouchPending = true;
+  const token = reportSessionToken;
+  return reportRequest("/session/touch", { method: "POST", body: "{}" })
+    .then(session => { if (reportSessionToken === token) setReportSession({ ...session, token }, reportAuthMethod); })
+    .catch(() => {})
+    .finally(() => { reportSessionTouchPending = false; });
+}
+function noteReportSessionClick() {
+  if (!reportSessionToken || !currentReportRole || ++reportSessionClickCount < 2) return;
+  reportSessionClickCount = 0;
+  reportSessionLastActionAt = Date.now();
+  storeReportSession();
+  keepReportSessionAlive();
+}
+function storedReportSessionLastAction(stored) {
+  return Number(stored?.lastActionAt || 0);
+}
+function mayRestoreReportSession(stored, now = Date.now()) {
+  const lastActionAt = storedReportSessionLastAction(stored);
+  return Boolean(stored && /^[A-Za-z0-9_-]{43}$/.test(stored.token || "") && Number.isFinite(lastActionAt) && lastActionAt > 0 && lastActionAt <= now && now - lastActionAt < REPORT_SESSION_IDLE_MS);
+}
 function setReportSession(session, method = session.authMethod) {
+  const newToken = Boolean(session.token && session.token !== reportSessionToken);
   reportSessionToken = session.token || reportSessionToken;
   reportSessionExpiresAt = Number(session.expiresAt) || 0;
+  if (newToken || !reportSessionLastActionAt) reportSessionLastActionAt = Date.now();
   try { window.MacApp?.setReportSessionToken?.(reportSessionToken); window.AndroidApp?.setReportSessionToken?.(reportSessionToken); }
   catch (error) { /* Die Sitzung im Web bleibt unabhängig von der App-Brücke aktiv. */ }
   reportAuthMethod = method || "pin";
   reportPin = "";
-  reportSessionClickCount = 0;
-  clearTimeout(reportSessionTimer);
-  if (reportSessionExpiresAt) reportSessionTimer = setTimeout(() => reportSessionExpiredHandler?.(), Math.max(0, reportSessionExpiresAt - Date.now()) + 50);
-  try {
-    const instanceId = reportAppInstanceId();
-    if (runsInNativeReportApp() && !instanceId) sessionStorage.removeItem(REPORT_SESSION_KEY);
-    else sessionStorage.setItem(REPORT_SESSION_KEY, JSON.stringify({ token: reportSessionToken, expiresAt: reportSessionExpiresAt, authMethod: reportAuthMethod, instanceId }));
-  } catch (error) { /* Ohne Sitzungsspeicher gilt die Anmeldung nur bis zum Reload. */ }
+  if (newToken) reportSessionClickCount = 0;
+  if (!reportSessionHeartbeatTimer) reportSessionHeartbeatTimer = setInterval(keepReportSessionAlive, REPORT_SESSION_HEARTBEAT_MS);
+  storeReportSession();
 }
 
 const passkeyAvailable = () => window.location.origin === "https://charavision.github.io" && window.isSecureContext && !!window.PublicKeyCredential && !!navigator.credentials;
@@ -4538,12 +4582,14 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     catch (error) { /* Offline mit den eingebauten Standardeinstellungen weiterarbeiten. */ }
     renderSettingsSlots();
     const sharedConfiguration = new URLSearchParams(window.location.search).get("config");
+    let sharedConfigurationError = "";
     if (sharedConfiguration) {
       try {
         applyConfigurationCode(sharedConfiguration, { nativeLayout: true });
         els.codeMessage.textContent = "Geteilte Konfiguration übernommen.";
       } catch (error) {
-        els.codeMessage.textContent = `Geteilter Link ungültig: ${error.message}`;
+        sharedConfigurationError = `Geteilter Link ungültig: ${error.message}`;
+        els.codeMessage.textContent = sharedConfigurationError;
       }
     }
     updateComparisonButtons();
@@ -4937,7 +4983,8 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     window.addEventListener("resize", () => { if (els.previewDialog.open) syncPreviewToolbarMode(); });
     new ResizeObserver(() => { if (els.previewDialog.open) syncPreviewToolbarMode(); }).observe(els.previewDialog);
     document.querySelector("#preview-split-toggle").addEventListener("click", () => setPreviewSplit(!document.body.classList.contains("preview-split-active")));
-    els.previewDialog.addEventListener("click", event => { if (event.target === els.previewDialog && !document.body.classList.contains("preview-split-active")) closeExportPreview(); });
+    els.previewDialog.addEventListener("click", event => { if (!previewOnlyRequested && event.target === els.previewDialog && !document.body.classList.contains("preview-split-active")) closeExportPreview(); });
+    els.previewDialog.addEventListener("cancel", event => { if (previewOnlyRequested) event.preventDefault(); });
     els.previewZoom.addEventListener("input", applyPreviewZoom);
     installPreviewGestures();
     installPreviewSplitter();
@@ -5200,7 +5247,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       reportDialog.classList.remove("settings-panel-open", "project-picker-dialog", "startup-project-dialog", "guest-project-dialog");
       document.querySelectorAll(".report-tab.active").forEach(tab => tab.classList.remove("active"));
       refreshSettingsSlots().catch(error => { document.querySelector("#settings-message").textContent = error.message; });
-      document.querySelector("#report-login-message").textContent = expired ? "Sitzung nach 15 Minuten abgelaufen. Bitte neu anmelden." : "";
+      document.querySelector("#report-login-message").textContent = expired ? "Sitzung nicht mehr gültig. Bitte neu anmelden." : "";
       if (expired) {
         document.querySelector("#report-title").textContent = "Log in";
         if (!reportDialog.open) reportDialog.showModal();
@@ -5210,21 +5257,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     reportSessionExpiredHandler = () => leaveReportSession(true);
     document.querySelector("#report-logout").addEventListener("click", () => leaveReportSession());
     document.addEventListener("click", event => {
-      if (!event.isTrusted || !reportSessionToken || !currentReportRole || document.hidden) return;
-      if (Date.now() >= reportSessionExpiresAt) { leaveReportSession(true); return; }
-      if (reportSessionTouchPending || ++reportSessionClickCount < 2) return;
-      reportSessionTouchPending = true;
-      const token = reportSessionToken;
-      reportRequest("/session/touch", { method: "POST", body: "{}" })
-        .then(session => { if (reportSessionToken === token) setReportSession({ ...session, token }, reportAuthMethod); })
-        .catch(() => {})
-        .finally(() => { reportSessionTouchPending = false; });
+      if (event.isTrusted) noteReportSessionClick();
     }, true);
-    const expireReportSessionIfNeeded = () => {
-      if (reportSessionToken && Date.now() >= reportSessionExpiresAt) leaveReportSession(true);
-    };
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) expireReportSessionIfNeeded(); });
-    window.addEventListener("focus", expireReportSessionIfNeeded);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) keepReportSessionAlive(); });
+    window.addEventListener("focus", keepReportSessionAlive);
     document.querySelector("#report-accounts-open").addEventListener("click", async () => {
       if (!toggleReportTab(document.querySelector("#report-accounts-open"))) return;
       try { await loadReportAccounts(); }
@@ -5432,6 +5468,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       try { await navigator.clipboard.writeText(configurationShareUrl()); message.textContent = "Link kopiert."; }
       catch (error) { message.textContent = "Link konnte nicht kopiert werden."; }
     });
+    document.querySelector("#preview-copy-view-link").addEventListener("click", async () => {
+      const message = document.querySelector("#preview-action-message");
+      try { await navigator.clipboard.writeText(previewOnlyShareUrl()); message.textContent = "Vorschau-Link kopiert."; }
+      catch (error) { message.textContent = "Vorschau-Link konnte nicht kopiert werden."; }
+    });
     document.querySelector("#copy-config-link").addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(configurationShareUrl());
@@ -5455,9 +5496,15 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         clearReportSession();
         return false;
       }
-      if (!stored || !/^[A-Za-z0-9_-]{43}$/.test(stored.token || "") || Number(stored.expiresAt) <= Date.now()) { clearReportSession(); return false; }
+      if (!mayRestoreReportSession(stored)) {
+        if (stored?.token && reportApiUrl) navigator.sendBeacon?.(`${reportApiUrl}/session/logout`, new Blob([JSON.stringify({ token: stored.token })], { type: "text/plain" }));
+        clearReportSession();
+        document.querySelector("#report-login-message").textContent = "15 Minuten ohne Aktion. Bitte neu anmelden.";
+        return false;
+      }
       reportSessionToken = stored.token;
       reportSessionExpiresAt = Number(stored.expiresAt);
+      reportSessionLastActionAt = storedReportSessionLastAction(stored);
       try {
         const session = await reportRequest("/session", { cache: "no-store" });
         setReportSession(session, session.authMethod || stored.authMethod);
@@ -5476,13 +5523,35 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       cancelAnimationFrame(perspectiveFrame);
       perspectiveFrame = requestAnimationFrame(updatePerspective);
     }, { passive: true });
+    if (previewOnlyRequested) {
+      try {
+        if (sharedConfigurationError) {
+          els.previewPages.textContent = sharedConfigurationError;
+          els.previewDialog.showModal();
+        } else {
+          showExportPreview();
+          requestAnimationFrame(fitPreviewWidth);
+        }
+      } catch (error) {
+        els.previewPages.textContent = `Vorschau konnte nicht geladen werden: ${error.message}`;
+        if (!els.previewDialog.open) els.previewDialog.showModal();
+      }
+      return;
+    }
     document.querySelector("#report-info").hidden = true;
     document.querySelector("#report-title").textContent = "Log in";
     reportDialog.classList.add("startup-login-dialog");
     reportDialog.showModal();
     restoreReportSession().then(restored => { if (!restored) focusFirstReportPin(); });
   })
-  .catch(error => { els.updated.textContent = "nicht verfügbar"; els.empty.hidden = false; els.empty.textContent = error.message; els.scroll.hidden = true; });
+  .catch(error => {
+    if (previewOnlyRequested) {
+      els.previewPages.textContent = `Vorschau konnte nicht geladen werden: ${error.message}`;
+      if (!els.previewDialog.open) els.previewDialog.showModal();
+      return;
+    }
+    els.updated.textContent = "nicht verfügbar"; els.empty.hidden = false; els.empty.textContent = error.message; els.scroll.hidden = true;
+  });
 
 let developerRefreshRunning = false;
 const syncDeveloperSettings = async () => {
