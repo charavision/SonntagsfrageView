@@ -7,7 +7,7 @@
   <title>Sonntagsfragen – Bund & Länder</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="shortcut icon" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=ui-polish-20261008">
+  <link rel="stylesheet" href="styles.css?v=settings-slots-20261008">
 </head>
 <body class="intro-running">
   <div id="app-intro" class="app-intro simple-intro intro-waiting" aria-label="Sonntagsfragen wird gestartet">
@@ -156,9 +156,14 @@
                 <input id="fullscreen-enabled" type="checkbox" checked>
                 <label for="fullscreen-enabled">Vollbild</label>
               </div>
-              <div class="view-3d-choice choice">
-                <input id="export-3d" type="checkbox">
-                <label for="export-3d">3D</label>
+              <div class="ui-choice choice">
+                <button id="ui-menu-toggle" class="ui-menu-toggle" type="button" aria-expanded="false" aria-controls="ui-options">UI</button>
+                <div id="ui-options" class="ui-options" aria-label="UI-Einstellungen">
+                  <label class="ui-3d-option" for="export-3d"><input id="export-3d" type="checkbox"> 3D</label>
+                  <label class="ui-slider-option" for="ui-brightness"><span>Helligkeit <output id="ui-brightness-value" for="ui-brightness">0 %</output></span><input id="ui-brightness" type="range" min="-50" max="50" step="5" value="0"></label>
+                  <label class="ui-slider-option" for="ui-saturation"><span>Sättigung <output id="ui-saturation-value" for="ui-saturation">0 %</output></span><input id="ui-saturation" type="range" min="-50" max="50" step="5" value="0"></label>
+                  <button id="ui-color-mode" class="ui-color-option" type="button" data-value="navy"><span>Color:</span><strong class="label-option-value">Navy</strong></button>
+                </div>
               </div>
             </div>
           </div>
@@ -192,7 +197,7 @@
     <section class="outputs" aria-label="Ausgabe">
       <form id="code-input" class="code-box code-input output-input" novalidate hidden>
         <label class="sr-only" for="input-code">Input Configuration</label>
-        <input id="input-code" maxlength="27" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
+        <input id="input-code" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
         <button type="submit">Anwenden</button>
         <small id="code-message" aria-live="polite"></small>
       </form>
@@ -201,6 +206,7 @@
         <fieldset><legend>Ausgabeform</legend><label><input type="radio" name="output-shape" value="a4" checked> A4</label><label><input type="radio" name="output-shape" value="tube"> Schlauch</label></fieldset>
         <div id="a4-orientation-settings" class="export-cycle-setting"><span>A4-Ausrichtung</span><button id="a4-orientation-cycle" type="button" data-value="auto">Auto</button></div>
         <div id="a4-diagram-format-settings" class="export-cycle-setting"><span>A4-Diagrammformat</span><button id="a4-diagram-format-cycle" type="button" data-value="auto">Auto</button></div>
+        <div class="export-cycle-setting"><span>Balkenbreite</span><button id="output-bar-width-cycle" type="button" data-value="standard">Standard</button></div>
         <label class="empty-clusters-choice"><input id="hide-empty-clusters" type="checkbox"> Cluster ohne Daten ausblenden</label>
         <input id="a4-mode" type="checkbox" checked hidden>
       </div>
@@ -229,7 +235,7 @@
       <h1>Sonntagsfragen</h1>
       <p class="creator">visualizer by <b>charavision</b></p>
     </div>
-    <div class="preview-header"><strong id="report-title">Info</strong><div class="report-header-actions"><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Info schließen">×</button></div></div>
+    <div class="preview-header"><strong id="report-title">Info</strong><div class="report-header-actions"><button id="guest-settings-open" class="report-settings-gear" type="button" aria-label="Grundeinstellungen" title="Grundeinstellungen">⚙</button><button id="report-logout" class="report-logout-icon" type="button" hidden aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></svg></button><button id="report-close" type="button" aria-label="Info schließen">×</button></div></div>
     <div class="report-content">
       <form id="report-login" class="report-login">
         <fieldset class="report-pin-group">
@@ -254,6 +260,7 @@
         <div class="report-session-actions">
           <button id="report-book-open" class="report-tab report-icon-tab" type="button" aria-label="Meldebuch" title="Meldebuch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5A3.5 3.5 0 0 1 6.5 2H11v18H6.5A3.5 3.5 0 0 0 3 23V5.5Zm18 0A3.5 3.5 0 0 0 17.5 2H13v18h4.5A3.5 3.5 0 0 1 21 23V5.5Z"/></svg></button>
           <button id="report-info-open" class="report-tab report-info-tab" type="button" aria-label="Info" title="Info"><span class="report-tab-info-icon" aria-hidden="true">i</span></button>
+          <button id="report-settings-open" class="report-tab report-icon-tab report-settings-gear" type="button" aria-label="Grundeinstellungen" title="Grundeinstellungen">⚙</button>
           <button id="report-notifications-open" class="report-tab report-icon-tab" type="button" aria-label="Benachrichtigungen" title="Benachrichtigungen" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM9.5 21h5"/></svg></button>
           <button id="report-projects-open" class="report-tab" type="button" hidden>Projekte</button>
           <button id="report-accounts-open" class="report-tab report-icon-tab" type="button" aria-label="Accounts" title="Accounts" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-5 3-7.5 7.5-7.5s6.9 2.5 7.5 7.5Z"/></svg></button>
@@ -312,7 +319,7 @@
         </div>
         <form id="project-code-input" class="project-code-input">
           <label class="sr-only" for="project-input-code">Input Configuration</label>
-          <input id="project-input-code" maxlength="27" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
+          <input id="project-input-code" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Input Configuration">
           <button type="submit">Anwenden</button>
           <small id="project-code-message" aria-live="polite"></small>
         </form>
@@ -325,6 +332,18 @@
           <button id="project-save" type="button" aria-label="Konfiguration als Projekt speichern">💾 Save Project</button>
           <small id="project-save-message" aria-live="polite"></small>
         </div>
+      </section>
+      <section id="report-settings" class="report-settings" hidden aria-labelledby="report-settings-title">
+        <div class="report-list-heading"><h2 id="report-settings-title">Grundeinstellungen</h2></div>
+        <div id="settings-slot-list" class="settings-slot-list"></div>
+        <div id="settings-editor" class="settings-editor" hidden>
+          <div class="settings-source"><label><input type="radio" name="settings-source" value="current" checked> Aktuelle Einstellungen</label><label><input type="radio" name="settings-source" value="code"> Code eingeben</label></div>
+          <input id="settings-input-code" type="text" maxlength="2048" autocomplete="off" spellcheck="false" placeholder="Einstellungscode" hidden>
+          <div class="settings-checks"><label><input id="settings-save-ui" type="checkbox" checked> UI speichern</label><label><input id="settings-save-output" type="checkbox" checked> Ausgabe übernehmen</label></div>
+          <button id="settings-save-open" type="button">Einstellungen speichern</button>
+          <button id="settings-copy-code" type="button">Einstellungscode kopieren</button>
+        </div>
+        <small id="settings-message" aria-live="polite"></small>
       </section>
       <section id="report-developer" class="report-developer" hidden aria-labelledby="report-developer-title">
         <div class="report-list-heading"><h2 id="report-developer-title">Entwicklereinstellungen</h2></div>
@@ -369,8 +388,12 @@
       <strong id="project-name-title">Projekt speichern</strong>
       <label for="project-name-input">Projektname</label>
       <input id="project-name-input" maxlength="100" placeholder="Unbenannt" autocomplete="off">
+      <label for="project-save-slot">Projektslot</label><select id="project-save-slot"></select>
       <div><button value="cancel" type="submit">Abbrechen</button><button value="save" type="submit">Speichern</button></div>
     </form>
+  </dialog>
+  <dialog id="settings-name-dialog" class="project-name-dialog" aria-labelledby="settings-name-title">
+    <form method="dialog"><strong id="settings-name-title">Einstellungen speichern</strong><label for="settings-name-input">Bezeichnung</label><input id="settings-name-input" maxlength="100" autocomplete="off"><label for="settings-save-slot">Slot</label><select id="settings-save-slot"></select><div><button value="cancel" type="submit">Abbrechen</button><button value="save" type="submit">Speichern</button></div></form>
   </dialog>
   <dialog id="edda-thanks" class="edda-thanks" aria-live="polite">
     <div id="edda-fireworks" class="edda-fireworks" aria-hidden="true"></div>
@@ -379,20 +402,25 @@
   </dialog>
   <dialog id="export-preview-dialog" class="preview-dialog" aria-labelledby="preview-title">
     <div class="preview-header">
-      <div><strong id="preview-title">Vorschau</strong><small id="preview-page-status"></small></div>
+      <div class="preview-heading"><strong id="preview-title">Vorschau</strong><small id="preview-page-status"></small></div>
       <div class="preview-zoom" aria-label="Zoom der Vorschau">
         <button id="preview-zoom-out" type="button" aria-label="Verkleinern">−</button>
         <input id="preview-zoom" type="range" min="40" max="500" step="10" value="100" aria-label="Zoomstufe">
         <output id="preview-zoom-value" for="preview-zoom">100 %</output>
         <button id="preview-zoom-in" type="button" aria-label="Vergrößern">+</button>
       </div>
-      <div class="preview-a4-controls" aria-label="A4-Einstellungen">
-        <button id="preview-a4-orientation" type="button" data-value="auto" title="A4-Ausrichtung">A4: Auto</button>
-        <button id="preview-a4-format" type="button" data-value="auto" title="A4-Diagrammformat">Format: Auto</button>
+      <button id="preview-download" class="preview-download" type="button" aria-label="Aktuelle Vorschau herunterladen" title="Download"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg></button>
+      <button id="preview-options-toggle" class="preview-options-toggle" type="button" aria-label="Weitere Vorschauoptionen" aria-controls="preview-extra-options" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div id="preview-extra-options" class="preview-extra-options">
+        <small id="preview-mobile-page-status" class="preview-mobile-page-status"></small>
+        <div class="preview-a4-controls" aria-label="A4-Einstellungen">
+          <button id="preview-a4-orientation" type="button" data-value="auto" title="A4-Ausrichtung">A4: Auto</button>
+          <button id="preview-a4-format" type="button" data-value="auto" title="A4-Diagrammformat">Format: Auto</button>
+          <button id="preview-bar-width" type="button" data-value="standard" title="Balkenbreite">Breite: Standard</button>
+        </div>
+        <label class="preview-empty-clusters-choice" title="Cluster ohne Daten ausblenden"><input id="preview-hide-empty-clusters" type="checkbox"> Cluster ohne Daten ausblenden</label>
+        <button id="preview-split-toggle" class="preview-split-toggle" type="button" aria-label="Vorschau im geteilten Vollbild anzeigen" aria-pressed="false" title="Geteilte Ansicht"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16M8 12H5m0 0 2-2m-2 2 2 2m9-2h3m0 0-2-2m2 2-2 2"/></svg></button>
       </div>
-      <label class="preview-empty-clusters-choice" title="Cluster ohne Daten ausblenden"><input id="preview-hide-empty-clusters" type="checkbox"> Cluster ohne Daten ausblenden</label>
-      <button id="preview-download" class="preview-download" type="button" aria-label="Aktuelle Vorschau herunterladen" title="Download">↓</button>
-      <button id="preview-split-toggle" class="preview-split-toggle" type="button" aria-label="Vorschau im geteilten Vollbild anzeigen" aria-pressed="false" title="Geteilte Ansicht"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16M8 12H5m0 0 2-2m-2 2 2 2m9-2h3m0 0-2-2m2 2-2 2"/></svg></button>
       <button id="close-preview" type="button" aria-label="Vorschau schließen">×</button>
     </div>
     <div id="preview-pages" class="preview-pages"></div>
@@ -400,6 +428,6 @@
   <div id="preview-splitter" class="preview-splitter" role="separator" aria-label="Breite von Ansicht und Vorschau ändern" aria-orientation="vertical" tabindex="0" hidden><span></span></div>
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <script src="report-config.js"></script>
-  <script src="app.js?v=ui-polish-20261008" defer></script>
+  <script src="app.js?v=settings-slots-20261008" defer></script>
 </body>
 </html>

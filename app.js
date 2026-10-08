@@ -48,6 +48,62 @@ try {
 const state = { data: null, regions: new Set(["Bundestag"]), parties: new Set(Object.keys(PARTY_META)), otherParties: new Set(), selectedPollRanks: new Set([0]), pollTimeMode: "current", pollDateMode: false, pollRankOverrides: [0, 1, 2], pollDateLabels: [null, null, null], pollSourceMode: "institute", pollSourceValue: "", averageMode: false, mobileView: startsMobile, electionDates: !startsMobile, fullRegionNames: false, showSinceElection: true, changeMode: "election", sinceElectionMode: "color", showBrackets: true, showLabels: true, regionLabelMode: "auto", partyLabelMode: "auto", barColors: true, barColorMode: "party", barNeon: true, showPercentValues: true, percentLabelMode: "without", showLut: true, showBackground: true, hideEmptyClusters: false, viewSizeEnabled: true, viewZoomEnabled: true, fullscreenEnabled: true, fullscreenDefault: true, viewScales: storedViewScales, export3d: false, tabMode: false, selectionTab: "regions", groupBy: "party", a4Mode: true, a4Orientation: "auto", a4DiagramFormat: "auto", chartLayout: new Map(), perspective: null };
 state.stackUnselected = false;
 state.barStyle = "neon";
+state.uiBrightness = 0;
+state.uiSaturation = 0;
+state.chartTheme = "navy";
+state.outputBarWidth = "standard";
+const outputBarWidthOptions = [["standard", "Standard"], ["adapted", "Angepasst"]];
+const chartThemeOptions = [["navy", "Navy"], ["purple", "Purple"], ["bright", "Bright"], ["sunshine", "Sunshine"]];
+const CHART_THEME_PALETTES = {
+  navy: { base: "#172744", middle: "#081326", dark: "#050d1b", glow: "#2a67a4", glowMiddle: "#17385e" },
+  purple: { base: "#172744", preMiddle: "#0d1c34", middle: "#211e31", dark: "#090d18", glow: "#2a67a4", glowMiddle: "#17385e" },
+  bright: { base: "#f1f2f3", middle: "#bfc1c3", dark: "#85888c", glow: "#ffffff", glowMiddle: "#e1e2e3" },
+  sunshine: { base: "#f1f2f0", preMiddle: "#c0c1bf", middle: "#b9afa5", dark: "#777471", glow: "#ffffff", glowMiddle: "#e4e1dc" }
+};
+function chartThemePalette() { return CHART_THEME_PALETTES[state.chartTheme] || CHART_THEME_PALETTES.navy; }
+function appendThemeGradientStops(gradient, theme) {
+  const stops = theme.preMiddle
+    ? [["0", theme.base], [".55", theme.preMiddle], [".78", theme.middle], ["1", theme.dark]]
+    : [["0", theme.base], [".7", theme.middle], ["1", theme.dark]];
+  gradient.append(...stops.map(([offset, color]) => svgEl("stop", { offset, "stop-color": color })));
+}
+function isLightChartTheme() { return state.chartTheme === "bright" || state.chartTheme === "sunshine"; }
+function applySvgTheme(svg) {
+  if (!isLightChartTheme()) return svg;
+  const muted = new Set(["#7f95b2", "#8fa6c1", "#91a4ba", "#9bb0c9", "#9bb4d0", "#a8bfd9", "#b9cbe0"]);
+  svg.querySelectorAll("text, tspan").forEach(node => {
+    const fill = node.getAttribute("fill")?.toLowerCase();
+    if (node.closest(".positive, .negative, .new-label")) return;
+    if (fill === "#63e6a6") { node.style.fill = "#176b4b"; return; }
+    if (fill === "#ff8b9b") { node.style.fill = "#a64052"; return; }
+    if (!fill || muted.has(fill) || ["#fff", "#ffffff", "#f4f8ff", "#dce8f7", "#e8f0fa", "#b9dff1", "#b8c8dc"].includes(fill)) node.style.fill = muted.has(fill) ? "#373b3e" : "#17191b";
+  });
+  svg.querySelectorAll("line, path").forEach(node => {
+    const stroke = node.getAttribute("stroke")?.toLowerCase();
+    if (stroke === "#9bb4d0") node.style.stroke = "#62676b";
+    if (stroke === "#7693b4") node.style.stroke = "#555a5e";
+    if (stroke === "#65b6ff") node.style.stroke = "#a8acb0";
+  });
+  svg.querySelectorAll('[id="floor-line-fade"] stop').forEach(node => node.setAttribute("stop-color", "#a8acb0"));
+  svg.querySelectorAll(".bar-delta.positive").forEach(node => { node.style.fill = "#176b4b"; });
+  svg.querySelectorAll(".bar-delta.negative").forEach(node => { node.style.fill = "#a64052"; });
+  svg.querySelectorAll("rect").forEach(node => {
+    if (node.getAttribute("fill") === "#071225") node.style.fill = "#e8e9ea";
+    if (node.getAttribute("fill") === "#dce8f7") node.style.fill = "#393d40";
+  });
+  return svg;
+}
+function displayColorFilter() {
+  return `brightness(${(100 + state.uiBrightness) / 100}) saturate(${(100 + state.uiSaturation) / 100})`;
+}
+function syncUiColorControls() {
+  for (const [name, value] of [["brightness", state.uiBrightness], ["saturation", state.uiSaturation]]) {
+    document.querySelector(`#ui-${name}`).value = String(value);
+    document.querySelector(`#ui-${name}-value`).textContent = `${value > 0 ? "+" : ""}${value} %`;
+  }
+  document.querySelector("#chart-scroll").style.filter = displayColorFilter();
+  document.querySelectorAll(".preview-sheet").forEach(sheet => { sheet.style.filter = displayColorFilter(); });
+}
 const barStyleOptions = [["neon", "Neon"], ["matt", "Matt"], ["hell", "Hell"]];
 function setBarStyle(value) {
   state.barStyle = value === false || value === "off" ? "matt" : ["neon", "matt", "hell"].includes(value) ? value : "neon";
@@ -254,8 +310,8 @@ function base62Encode(value) { let text = ""; do { text = CODE_ALPHABET[Number(v
 function base62Decode(text) { return [...text].reduce((value, char) => { const digit = CODE_ALPHABET.indexOf(char); if (digit < 0) throw new Error("Ungültiger Code"); return value * 62n + BigInt(digit); }, 0n); }
 const CONFIG_DATE_EPOCH = Date.UTC(1996, 0, 1);
 const CONFIG_DATE_RADIX = 16384n;
-function encodeCalendarConfiguration() {
-  if (state.pollTimeMode === "current" && !state.pollDateLabels.some(Boolean)) return "";
+function encodeCalendarConfiguration(force = false) {
+  if (!force && state.pollTimeMode === "current" && !state.pollDateLabels.some(Boolean)) return "";
   let payload = BigInt({ current: 0, free: 1, from: 2 }[state.pollTimeMode] ?? 0);
   state.pollDateLabels.forEach(date => {
     const timestamp = date ? Date.parse(`${date}T00:00:00Z`) : NaN;
@@ -298,8 +354,18 @@ function configurationCode() {
   const mode = (state.averageMode ? 1n : 0n) + (state.mobileView ? 2n : 0n) + (state.groupBy === "region" ? 4n : 0n) + (state.a4Mode ? 8n : 0n) + (state.fullRegionNames ? 16n : 0n) + (!state.electionDates ? 32n : 0n) + orientationBits + (!state.showSinceElection ? 256n : 0n) + (!state.showBrackets ? 512n : 0n) + (!state.showLabels ? 1024n : 0n) + (!state.barColors ? 2048n : 0n) + (!state.showPercentValues ? 4096n : 0n) + (!state.showLut ? 8192n : 0n) + (!state.showBackground ? 16384n : 0n) + (!state.export3d ? 32768n : 0n) + regionLabelBits + partyLabelBits + percentLabelBits + sinceElectionBits + yAxisBits + barColorBits + barNeonBits + diagramFormatBits + changeModeBits + emptyClusterBits;
   const remainingPartyBits = (state.stackUnselected ? 1n : 0n) << 34n;
   const brightStyleBits = (state.barStyle === "hell" ? 1n : 0n) << 35n;
-  value += (mode + remainingPartyBits + brightStyleBits) * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
-  return base62Encode(value) + encodeCalendarConfiguration();
+  const noPartiesBits = (state.parties.size ? 0n : 1n) << 36n;
+  const otherPartyBits = Object.keys(OTHER_PARTIES).reduce((bits, party, index) => bits | (state.otherParties.has(party) ? 1n << BigInt(37 + index) : 0n), 0n);
+  const encodeTone = amount => {
+    const steps = Math.max(-10, Math.min(10, Math.round((Number(amount) || 0) / 5)));
+    return BigInt(steps < 0 ? 32 + steps : steps);
+  };
+  const toneBits = (encodeTone(state.uiBrightness) << 41n) + (encodeTone(state.uiSaturation) << 46n);
+  const themeBits = BigInt(Math.max(0, chartThemeOptions.findIndex(([name]) => name === state.chartTheme))) << 51n;
+  const outputWidthBits = (state.outputBarWidth === "adapted" ? 1n : 0n) << 53n;
+  value += (mode + remainingPartyBits + brightStyleBits + noPartiesBits + otherPartyBits + toneBits + themeBits + outputWidthBits) * orderedChoiceCount(state.data.regions.length) * partyCount * 7n;
+  // The eight-character calendar suffix also disambiguates longer color-adjustment codes.
+  return base62Encode(value) + encodeCalendarConfiguration(toneBits !== 0n || themeBits !== 0n || outputWidthBits !== 0n);
 }
 
 function updateConfigurationCode() {
@@ -917,13 +983,22 @@ function updateA4Controls() {
   const formatButton = document.querySelector("#a4-diagram-format-cycle");
   const previewOrientation = document.querySelector("#preview-a4-orientation");
   const previewFormat = document.querySelector("#preview-a4-format");
+  const previewWidth = document.querySelector("#preview-bar-width");
   [orientationButton, formatButton, previewOrientation, previewFormat].forEach(button => { if (button) button.disabled = disabled; });
   setCycleButton(orientationButton, state.a4Orientation, a4OrientationOptions);
   setCycleButton(formatButton, state.a4DiagramFormat, a4DiagramFormatOptions);
   if (previewOrientation) { previewOrientation.dataset.value = state.a4Orientation; previewOrientation.textContent = `A4: ${a4OrientationOptions.find(([value]) => value === state.a4Orientation)?.[1] || "Auto"}`; }
   if (previewFormat) { previewFormat.dataset.value = state.a4DiagramFormat; previewFormat.textContent = `Format: ${a4DiagramFormatOptions.find(([value]) => value === state.a4DiagramFormat)?.[1] || "Auto"}`; }
+  setCycleButton(document.querySelector("#output-bar-width-cycle"), state.outputBarWidth, outputBarWidthOptions);
+  if (previewWidth) { previewWidth.dataset.value = state.outputBarWidth; previewWidth.textContent = `Breite: ${state.outputBarWidth === "adapted" ? "Angepasst" : "Standard"}`; }
   document.querySelector("#a4-orientation-settings")?.classList.toggle("is-disabled", disabled);
   document.querySelector("#a4-diagram-format-settings")?.classList.toggle("is-disabled", disabled);
+}
+
+function cycleOutputBarWidth() {
+  state.outputBarWidth = state.outputBarWidth === "standard" ? "adapted" : "standard";
+  updateA4Controls();
+  render(false);
 }
 
 function cycleA4Orientation() {
@@ -1157,7 +1232,7 @@ function appendBackgroundWave(parent, { left, right, top, bottom }, id) {
   return group;
 }
 
-function calculateBarLayout(groups, requestedPlotWidth, horizontalScale, compact, minimumSlotWidth) {
+function calculateBarLayout(groups, requestedPlotWidth, horizontalScale, compact, minimumSlotWidth, adaptedOutput = false) {
   const counts = groups.map(group => Math.max(1, group.bars.length));
   const secondaryKey = ({ party, item }) => groupByParty ? item.region : party;
   const groupByParty = state.groupBy === "party";
@@ -1172,8 +1247,11 @@ function calculateBarLayout(groups, requestedPlotWidth, horizontalScale, compact
   const cap = total === 1 ? 280 : total <= 3 ? 150 : total <= 6 ? 92 : total <= 10 ? 58 : 38;
   // Use the available width for the bars as well as the spacing. A scale below
   // 100% can still fill the viewport, so it must not cap bars independently of it.
-  const barWidth = Math.max(minBarWidth, Math.min(cap * Math.max(1, horizontalScale), requestedPlotWidth / total * .65));
-  const slotWidth = Math.max(naturalSlot, minimumSlotWidth, barWidth + barGap);
+  const standardBarWidth = Math.max(minBarWidth, Math.min(cap * Math.max(1, horizontalScale), requestedPlotWidth / total * .65));
+  const slotWidth = Math.max(naturalSlot, minimumSlotWidth, standardBarWidth + barGap);
+  const barWidth = adaptedOutput && slotWidth - standardBarWidth > 24
+    ? Math.max(standardBarWidth, Math.min(cap * 2, slotWidth * .78))
+    : standardBarWidth;
   const finalBarGap = (slotWidth - barWidth) * .85;
   let offset = 0;
   const layouts = counts.map((count, index) => {
@@ -1188,6 +1266,10 @@ function calculateBarLayout(groups, requestedPlotWidth, horizontalScale, compact
 function render(animate = true, outputMode = false, suppressPreviewRefresh = false) {
   if (!outputMode && !suppressPreviewRefresh) scheduleOpenPreviewRefresh();
   applyViewMode();
+  document.body.dataset.chartTheme = state.chartTheme;
+  document.body.classList.toggle("light-chart-theme", isLightChartTheme());
+  setCycleButton(document.querySelector("#ui-color-mode"), state.chartTheme, chartThemeOptions);
+  syncUiColorControls();
   setCycleButton(els.changeMode, state.showSinceElection ? state.changeMode : "off", labelModeOptions.change);
   setCycleButton(els.sinceElectionMode, state.sinceElectionMode, labelModeOptions.since);
   els.changeMode.closest(".change-options-group")?.classList.toggle("is-off", !state.showSinceElection);
@@ -1278,7 +1360,7 @@ function render(animate = true, outputMode = false, suppressPreviewRefresh = fal
       minimumSlotWidth = Math.max(minimumSlotWidth, text.length * (compact ? 5.2 : 6.7) + 6);
     }));
   }
-  const barLayout = calculateBarLayout(groupedBars, requestedWidth - margin.left - margin.right, horizontalScale, compact, minimumSlotWidth);
+  const barLayout = calculateBarLayout(groupedBars, requestedWidth - margin.left - margin.right, horizontalScale, compact, minimumSlotWidth, outputMode && state.outputBarWidth === "adapted");
   const width = margin.left + margin.right + barLayout.plotWidth;
   const fullscreenHeight = document.body.classList.contains("view-fullscreen-active") ? window.innerHeight : 0;
   const height = Math.max(compact ? 520 : 590, fullscreenHeight);
@@ -1736,18 +1818,19 @@ async function loadProjects() {
     button.type = "button";
     button.className = "report-project-button";
     const title = document.createElement("strong");
-    title.textContent = project.title;
+    title.textContent = `${project.slot || "–"}. ${project.title}`;
     const detail = document.createElement("span");
     detail.textContent = project.detail;
     const meta = document.createElement("small");
     meta.textContent = `${project.configuration} · ${formatTimestamp(project.updated_at)}`;
     button.append(title, detail, meta);
-    button.addEventListener("click", () => {
-      applyConfigurationCode(project.configuration, { nativeLayout: true });
-      restoreSavedPollSelection(project.poll_selection);
-      els.inputCode.value = project.configuration;
-      document.querySelector("#report-dialog").classList.remove("project-picker-dialog", "startup-project-dialog");
-      document.querySelector("#report-dialog").close();
+    button.addEventListener("click", async () => {
+      try {
+        if (!await openProjectConfiguration(project.configuration, project.poll_selection, project.settings)) return;
+        els.inputCode.value = project.configuration;
+        document.querySelector("#report-dialog").classList.remove("project-picker-dialog", "startup-project-dialog");
+        document.querySelector("#report-dialog").close();
+      } catch (error) { document.querySelector("#project-code-message").textContent = error.message; }
     });
     const remove = document.createElement("button");
     remove.type = "button";
@@ -1772,27 +1855,28 @@ async function loadProjects() {
   return projects;
 }
 
-async function saveCurrentProject(projectName = "") {
+async function saveCurrentProject(projectName = "", selectedSlot = 0, projects = null) {
   if (!currentReportRole || !state.data) throw new Error("Bitte zuerst anmelden.");
   const payload = {
     configuration: configurationCode(),
     pollSelection: savedPollSelection(),
+    settings: captureSettingsSnapshot(),
+    slot: selectedSlot,
     title: projectName.trim().slice(0, 100) || "Unbenannt",
     detail: document.querySelector("#chart-meta")?.textContent?.trim() || "Aktuelle Konfiguration"
   };
-  const { projects } = await reportRequest("/projects");
-  const existing = projects.find(project => project.configuration === payload.configuration);
-  if (projects.length >= 5 && !existing) {
-    const replaceId = await chooseProjectToOverwrite(projects);
-    if (!replaceId) return null;
-    await reportRequest(`/projects/${encodeURIComponent(replaceId)}`, { method: "PATCH", body: JSON.stringify(payload) });
-  } else {
+  if (!projects) ({ projects } = await reportRequest("/projects"));
+  const target = projects.find(project => project.slot === selectedSlot);
+  if (target) {
+    if (await openProjectActionDialog({ title: "Projekt überschreiben?", choices: [{ value: "overwrite", label: "Überschreiben", danger: true }] }) !== "overwrite") return null;
+    await reportRequest(`/projects/${encodeURIComponent(target.id)}`, { method: "PATCH", body: JSON.stringify(payload) });
+  } else if (projects.length < 5) {
     await reportRequest("/projects", { method: "POST", body: JSON.stringify(payload) });
-  }
+  } else throw new Error("Bitte einen vorhandenen Projektslot auswählen.");
   return payload.configuration;
 }
 
-function openProjectActionDialog({ title, message, choices = [], danger = false }) {
+function openProjectActionDialog({ title, message, choices = [], danger = false, showCancel = true }) {
   const dialog = document.createElement("dialog");
   dialog.className = "project-action-dialog";
   const form = document.createElement("form");
@@ -1815,12 +1899,14 @@ function openProjectActionDialog({ title, message, choices = [], danger = false 
     if (choice.danger || danger) button.classList.add("danger");
     options.append(button);
   });
-  const cancel = document.createElement("button");
-  cancel.type = "submit";
-  cancel.value = "";
-  cancel.textContent = "Abbrechen";
-  cancel.className = "project-action-cancel";
-  options.append(cancel);
+  if (showCancel) {
+    const cancel = document.createElement("button");
+    cancel.type = "submit";
+    cancel.value = "";
+    cancel.textContent = "Abbrechen";
+    cancel.className = "project-action-cancel";
+    options.append(cancel);
+  }
   form.append(options);
   dialog.append(form);
   document.body.append(dialog);
@@ -1847,19 +1933,45 @@ function confirmProjectDeletion() {
   }).then(result => result === "delete");
 }
 
-function askProjectName() {
+async function askProjectName() {
   const dialog = document.querySelector("#project-name-dialog");
   const input = document.querySelector("#project-name-input");
+  const { projects } = await reportRequest("/projects");
+  const select = document.querySelector("#project-save-slot");
+  select.replaceChildren();
+  for (let slot = 1; slot <= 5; slot += 1) {
+    const option = document.createElement("option"); option.value = String(slot);
+    option.textContent = `${slot}. ${projects.find(project => project.slot === slot)?.title || "Leer"}`;
+    select.append(option);
+  }
+  select.value = String([1, 2, 3, 4, 5].find(slot => !projects.some(project => project.slot === slot)) || 1);
   input.value = "";
   dialog.showModal();
   requestAnimationFrame(() => input.focus());
   return new Promise(resolve => {
-    dialog.addEventListener("close", () => resolve(dialog.returnValue === "save" ? input.value : null), { once: true });
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "save" ? { name: input.value, slot: Number(select.value), projects } : null), { once: true });
   });
 }
 
+async function openProjectConfiguration(configuration, pollSelection = null, projectSettings = null) {
+  const previous = captureSettingsSnapshot();
+  applyConfigurationCode(configuration, { nativeLayout: true });
+  const imported = projectSettings ? sanitizeSettingsSnapshot(projectSettings) : captureSettingsSnapshot();
+  const changed = settingsDiffer(imported, previous);
+  if (changed) {
+    const choice = await openProjectActionDialog({ title: "Was soll geöffnet werden?", choices: [{ value: "data", label: "Daten" }, { value: "all", label: "Daten + UI" }], showCancel: false });
+    if (!choice) { applySettingsSnapshot(previous); return false; }
+    if (choice === "data") applySettingsSnapshot(previous);
+    else if (projectSettings) applySettingsSnapshot(imported);
+  }
+  projectSettingsSnapshot = !projectSettings || changed ? imported : null;
+  if (pollSelection) restoreSavedPollSelection(pollSelection);
+  renderSettingsSlots();
+  return true;
+}
+
 function applyConfigurationCode(text, { nativeLayout = false } = {}) {
-  if (!/^[0-9A-Za-z]{13,27}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
+  if (!/^[0-9A-Za-z]{13,32}$/.test(text)) throw new Error("Bitte einen gültigen Code eingeben.");
   const hasCalendarConfiguration = text.length >= 21;
   const calendarConfiguration = hasCalendarConfiguration ? decodeCalendarConfiguration(text.slice(-8)) : { enabled: false, mode: "current", dates: [null, null, null] };
   const baseCode = hasCalendarConfiguration ? text.slice(0, -8) : text;
@@ -1869,8 +1981,16 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   let value = base62Decode(baseCode);
   const legacySpace = regionCount * partyCount * 7n;
   const modeValue = value / legacySpace;
-  const mode = Number(modeValue);
-  if (modeValue > 68719476735n) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  const mode = Number(modeValue & 0xffffffffn);
+  if (modeValue >= (1n << 54n)) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
+  state.outputBarWidth = modeValue & (1n << 53n) ? "adapted" : "standard";
+  state.chartTheme = chartThemeOptions[Number((modeValue >> 51n) & 3n)][0];
+  const decodeTone = shift => {
+    const encoded = Number((modeValue >> shift) & 31n);
+    return (encoded >= 22 ? encoded - 32 : encoded <= 10 ? encoded : 0) * 5;
+  };
+  state.uiBrightness = decodeTone(41n);
+  state.uiSaturation = decodeTone(46n);
   state.averageMode = Boolean(mode & 1);
   state.mobileView = Boolean(mode & 2);
   state.groupBy = mode & 4 ? "region" : "party";
@@ -1916,7 +2036,8 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   const regionRank = value / partyCount;
   if (regionRank >= regionCount) throw new Error("Dieser Code gehört nicht zu einer gültigen Konfiguration.");
   state.regions = new Set(unrankOrdered(regionRank, state.data.regions));
-  state.parties = new Set(unrankOrdered(partyRank, partyUniverse));
+  state.parties = modeValue & (1n << 36n) ? new Set() : new Set(unrankOrdered(partyRank, partyUniverse));
+  state.otherParties = new Set(Object.keys(OTHER_PARTIES).filter((party, index) => Boolean(modeValue & (1n << BigInt(37 + index)))));
   state.selectedPollRanks = new Set([0, 1, 2].filter(rank => pollMask & (1 << rank)));
   setPollTimeMode(calendarConfiguration.mode || (calendarConfiguration.enabled ? "free" : "current"));
   state.pollDateLabels = calendarConfiguration.dates;
@@ -1949,6 +2070,8 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   setCycleButton(document.querySelector("#background-mode"), state.showBackground ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
   setCycleButton(document.querySelector("#brackets-mode"), state.showBrackets ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
   document.querySelector("#export-3d").checked = state.export3d;
+  setCycleButton(document.querySelector("#ui-color-mode"), state.chartTheme, chartThemeOptions);
+  syncUiColorControls();
   syncEmptyClusterControls();
   els.electionDates.checked = state.electionDates;
   document.querySelector("#a4-mode").checked = state.a4Mode;
@@ -1956,6 +2079,7 @@ function applyConfigurationCode(text, { nativeLayout = false } = {}) {
   updateA4Controls();
   els.regions.querySelectorAll("input").forEach(input => input.checked = state.regions.has(input.value));
   els.parties.querySelectorAll('input[name="party"]').forEach(input => input.checked = state.parties.has(input.value));
+  document.querySelectorAll('input[name="other-party"]:not([data-stack-unselected])').forEach(input => input.checked = state.otherParties.has(input.value));
   updatePollOptions(false);
   render(false);
 }
@@ -1964,6 +2088,11 @@ function cloneChartForFileOutput() {
   render(false, true);
   try {
     const clone = els.chart.cloneNode(true);
+    const theme = chartThemePalette();
+    const themeGradient = svgEl("linearGradient", { id: "chart-theme-base", x1: "0", y1: "0", x2: "1", y2: "1" });
+    appendThemeGradientStops(themeGradient, theme);
+    clone.querySelector("defs")?.append(themeGradient);
+    clone.insertBefore(svgEl("rect", { width: "100%", height: "100%", fill: "url(#chart-theme-base)" }), clone.children[1] || null);
     const sourceBarEdges = [...els.chart.querySelectorAll(".bar, .bar-glow, .bar-side, .bar-top, .bar-stack path")];
     [...clone.querySelectorAll(".bar, .bar-glow, .bar-side, .bar-top, .bar-stack path")].forEach((edge, index) => {
       const width = Number.parseFloat(getComputedStyle(sourceBarEdges[index]).strokeWidth);
@@ -1980,7 +2109,7 @@ function cloneChartForFileOutput() {
       text.style.fontStyle = computed.fontStyle;
       text.style.letterSpacing = computed.letterSpacing;
     });
-    return clone;
+    return applySvgTheme(clone);
   }
   finally { render(false, false, true); }
 }
@@ -2022,7 +2151,11 @@ async function exportChartImage(format = "jpeg") {
   const css = [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules].map(rule => rule.cssText); } catch { return []; } }).join("\n");
   const style = svgEl("style");
   style.textContent = `svg, text { font-family: ${getComputedStyle(document.body).fontFamily}; }\n${css}`;
-  documentSvg.append(style, svgEl("rect", { x: 0, y: 0, width: documentWidth, height: documentHeight, fill: "#081326" }));
+  const theme = chartThemePalette();
+  const documentBackground = svgEl("linearGradient", { id: "document-theme-base", x1: "0", y1: "0", x2: "1", y2: "1" });
+  appendThemeGradientStops(documentBackground, theme);
+  const documentDefs = svgEl("defs"); documentDefs.append(documentBackground);
+  documentSvg.append(style, documentDefs, svgEl("rect", { x: 0, y: 0, width: documentWidth, height: documentHeight, fill: "url(#document-theme-base)" }));
 
   const addText = (text, attrs = {}) => {
     const node = svgEl("text", { fill: "#f4f8ff", ...attrs });
@@ -2081,6 +2214,7 @@ async function exportChartImage(format = "jpeg") {
   addText(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: footerCenter, y: footerY + 15, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 8 });
   addText("© 2026 charavision", { x: footerCenter, y: footerY + 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 8, "font-weight": 700 });
 
+  applySvgTheme(documentSvg);
   const rootStyle = getComputedStyle(document.documentElement);
   let source = new XMLSerializer().serializeToString(documentSvg).replace(/var\((--[\w-]+)\)/g, (_, name) => rootStyle.getPropertyValue(name).trim());
   const blobUrl = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
@@ -2092,8 +2226,9 @@ async function exportChartImage(format = "jpeg") {
     canvas.width = exportWidth;
     canvas.height = exportHeight;
     const context = canvas.getContext("2d");
-    context.fillStyle = "#081326";
+    context.fillStyle = theme.dark;
     context.fillRect(0, 0, exportWidth, exportHeight);
+    context.filter = displayColorFilter();
     context.drawImage(image, 0, 0, exportWidth, exportHeight);
     const imageBlob = await new Promise((resolve, reject) => canvas.toBlob(
       blob => blob ? resolve(blob) : reject(new Error("Die Bildgröße konnte nicht verarbeitet werden.")),
@@ -2183,6 +2318,13 @@ function updateExportSummary() {
   els.exportSummary.textContent = `${fittedClusters.length} ${fittedClusters.length === 1 ? "Diagramm" : "Diagramme"} auf ${pages} ${pages === 1 ? "Seite" : "Seiten"}`;
 }
 
+function a4BarWidthForSlot(slot) {
+  const standard = Math.max(2, Math.min(34, slot * .68));
+  return state.outputBarWidth === "adapted" && slot > 50
+    ? Math.max(standard, Math.min(96, slot * .8))
+    : standard;
+}
+
 function buildA4Page(clusters, pageNumber, pageCount, layout) {
   const { width, height, columns } = layout;
   const rows = layout.sharedPollLegend
@@ -2191,11 +2333,12 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       ? layout.rows
       : Math.max(1, Math.min(layout.rows, Math.ceil(clusters.length / columns)));
   const page = svgEl("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${width} ${height}`, width, height });
+  const theme = chartThemePalette();
   const defs = svgEl("defs");
   const pageBase = svgEl("linearGradient", { id: "page-base", x1: "0", y1: "0", x2: "1", y2: "1" });
-  pageBase.append(svgEl("stop", { offset: "0", "stop-color": "#172744" }), svgEl("stop", { offset: ".7", "stop-color": "#081326" }), svgEl("stop", { offset: "1", "stop-color": "#050d1b" }));
+  appendThemeGradientStops(pageBase, theme);
   const pageGlow = svgEl("radialGradient", { id: "page-glow", cx: "50%", cy: "28%", r: "68%" });
-  pageGlow.append(svgEl("stop", { offset: "0", "stop-color": "#2a67a4", "stop-opacity": ".28" }), svgEl("stop", { offset: ".58", "stop-color": "#17385e", "stop-opacity": ".12" }), svgEl("stop", { offset: "1", "stop-color": "#081326", "stop-opacity": "0" }));
+  pageGlow.append(svgEl("stop", { offset: "0", "stop-color": theme.glow, "stop-opacity": ".28" }), svgEl("stop", { offset: ".58", "stop-color": theme.glowMiddle, "stop-opacity": ".12" }), svgEl("stop", { offset: "1", "stop-color": theme.dark, "stop-opacity": "0" }));
   const pageBarShadow = svgEl("filter", { id: "page-bar-shadow", x: "-80%", y: "-500%", width: "260%", height: "1100%" });
   pageBarShadow.append(svgEl("feGaussianBlur", { stdDeviation: 3.2 }));
   defs.append(pageBase, pageGlow, pageBarShadow);
@@ -2395,7 +2538,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
       : exportBreaks;
     const exportBlockGap = sharedExportBreaks ? Math.max(4, Math.min(10, fullRowPlotWidth * .008)) : 0;
     const slot = (fullRowPlotWidth - sharedExportBreaks * exportBlockGap) / slotCount;
-    const barWidth = Math.max(2, Math.min(34, slot * .68));
+    const barWidth = a4BarWidthForSlot(slot);
     const exportBarCenters = [];
     const otherPartyLinks = [];
     const otherPartyCards = [];
@@ -2610,7 +2753,7 @@ function buildA4Page(clusters, pageNumber, pageCount, layout) {
   text(`Quelle: Wahlrecht.de · Letzter Datenabruf: ${dataRetrievalStamp()}`, { x: width / 2, y: height - 46, "text-anchor": "middle", fill: "#8fa6c1", "font-size": 9 });
   text("© 2026 charavision", { x: width / 2, y: height - 30, "text-anchor": "middle", fill: "#dce8f7", "font-size": 9, "font-weight": 700 });
   text(`Seite ${pageNumber} / ${pageCount}`, { x: width - 42, y: height - 30, "text-anchor": "end", fill: "#dce8f7", "font-size": 12, "font-weight": 700 });
-  return page;
+  return applySvgTheme(page);
 }
 
 async function rasterizeA4Page(svg, mimeType, quality, layout) {
@@ -2619,7 +2762,7 @@ async function rasterizeA4Page(svg, mimeType, quality, layout) {
   try {
     const image = new Image(); image.src = url; await image.decode();
     const canvas = document.createElement("canvas"); canvas.width = layout.width * 2; canvas.height = layout.height * 2;
-    const context = canvas.getContext("2d"); context.fillStyle = "#081326"; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const context = canvas.getContext("2d"); context.fillStyle = chartThemePalette().dark; context.fillRect(0, 0, canvas.width, canvas.height); context.filter = displayColorFilter(); context.drawImage(image, 0, 0, canvas.width, canvas.height);
     return await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("A4-Seite konnte nicht erstellt werden.")), mimeType, quality));
   } finally { URL.revokeObjectURL(url); }
 }
@@ -2674,6 +2817,21 @@ function applyPreviewZoom() {
   });
 }
 
+function closePreviewOptions() {
+  document.querySelector("#preview-extra-options").classList.remove("is-open");
+  document.querySelector("#preview-options-toggle").setAttribute("aria-expanded", "false");
+}
+
+function syncPreviewToolbarMode() {
+  const compact = state.mobileView || window.matchMedia("(max-width: 900px)").matches;
+  els.previewDialog.classList.toggle("mobile-preview", compact);
+  if (!compact) closePreviewOptions();
+}
+
+function syncPreviewPageStatus() {
+  document.querySelector("#preview-mobile-page-status").textContent = els.previewPageStatus.textContent;
+}
+
 function setPreviewSplitPosition(clientX) {
   const minimum = 320;
   const maximum = Math.max(minimum, window.innerWidth - 320);
@@ -2701,6 +2859,7 @@ function setPreviewSplit(active) {
 }
 
 function closeExportPreview() {
+  closePreviewOptions();
   document.body.classList.remove("preview-split-active");
   els.previewDialog.classList.remove("preview-split");
   document.querySelector("#preview-split-toggle").setAttribute("aria-pressed", "false");
@@ -2892,6 +3051,8 @@ function buildExportPreview(preservePosition = false) {
     els.previewPages.append(chart);
     els.previewPageStatus.textContent = "Schlauchausgabe";
   }
+  syncUiColorControls();
+  syncPreviewPageStatus();
   if (els.previewDialog.open) applyPreviewZoom();
   if (preservePosition) {
     els.previewPages.scrollLeft = scrollLeft;
@@ -2906,11 +3067,13 @@ function scheduleOpenPreviewRefresh() {
   previewRefreshTimer = setTimeout(() => {
     if (!els.previewDialog.open) return;
     try { buildExportPreview(true); }
-    catch (error) { els.previewPageStatus.textContent = error.message; }
+    catch (error) { els.previewPageStatus.textContent = error.message; syncPreviewPageStatus(); }
   }, 200);
 }
 
 function showExportPreview() {
+  syncPreviewToolbarMode();
+  closePreviewOptions();
   buildExportPreview(false);
   els.previewDialog.showModal();
   requestAnimationFrame(applyPreviewZoom);
@@ -2986,6 +3149,176 @@ async function reportRequest(path, options = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || "Die Reportfunktion ist momentan nicht erreichbar.");
   return payload;
+}
+
+const UI_SETTING_KEYS = ["fullRegionNames", "showSinceElection", "changeMode", "sinceElectionMode", "showBrackets", "showLabels", "regionLabelMode", "partyLabelMode", "barColors", "barColorMode", "barStyle", "showPercentValues", "percentLabelMode", "showLut", "showBackground", "export3d", "chartTheme", "uiBrightness", "uiSaturation", "yAxisMode"];
+const OUTPUT_SETTING_KEYS = ["exportFormat", "a4Mode", "a4Orientation", "a4DiagramFormat", "outputBarWidth", "hideEmptyClusters"];
+const SETTINGS_ENUMS = {
+  changeMode: ["election", "development"], sinceElectionMode: ["color", "gray", "off"],
+  regionLabelMode: ["auto", "0", "90", "off"], partyLabelMode: ["auto", "0", "90", "off"],
+  barColorMode: ["party", "lightblue", "gray"], percentLabelMode: ["without", "with", "off"],
+  yAxisMode: ["dynamic", "static", "off"], a4Orientation: ["auto", "portrait", "landscape"],
+  a4DiagramFormat: ["auto", "1x1", "1x2", "1x3", "2x2", "2x3"], exportFormat: ["jpeg", "png", "pdf"]
+};
+let initialSettingsSnapshot = null;
+let standardSettingsSnapshot = null;
+let projectSettingsSnapshot = null;
+let settingsSlots = [];
+let settingsSlotLimit = 2;
+let standardSettingsSlot = 0;
+function captureSettingsSnapshot() {
+  const ui = Object.fromEntries(UI_SETTING_KEYS.map(key => [key, key === "yAxisMode" ? yAxisMode : state[key]]));
+  const output = Object.fromEntries(OUTPUT_SETTING_KEYS.map(key => [key, key === "exportFormat" ? document.querySelector("#export-format").value : state[key]]));
+  return { ui, output };
+}
+function sanitizeSettingsSnapshot(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Ungültiger Einstellungscode.");
+  const current = captureSettingsSnapshot();
+  const result = { ui: {}, output: {} };
+  for (const [section, keys] of [["ui", UI_SETTING_KEYS], ["output", OUTPUT_SETTING_KEYS]]) {
+    for (const key of keys) {
+      const candidate = value[section]?.[key];
+      if (candidate === undefined) continue;
+      if (typeof candidate !== typeof current[section][key]) throw new Error("Ungültiger Einstellungscode.");
+      if (SETTINGS_ENUMS[key] && !SETTINGS_ENUMS[key].includes(candidate)) throw new Error("Ungültiger Einstellungscode.");
+      result[section][key] = candidate;
+    }
+  }
+  if (!Object.keys(result.ui).length && !Object.keys(result.output).length) throw new Error("Der Code enthält keine Einstellungen.");
+  if (result.ui.chartTheme && !chartThemeOptions.some(([key]) => key === result.ui.chartTheme)) throw new Error("Ungültige Hintergrundfarbe im Code.");
+  if (result.ui.barStyle && !barStyleOptions.some(([key]) => key === result.ui.barStyle)) throw new Error("Ungültiger Balkenstil im Code.");
+  for (const key of ["uiBrightness", "uiSaturation"]) if (key in result.ui && (!Number.isInteger(result.ui[key]) || result.ui[key] < -50 || result.ui[key] > 50 || result.ui[key] % 5)) throw new Error("Ungültiger Farbwert im Code.");
+  if (result.output.outputBarWidth && !outputBarWidthOptions.some(([key]) => key === result.output.outputBarWidth)) throw new Error("Ungültige Balkenbreite im Code.");
+  return result;
+}
+function settingsCode(snapshot = captureSettingsSnapshot()) {
+  const bytes = new TextEncoder().encode(JSON.stringify(sanitizeSettingsSnapshot(snapshot)));
+  return `S1.${btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
+}
+function decodeSettingsCode(code) {
+  if (!/^S1\.[A-Za-z0-9_-]{8,2048}$/.test(code)) throw new Error("Bitte einen gültigen Einstellungscode eingeben.");
+  const encoded = code.slice(3).replace(/-/g, "+").replace(/_/g, "/");
+  try {
+    const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0));
+    return sanitizeSettingsSnapshot(JSON.parse(new TextDecoder().decode(bytes)));
+  } catch (error) { throw new Error("Der Einstellungscode ist beschädigt."); }
+}
+function applySettingsSnapshot(snapshot, { ui = true, output = true } = {}) {
+  const clean = sanitizeSettingsSnapshot(snapshot);
+  if (ui) for (const [key, value] of Object.entries(clean.ui)) {
+    if (key === "yAxisMode") yAxisMode = value;
+    else if (key === "barStyle") setBarStyle(value);
+    else state[key] = value;
+  }
+  if (output) for (const [key, value] of Object.entries(clean.output)) {
+    if (key === "exportFormat") document.querySelector("#export-format").value = value;
+    else state[key] = value;
+  }
+  els.fullRegionNames.checked = !state.fullRegionNames;
+  els.showSinceElection.checked = state.showSinceElection;
+  els.showBrackets.checked = state.showBrackets;
+  els.showLabels.checked = state.showLabels;
+  els.showBarColors.checked = state.barColors;
+  els.showPercentValues.checked = state.showPercentValues;
+  els.showLut.checked = state.showLut;
+  els.showBackground.checked = state.showBackground;
+  document.querySelector("#export-3d").checked = state.export3d;
+  document.querySelector("#a4-mode").checked = state.a4Mode;
+  document.querySelector(`input[name="output-shape"][value="${state.a4Mode ? "a4" : "tube"}"]`).checked = true;
+  setCycleButton(els.abbreviationMode, state.fullRegionNames ? "off" : "on", [["on", "An"], ["off", "Aus"]]);
+  setCycleButton(els.regionLabelMode, state.regionLabelMode, labelModeOptions.rotation);
+  setCycleButton(els.partyLabelMode, state.partyLabelMode, labelModeOptions.rotation);
+  setCycleButton(els.percentLabelMode, state.percentLabelMode, labelModeOptions.percent);
+  setCycleButton(els.barColorMode, state.barColorMode, [["party", "Parteifarben"], ["lightblue", "Hellblau"], ["gray", "Grau"]]);
+  setCycleButton(document.querySelector("#y-axis-mode"), yAxisMode, [["static", "Statisch"], ["dynamic", "Dynamisch"], ["off", "Aus"]]);
+  setCycleButton(document.querySelector("#background-mode"), state.showBackground ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
+  setCycleButton(document.querySelector("#brackets-mode"), state.showBrackets ? "on" : "off", [["on", "An"], ["off", "Aus"]]);
+  syncEmptyClusterControls();
+  updateA4Controls();
+  render(false);
+}
+function settingsDiffer(left, right) { return JSON.stringify(left) !== JSON.stringify(right); }
+async function loadStandardSettings() {
+  if (!reportApiUrl) return;
+  const response = await fetch(`${reportApiUrl}/settings/slots/public`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Standard konnte nicht geladen werden.");
+  const { standard } = await response.json();
+  standardSettingsSnapshot = standard?.settings ? sanitizeSettingsSnapshot(standard.settings) : initialSettingsSnapshot;
+}
+async function refreshSettingsSlots() {
+  if (currentReportRole) {
+    const result = await reportRequest("/settings/slots");
+    settingsSlots = result.slots || [];
+    settingsSlotLimit = result.limit;
+    standardSettingsSlot = result.standardSlot;
+  } else { settingsSlots = []; settingsSlotLimit = 0; standardSettingsSlot = 0; }
+  renderSettingsSlots();
+}
+function renderSettingsSlots() {
+  const list = document.querySelector("#settings-slot-list");
+  list.replaceChildren();
+  const addRow = (label, snapshot, { slot = 0, removable = false, global = false } = {}) => {
+    const row = document.createElement("div"); row.className = "settings-slot-row";
+    const use = document.createElement("button"); use.type = "button"; use.textContent = label;
+    use.disabled = !snapshot;
+    use.addEventListener("click", () => { applySettingsSnapshot(snapshot); document.querySelector("#settings-message").textContent = `${label} übernommen.`; });
+    row.append(use);
+    if (global) {
+      const mark = document.createElement("input"); mark.type = "checkbox"; mark.className = "settings-global-check"; mark.checked = slot === standardSettingsSlot; mark.disabled = !snapshot; mark.title = "Als globalen Standard festlegen";
+      mark.addEventListener("change", async () => {
+        try { await reportRequest("/settings/slots/standard", { method: "PUT", body: JSON.stringify({ slot }) }); await loadStandardSettings(); await refreshSettingsSlots(); }
+        catch (error) { mark.checked = !mark.checked; document.querySelector("#settings-message").textContent = error.message; }
+      }); row.append(mark);
+    }
+    if (removable) {
+      const remove = document.createElement("button"); remove.type = "button"; remove.className = "settings-slot-delete"; remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5"/></svg>'; remove.title = `Slot ${slot} löschen`; remove.setAttribute("aria-label", `Slot ${slot} löschen`); remove.disabled = !snapshot;
+      remove.addEventListener("click", async () => {
+        if (await openProjectActionDialog({ title: "Einstellungen löschen?", choices: [{ value: "delete", label: "Löschen", danger: true }] }) !== "delete") return;
+        await reportRequest(`/settings/slots/${slot}`, { method: "DELETE" }); await loadStandardSettings(); await refreshSettingsSlots();
+      }); row.append(remove);
+    }
+    list.append(row);
+  };
+  if (currentReportRole) for (let slot = 1; slot <= settingsSlotLimit; slot += 1) {
+    const saved = settingsSlots.find(item => item.slot === slot);
+    addRow(saved ? `${slot}. ${saved.title}` : `${slot}. Leer (überschreibbar)`, saved?.settings, { slot, removable: true, global: currentReportRole === "Admin" });
+  }
+  if (projectSettingsSnapshot) addRow("Projektsettings", projectSettingsSnapshot);
+  addRow("Standard", standardSettingsSnapshot || initialSettingsSnapshot);
+  document.querySelector("#settings-editor").hidden = !currentReportRole;
+}
+function askSettingsName() {
+  const dialog = document.querySelector("#settings-name-dialog");
+  const name = document.querySelector("#settings-name-input");
+  const slots = document.querySelector("#settings-save-slot");
+  name.value = ""; slots.replaceChildren();
+  for (let slot = 1; slot <= settingsSlotLimit; slot += 1) {
+    const saved = settingsSlots.find(item => item.slot === slot);
+    const option = document.createElement("option"); option.value = String(slot);
+    option.textContent = `${slot}. ${saved?.title || "Leer"}`; slots.append(option);
+  }
+  slots.value = String(Array.from({ length: settingsSlotLimit }, (_, index) => index + 1).find(slot => !settingsSlots.some(item => item.slot === slot)) || 1);
+  dialog.showModal(); requestAnimationFrame(() => name.focus());
+  return new Promise(resolve => dialog.addEventListener("close", () => resolve(dialog.returnValue === "save" ? { title: name.value.trim(), slot: Number(slots.value) } : null), { once: true }));
+}
+async function saveSettingsSlot() {
+  const message = document.querySelector("#settings-message");
+  const source = document.querySelector('input[name="settings-source"]:checked')?.value;
+  const snapshot = source === "code" ? decodeSettingsCode(document.querySelector("#settings-input-code").value.trim()) : captureSettingsSnapshot();
+  const ui = document.querySelector("#settings-save-ui").checked;
+  const output = document.querySelector("#settings-save-output").checked;
+  if (!ui && !output) throw new Error("Bitte UI und/oder Ausgabe auswählen.");
+  const selected = { ui: ui ? snapshot.ui : {}, output: output ? snapshot.output : {} };
+  const choice = await askSettingsName();
+  if (!choice) return;
+  if (!choice.title) throw new Error("Bitte eine Bezeichnung eingeben.");
+  if (settingsSlots.some(item => item.slot === choice.slot)) {
+    const confirmed = await openProjectActionDialog({ title: "Einstellungen überschreiben?", choices: [{ value: "overwrite", label: "Überschreiben", danger: true }] });
+    if (confirmed !== "overwrite") return;
+  }
+  await reportRequest(`/settings/slots/${choice.slot}`, { method: "PUT", body: JSON.stringify({ title: choice.title, settings: selected }) });
+  await refreshSettingsSlots();
+  message.textContent = `${choice.title} gespeichert.`;
 }
 
 const notificationRegions = Object.keys(REGION_CODES);
@@ -3280,7 +3613,7 @@ function applyDeveloperSettings() {
   const a4Choice = document.querySelector('input[name="output-shape"][value="a4"]')?.closest("label");
   if (a4Choice) a4Choice.hidden = !settings.a4Output.visible;
   document.querySelector("#a4-diagram-format-settings").hidden = !settings.a4DiagramFormat.visible;
-  const export3dChoice = document.querySelector("#export-3d")?.closest("label");
+  const export3dChoice = document.querySelector("#export-3d")?.closest(".ui-3d-option");
   if (export3dChoice) export3dChoice.hidden = !settings.export3d.visible;
   els.updateData.disabled = !settings.dataUpdate.value;
   els.viewSizeDown.disabled = !state.viewSizeEnabled;
@@ -3510,9 +3843,8 @@ async function loadReportAccounts() {
           const title = document.createElement("strong"); title.textContent = project.title;
           const detail = document.createElement("span"); detail.textContent = project.detail;
           projectButton.append(title, detail);
-          projectButton.addEventListener("click", () => {
-            applyConfigurationCode(project.configuration, { nativeLayout: true });
-            restoreSavedPollSelection(project.poll_selection);
+          projectButton.addEventListener("click", async () => {
+            if (!await openProjectConfiguration(project.configuration, project.poll_selection, project.settings)) return;
             els.inputCode.value = project.configuration;
             const dialog = document.querySelector("#report-dialog");
             dialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog");
@@ -3870,7 +4202,7 @@ async function startSimpleAppIntro() {
 }
 
 Promise.all([fetchLatestData(), fetchDeveloperSettings()])
-  .then(([data]) => {
+  .then(async ([data]) => {
     state.data = data;
     applyDeveloperSettings();
     els.mobileView.checked = state.mobileView;
@@ -3891,6 +4223,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     if (startsMobile) document.querySelector("#chart-view-settings").hidden = true;
     updateHeaderTimestamp(data);
     buildControls();
+    initialSettingsSnapshot = captureSettingsSnapshot();
+    standardSettingsSnapshot = initialSettingsSnapshot;
+    try { await loadStandardSettings(); if (standardSettingsSnapshot) applySettingsSnapshot(standardSettingsSnapshot); }
+    catch (error) { /* Offline mit den eingebauten Standardeinstellungen weiterarbeiten. */ }
     const sharedConfiguration = new URLSearchParams(window.location.search).get("config");
     if (sharedConfiguration) {
       try {
@@ -4144,10 +4480,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       els.fullscreenSettings.setAttribute("aria-expanded", String(open));
       if (open) viewPanel.scrollTop = 0;
       else {
-        document.querySelectorAll(".labels-choice, .lut-choice, .bar-colors-choice").forEach(choice => choice.classList.remove("is-open"));
+        document.querySelectorAll(".labels-choice, .lut-choice, .bar-colors-choice, .ui-choice").forEach(choice => choice.classList.remove("is-open"));
         els.labelsMenuToggle.setAttribute("aria-expanded", "false");
         document.querySelector("#lut-menu-toggle").setAttribute("aria-expanded", "false");
         els.barMenuToggle.setAttribute("aria-expanded", "false");
+        document.querySelector("#ui-menu-toggle").setAttribute("aria-expanded", "false");
       }
     };
     desktopViewButton.addEventListener("click", () => setViewMenuOpen(viewPanel.hidden));
@@ -4247,6 +4584,11 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         barChoice.classList.remove("is-open");
         els.barMenuToggle.setAttribute("aria-expanded", "false");
       }
+      const uiChoice = document.querySelector(".ui-choice");
+      if (uiChoice.classList.contains("is-open") && !uiChoice.contains(event.target)) {
+        uiChoice.classList.remove("is-open");
+        document.querySelector("#ui-menu-toggle").setAttribute("aria-expanded", "false");
+      }
       const mainPanel = document.querySelector("#chart-settings");
       const mainButton = document.querySelector("#settings-toggle");
       if (!mainPanel.hidden && !mainPanel.contains(event.target) && !mainButton.contains(event.target)) {
@@ -4276,6 +4618,15 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       catch (error) { els.exportMessage.textContent = `Vorschau fehlgeschlagen: ${error.message}`; }
     });
     document.querySelector("#close-preview").addEventListener("click", closeExportPreview);
+    document.querySelector("#preview-options-toggle").addEventListener("click", event => {
+      const menu = document.querySelector("#preview-extra-options");
+      const open = menu.classList.toggle("is-open");
+      event.currentTarget.setAttribute("aria-expanded", String(open));
+    });
+    els.previewDialog.addEventListener("click", event => {
+      if (!event.target.closest("#preview-extra-options, #preview-options-toggle")) closePreviewOptions();
+    });
+    window.addEventListener("resize", () => { if (els.previewDialog.open) syncPreviewToolbarMode(); });
     document.querySelector("#preview-split-toggle").addEventListener("click", () => setPreviewSplit(!document.body.classList.contains("preview-split-active")));
     els.previewDialog.addEventListener("click", event => { if (event.target === els.previewDialog && !document.body.classList.contains("preview-split-active")) closeExportPreview(); });
     els.previewZoom.addEventListener("input", applyPreviewZoom);
@@ -4292,6 +4643,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     const reportTabs = {
       "report-book-open": "report-book",
       "report-info-open": "report-info",
+      "report-settings-open": "report-settings",
       "report-notifications-open": "report-notifications",
       "report-projects-open": "report-projects",
       "report-accounts-open": "report-accounts",
@@ -4299,6 +4651,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       "report-app-open": "report-app"
     };
     const toggleReportTab = button => {
+      reportDialog.classList.remove("settings-panel-open");
       const targetId = reportTabs[button.id];
       const target = document.querySelector(`#${targetId}`);
       const willOpen = target.hidden;
@@ -4306,8 +4659,23 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector(`#${panelId}`).hidden = true;
         document.querySelector(`#${buttonId}`).classList.remove("active");
       });
-      if (willOpen) { target.hidden = false; button.classList.add("active"); }
+      if (willOpen) { target.hidden = false; button.classList.add("active"); document.querySelector("#report-title").textContent = { "report-book": "Meldebuch", "report-info": "Info", "report-projects": "Projekte", "report-accounts": "Accounts", "report-developer": "Mastereinstellungen", "report-app": "App", "report-notifications": "Benachrichtigungen" }[targetId] || "Info"; }
       return willOpen;
+    };
+    const openSettingsPanel = async () => {
+      reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog", "startup-login-dialog");
+      document.body.classList.remove("startup-project-open");
+      reportDialog.classList.add("settings-panel-open");
+      Object.entries(reportTabs).forEach(([buttonId, panelId]) => {
+        document.querySelector(`#${panelId}`).hidden = true;
+        document.querySelector(`#${buttonId}`).classList.remove("active");
+      });
+      document.querySelector("#report-settings").hidden = false;
+      document.querySelector("#report-settings-open").classList.add("active");
+      document.querySelector("#report-title").textContent = "Grundeinstellungen";
+      try { await loadStandardSettings(); await refreshSettingsSlots(); }
+      catch (error) { document.querySelector("#settings-message").textContent = error.message; renderSettingsSlots(); }
+      if (!reportDialog.open) reportDialog.showModal();
     };
     const pinFields = [...document.querySelectorAll("#report-pin input")];
     const focusFirstReportPin = () => {
@@ -4379,6 +4747,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       });
     });
     document.querySelector("#report-open").addEventListener("click", () => {
+      reportDialog.classList.remove("settings-panel-open");
       reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog");
       document.querySelector("#report-title").textContent = "Info";
       document.querySelector("#project-picker-output").hidden = true;
@@ -4397,6 +4766,16 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       }
     });
     document.querySelector("#report-close").addEventListener("click", () => { reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog"); reportDialog.close(); });
+    document.querySelector("#guest-settings-open").addEventListener("click", openSettingsPanel);
+    document.querySelector("#report-settings-open").addEventListener("click", openSettingsPanel);
+    document.querySelectorAll('input[name="settings-source"]').forEach(input => input.addEventListener("change", () => {
+      document.querySelector("#settings-input-code").hidden = document.querySelector('input[name="settings-source"]:checked')?.value !== "code";
+    }));
+    document.querySelector("#settings-save-open").addEventListener("click", () => saveSettingsSlot().catch(error => { document.querySelector("#settings-message").textContent = error.message; }));
+    document.querySelector("#settings-copy-code").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(settingsCode()); document.querySelector("#settings-message").textContent = "Einstellungscode kopiert."; }
+      catch (error) { document.querySelector("#settings-message").textContent = "Einstellungscode konnte nicht kopiert werden."; }
+    });
     document.querySelector("#report-login").addEventListener("submit", async event => {
       event.preventDefault();
       const message = document.querySelector("#report-login-message");
@@ -4414,6 +4793,7 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
         document.querySelector("#report-login").hidden = true;
         document.querySelector("#report-info").hidden = true;
         document.querySelector("#report-session").hidden = false;
+        document.querySelector("#guest-settings-open").hidden = true;
         document.querySelector("#report-accounts-open").hidden = currentReportRole !== "Admin";
         document.querySelector("#report-notifications-open").hidden = currentReportRole !== "Admin" && !window.AndroidApp?.getNotificationSettings;
         document.querySelector("#report-app-open").hidden = false;
@@ -4455,6 +4835,8 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       document.querySelector("#save-project").hidden = true;
       document.querySelector("#project-picker-toggle").hidden = true;
       document.querySelector("#report-login").hidden = false;
+      document.querySelector("#guest-settings-open").hidden = false;
+      reportDialog.classList.remove("settings-panel-open");
       document.querySelector("#report-login-message").textContent = "";
       focusFirstReportPin();
     });
@@ -4523,12 +4905,12 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       });
     });
     document.querySelector("#project-picker-toggle").addEventListener("click", () => openProjectPicker(true).catch(error => { document.querySelector("#project-code-message").textContent = error.message; }));
-    document.querySelector("#project-code-input").addEventListener("submit", event => {
+    document.querySelector("#project-code-input").addEventListener("submit", async event => {
       event.preventDefault();
       const input = document.querySelector("#project-input-code");
       const message = document.querySelector("#project-code-message");
       try {
-        applyConfigurationCode(input.value.trim(), { nativeLayout: true });
+        if (!await openProjectConfiguration(input.value.trim())) return;
         els.inputCode.value = input.value.trim();
         reportDialog.classList.remove("project-picker-dialog", "startup-project-dialog", "guest-project-dialog");
         reportDialog.close();
@@ -4543,10 +4925,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
       const button = event.currentTarget;
       const message = document.querySelector("#project-save-message");
       button.disabled = true;
-      const projectName = await askProjectName();
-      if (projectName === null) { button.disabled = false; return; }
       try {
-        const saved = await saveCurrentProject(projectName);
+        const selection = await askProjectName();
+        if (selection === null) return;
+        const saved = await saveCurrentProject(selection.name, selection.slot, selection.projects);
         if (saved) { savedProjectConfiguration = saved; message.textContent = "Projekt zentral gespeichert."; await loadProjects(); }
         else message.textContent = "Speichern abgebrochen.";
       }
@@ -4563,10 +4945,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     document.querySelector("#save-project").addEventListener("click", async () => {
       const button = document.querySelector("#save-project");
       button.disabled = true;
-      const projectName = await askProjectName();
-      if (projectName === null) { button.disabled = false; return; }
       try {
-        const saved = await saveCurrentProject(projectName);
+        const selection = await askProjectName();
+        if (selection === null) return;
+        const saved = await saveCurrentProject(selection.name, selection.slot, selection.projects);
         if (saved) { savedProjectConfiguration = saved; els.exportMessage.textContent = "Projekt zentral gespeichert."; }
         else els.exportMessage.textContent = "Speichern abgebrochen.";
       }
@@ -4624,6 +5006,22 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     const exportFormat = document.querySelector("#export-format");
     const a4Mode = document.querySelector("#a4-mode");
     const export3d = document.querySelector("#export-3d");
+    document.querySelector("#ui-menu-toggle").addEventListener("click", event => {
+      const choice = event.currentTarget.closest(".ui-choice");
+      const open = choice.classList.toggle("is-open");
+      event.currentTarget.setAttribute("aria-expanded", String(open));
+    });
+    for (const [name, key] of [["brightness", "uiBrightness"], ["saturation", "uiSaturation"]]) {
+      document.querySelector(`#ui-${name}`).addEventListener("input", event => {
+        state[key] = Number(event.currentTarget.value);
+        syncUiColorControls();
+        if (state.data) updateConfigurationCode();
+      });
+    }
+    document.querySelector("#ui-color-mode").addEventListener("click", event => {
+      state.chartTheme = advanceCycleButton(event.currentTarget, chartThemeOptions);
+      render(false);
+    });
     export3d.addEventListener("change", event => {
       state.export3d = event.currentTarget.checked;
       render(false);
@@ -4646,8 +5044,10 @@ Promise.all([fetchLatestData(), fetchDeveloperSettings()])
     }));
     document.querySelector("#a4-orientation-cycle").addEventListener("click", cycleA4Orientation);
     document.querySelector("#a4-diagram-format-cycle").addEventListener("click", cycleA4DiagramFormat);
+    document.querySelector("#output-bar-width-cycle").addEventListener("click", cycleOutputBarWidth);
     document.querySelector("#preview-a4-orientation").addEventListener("click", cycleA4Orientation);
     document.querySelector("#preview-a4-format").addEventListener("click", cycleA4DiagramFormat);
+    document.querySelector("#preview-bar-width").addEventListener("click", cycleOutputBarWidth);
     document.querySelector("#preview-download").addEventListener("click", () => document.querySelector("#export-file").click());
     document.querySelector("#copy-config-link").addEventListener("click", async () => {
       try {
