@@ -234,6 +234,7 @@ body.physical-mobile:not(.mobile-mode) .next-election { font-size: 8px; }
 .other-party-popover[hidden] { display: none !important; }
 .other-party-popover .party-choice label { min-height: 34px; padding: 7px 9px; font-size: 12px; white-space: nowrap; }
 .other-party-popover .party-choice label::before { width: 8px; height: 8px; }
+.other-party-popover { position: fixed; z-index: 10020; top: 0; right: auto; max-height: min(390px, calc(100dvh - 20px)); overflow-y: auto; box-sizing: border-box; min-width: 210px; scrollbar-width: thin; }
 #party-cdu-csu + label { border-color: rgba(174,184,196,.4); box-shadow: 0 0 7px rgba(154,164,176,.1); }
 #party-cdu-csu:checked + label { border-color: #9da6b1; box-shadow: 0 0 10px rgba(157,166,177,.22), inset 0 0 0 1px rgba(255,255,255,.04); }
 .poll-picker { margin-top: 24px; }
@@ -242,6 +243,12 @@ body.physical-mobile:not(.mobile-mode) .next-election { font-size: 8px; }
 .poll-time-switch { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 0 0 10px; }
 .poll-time-switch button { min-height: 31px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgba(8,23,43,.68); color: var(--muted); cursor: pointer; font: inherit; font-size: 12px; font-weight: 750; }
 .poll-time-switch button.active { border-color: var(--accent); background: rgba(30,77,116,.92); color: var(--ink); box-shadow: 0 0 12px rgba(89,217,255,.12); }
+.poll-source-filter { display: grid; grid-template-columns: minmax(0, auto) minmax(130px, 1fr); align-items: center; gap: 8px; margin: 0 0 10px; }
+.poll-source-switch { display: inline-flex; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: rgba(8,23,43,.68); }
+.poll-source-switch button { min-height: 34px; padding: 6px 10px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 11px; font-weight: 750; }
+.poll-source-switch button:last-child { border-right: 0; }
+.poll-source-switch button.active { background: rgba(30,77,116,.92); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+#poll-source-select { width: 100%; min-width: 0; min-height: 34px; padding: 6px 28px 6px 10px; border: 1px solid var(--line); border-radius: 9px; background: #10233d; color: var(--ink); font: inherit; font-size: 12px; }
 .poll-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .poll-option-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; min-width: 0; }
 .poll-calendar-wrap { position: relative; display: flex; align-items: center; }
@@ -262,6 +269,7 @@ body.physical-mobile:not(.mobile-mode) .next-election { font-size: 8px; }
 .average-choice label::before { display: grid; place-items: center; flex: 0 0 auto; width: 16px; height: 16px; border: 1px solid #6e87a5; border-radius: 3px; content: ""; font-size: 12px; font-weight: 900; line-height: 1; }
 .average-choice input:checked + label::before { border-color: var(--accent); background: var(--accent); color: #071225; content: "✓"; }
 .chart-section { position: relative; margin-top: 18px; padding: 30px clamp(18px, 3vw, 34px) 22px; border: 1px solid var(--line); border-radius: 22px; background: rgba(10,24,45,.72); }
+.empty-cluster-label { fill: #b9cbe0; fill-opacity: .62; font-size: 13px; font-weight: 700; letter-spacing: .01em; }
 .settings-toggle { position: static; z-index: 4; grid-column: 2; grid-row: 2; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: #8fa6c1; cursor: pointer; font-size: 22px; text-shadow: none; }
 .settings-popover { position: absolute; z-index: 5; right: 16px; bottom: 72px; min-width: 190px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #0d1d34; box-shadow: 0 18px 40px rgba(0,0,0,.4); }
 .settings-popover strong { display: block; margin-bottom: 10px; }
@@ -549,10 +557,11 @@ body.view-fullscreen-active .fullscreen-report-tools .view-switch { margin-top: 
 .chart-unit-label { fill: #8fa6c1; font-size: 9px; font-weight: 400; letter-spacing: .025em; }
 .poll-label { fill: #e8f0fa; font-size: 12px; font-weight: 700; }
 .party-label { fill: #e8f0fa; font-size: 12px; font-weight: 700; }
-.bar-glow { stroke-width: 1.43; pointer-events: none; }
-.bar { stroke-width: 1.43; transition: fill-opacity .15s, stroke-opacity .15s, stroke-width .15s; }
-.bar:hover { fill-opacity: .84; stroke-opacity: 1; stroke-width: 1.77; }
-.bar.matte-bar, .bar.matte-bar:hover { stroke-width: .01px; stroke-opacity: .12; }
+.bar-glow { stroke-width: 1.28; pointer-events: none; }
+.bar-sheen { pointer-events: none; }
+.bar { stroke-width: .56; transition: fill-opacity .15s, stroke-opacity .15s, stroke-width .15s; }
+.bar:hover { fill-opacity: .84; stroke-opacity: 1; stroke-width: .76; }
+.bar.matte-bar, .bar.matte-bar:hover { stroke-width: .008px; stroke-opacity: .12; }
 .bar-value { fill: #fff; fill-opacity: .8; stroke-opacity: .8; font-size: 10.5px; font-weight: 800; paint-order: stroke; stroke: #071225; stroke-width: 1.8px; stroke-linejoin: round; }
 .other-party-values { pointer-events: none; }
 .other-party-value-link { fill: none; stroke: rgba(210,225,242,.68); stroke-width: .8px; }
@@ -609,6 +618,10 @@ body.view-fullscreen-active .fullscreen-report-tools .view-switch { margin-top: 
 .export-settings-panel fieldset { padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
 .export-settings-panel legend { color: var(--muted); font-size: 11px; font-weight: 800; }
 .export-settings-panel select { min-width: 120px; padding: 7px; border: 1px solid var(--line); border-radius: 7px; background: #071326; color: white; }
+.export-settings-panel .empty-clusters-choice { display: flex; align-items: center; gap: 8px; margin: 2px 0 0; color: var(--ink); font-size: 12px; font-weight: 750; }
+.empty-clusters-choice input, .preview-empty-clusters-choice input { accent-color: var(--accent); }
+.preview-header .preview-empty-clusters-choice { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 10px; font-weight: 750; white-space: nowrap; }
+.preview-header .preview-empty-clusters-choice input { width: 15px; height: 15px; margin: 0; }
 .export-cycle-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0 0 12px; }
 .export-cycle-setting > span { color: var(--muted); font-size: 12px; font-weight: 800; }
 .export-cycle-setting button { min-width: 108px; min-height: 36px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; background: #102744; color: var(--ink); cursor: pointer; font-weight: 800; }
@@ -915,6 +928,7 @@ body.view-fullscreen-active .fullscreen-logo small,
   .preview-dialog .preview-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 9px; }
   .preview-dialog .preview-header > div:first-child { display: flex; min-width: 0; align-items: baseline; }
   .preview-dialog .preview-header .preview-zoom { grid-column: 1 / -1; grid-row: 2; justify-self: center; gap: 6px; margin-left: 0; }
+  .preview-dialog .preview-empty-clusters-choice { grid-column: 1 / -1; justify-self: center; }
   .preview-dialog #close-preview { grid-column: 2; grid-row: 1; display: block; flex: none; }
   .preview-zoom input { width: 82px; }
   .preview-zoom output { min-width: 40px; font-size: 9px; }
@@ -935,6 +949,9 @@ body.view-fullscreen-active .fullscreen-logo small,
   .party-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
   .party-choice label { justify-content: center; gap: 4px; min-height: 34px; padding: 5px 3px; font-size: 8.5px; white-space: nowrap; }
   .party-choice label::before { flex: 0 0 3px; width: 3px; height: 18px; margin-right: 1px; border-radius: 2px; }
+  .poll-source-filter { grid-template-columns: minmax(0, auto) minmax(105px, 1fr); gap: 5px; }
+  .poll-source-switch button { min-height: 31px; padding: 5px 7px; font-size: 9px; }
+  #poll-source-select { min-height: 31px; padding: 5px 22px 5px 7px; font-size: 10px; }
   .poll-options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
   .poll-actions { grid-template-columns: minmax(0, 1fr) 48px; gap: 5px; }
   .desktop-poll-hint { display: none; }
@@ -1078,4 +1095,134 @@ body:not(.mobile-mode).view-fullscreen-active.fullscreen-selection-open .tab-gro
   position: static;
   padding-bottom: 0;
   background: none;
+}
+
+/* The selection panel scrolls, but its tabs and nested party choices stay intact. */
+body.view-fullscreen-active.fullscreen-selection-open .selection-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  min-height: 52px;
+  overflow: visible;
+  align-items: stretch;
+  background: #10243e;
+  border-radius: 0;
+}
+body.view-fullscreen-active.fullscreen-selection-open .selection-tabs button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border-radius: 0;
+  box-shadow: none;
+  line-height: 1.15;
+  white-space: normal;
+  text-align: center;
+}
+body.view-fullscreen-active.fullscreen-selection-open .selection-tabs button:first-child,
+body.view-fullscreen-active.fullscreen-selection-open .selection-tabs button:last-child {
+  border-radius: 0;
+}
+body.view-fullscreen-active.fullscreen-selection-open .selection-tabs button:focus-visible,
+.other-party-popover .party-choice input:focus-visible + label {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+/* Floating view settings use one consistent card; expanded groups stay inside it. */
+body.mobile-mode .chart-view-settings,
+body.view-fullscreen-active .chart-section .chart-view-settings {
+  top: 50%;
+  bottom: auto;
+  width: min(320px, calc(100vw - 40px));
+  max-height: calc(100dvh - 32px);
+  align-content: start;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  justify-content: stretch;
+  justify-items: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transform: translate(-50%, -50%);
+  scrollbar-width: thin;
+}
+body.mobile-mode .chart-view-settings .is-open > .labels-menu-toggle,
+body.mobile-mode .chart-view-settings .is-open > .bar-menu-toggle,
+body.mobile-mode .chart-view-settings .is-open > .lut-menu-toggle,
+body.view-fullscreen-active .chart-view-settings .is-open > .labels-menu-toggle,
+body.view-fullscreen-active .chart-view-settings .is-open > .bar-menu-toggle,
+body.view-fullscreen-active .chart-view-settings .is-open > .lut-menu-toggle {
+  width: 100%;
+  margin-left: 0;
+}
+body.mobile-mode .chart-view-settings .label-options,
+body.mobile-mode .chart-view-settings .bar-options,
+body.mobile-mode .chart-view-settings .lut-options,
+body.view-fullscreen-active .chart-view-settings .label-options,
+body.view-fullscreen-active .chart-view-settings .bar-options,
+body.view-fullscreen-active .chart-view-settings .lut-options {
+  position: static;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 7px 0 3px;
+  transform: none;
+}
+body.mobile-mode .chart-view-settings .choice label,
+body.mobile-mode .chart-view-settings .labels-menu-toggle,
+body.mobile-mode .chart-view-settings .bar-menu-toggle,
+body.mobile-mode .chart-view-settings .lut-menu-toggle,
+body.view-fullscreen-active .chart-view-settings .choice label,
+body.view-fullscreen-active .chart-view-settings .labels-menu-toggle,
+body.view-fullscreen-active .chart-view-settings .bar-menu-toggle,
+body.view-fullscreen-active .chart-view-settings .lut-menu-toggle {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+}
+body.mobile-mode .chart-view-settings .label-option-row,
+body.mobile-mode .chart-view-settings .bar-option-row,
+body.mobile-mode .chart-view-settings .lut-option-row,
+body.view-fullscreen-active .chart-view-settings .label-option-row,
+body.view-fullscreen-active .chart-view-settings .bar-option-row,
+body.view-fullscreen-active .chart-view-settings .lut-option-row {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.chart-view-settings .change-options-group {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid rgba(137,176,215,.62);
+  border-radius: 10px;
+  background: rgba(48,78,112,.72);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 4px 14px rgba(0,0,0,.16);
+}
+.chart-view-settings .change-options-group .label-option-row,
+.chart-view-settings .change-options-group .label-option-row + .label-option-row {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.chart-view-settings .change-options-group .label-option-row + .label-option-row {
+  border-top: 1px solid rgba(137,176,215,.4);
+}
+.chart-view-settings .change-options-group .label-option-row:hover,
+.chart-view-settings .change-options-group .label-option-row:focus-visible {
+  background: rgba(42,72,108,.97);
+}
+body.preview-split-active.view-fullscreen-active .chart-section .chart-view-settings {
+  transform: translate(-50%, -50%);
 }

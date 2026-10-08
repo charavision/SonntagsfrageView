@@ -28,16 +28,17 @@ const reportUsers = [
 ];
 
 const developerFeatureKeys = ["intro", "deviceForce", "tabMode", "dataUpdate", "pollDateSelection", "abbreviations", "sinceElection", "brackets", "labels", "regionLabelMode", "partyLabelMode", "percentLabelMode", "sinceElectionMode", "barColors", "barColorMode", "barNeon", "percentValues", "lut", "yAxisMode", "background", "viewSize", "uiScale", "fullscreen", "fullscreenDefault", "helperAppAccess", "helperAndroidAccess", "helperMacAccess", "helperIntroAccess", "preview", "a4Output", "a4DiagramFormat", "export3d"];
-const developerOptions = { regionLabelMode: ["auto", "0", "90", "off"], partyLabelMode: ["auto", "0", "90", "off"], percentLabelMode: ["with", "without", "off"], sinceElectionMode: ["color", "gray", "off"], barColorMode: ["party", "lightblue", "gray"], yAxisMode: ["static", "dynamic", "off"] };
-const developerDefaultValue = (key, platform) => ({ deviceForce: platform, regionLabelMode: "auto", partyLabelMode: "auto", percentLabelMode: "without", sinceElectionMode: "color", barColorMode: "party", yAxisMode: "static" }[key] ?? !["export3d", "tabMode", "helperAppAccess", "helperAndroidAccess", "helperMacAccess", "helperIntroAccess", "pollDateSelection"].includes(key));
+const developerOptions = { regionLabelMode: ["auto", "0", "90", "off"], partyLabelMode: ["auto", "0", "90", "off"], percentLabelMode: ["with", "without", "off"], sinceElectionMode: ["color", "gray", "off"], barColorMode: ["party", "lightblue", "gray"], barNeon: ["neon", "matt", "hell"], yAxisMode: ["static", "dynamic", "off"] };
+const developerDefaultValue = (key, platform) => ({ deviceForce: platform, regionLabelMode: "auto", partyLabelMode: "auto", percentLabelMode: "without", sinceElectionMode: "color", barColorMode: "party", barNeon: "neon", yAxisMode: "static" }[key] ?? !["export3d", "tabMode", "helperAppAccess", "helperAndroidAccess", "helperMacAccess", "helperIntroAccess", "pollDateSelection"].includes(key));
 const developerDefaults = {
   mobile: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: !key.startsWith("helper"), value: developerDefaultValue(key, "mobile") }])),
   desktop: Object.fromEntries(developerFeatureKeys.map(key => [key, { visible: !key.startsWith("helper"), value: developerDefaultValue(key, "desktop") }]))
 };
 const sanitizeDeveloperSettings = input => Object.fromEntries(["mobile", "desktop"].map(platform => [platform,
   Object.fromEntries(developerFeatureKeys.map(key => {
-    const candidate = input?.[platform]?.[key] || {};
-    const fallback = developerDefaults[platform][key];
+    const candidate = { ...(input?.[platform]?.[key] || {}) };
+    if (key === "barNeon" && typeof candidate.value === "boolean") candidate.value = candidate.value ? "neon" : "matt";
+    const fallback = key === "barNeon" ? { ...developerDefaults[platform][key], value: "neon" } : developerDefaults[platform][key];
     return [key, {
       visible: typeof candidate.visible === "boolean" ? candidate.visible : fallback.visible,
       value: key === "deviceForce"
@@ -95,7 +96,9 @@ const sanitizePollSelection = value => {
     return Number.isInteger(rank) && rank >= 0 && rank < 10000 ? rank : fallback;
   });
   const mode = ["current", "from", "free"].includes(value.mode) ? value.mode : (value.dateMode ? "free" : "current");
-  return { mode, dateMode: mode !== "current", dateLabels, rankOverrides };
+  const sourceMode = value.sourceMode === "client" ? "client" : "institute";
+  const sourceValue = typeof value.sourceValue === "string" ? value.sourceValue.trim().slice(0, 120) : "";
+  return { mode, dateMode: mode !== "current", dateLabels, rankOverrides, sourceMode, sourceValue };
 };
 
 const parsePollSelection = value => {
@@ -217,7 +220,7 @@ export default {
       const title = String(payload.title || "Sonntagsfragen").trim().slice(0, 100) || "Sonntagsfragen";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
       const pollSelection = sanitizePollSelection(payload.pollSelection);
-      if (!/^[0-9A-Za-z]{13,25}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
+      if (!/^[0-9A-Za-z]{13,27}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       const existing = await env.REPORTS.prepare("SELECT id FROM projects WHERE user_id = ? AND configuration = ? LIMIT 1").bind(reporter.id, configuration).first();
       if (!existing) {
@@ -236,7 +239,7 @@ export default {
       const title = String(payload.title || "Unbenannt").trim().slice(0, 100) || "Unbenannt";
       const detail = String(payload.detail || "Aktuelle Konfiguration").trim().slice(0, 240) || "Aktuelle Konfiguration";
       const pollSelection = sanitizePollSelection(payload.pollSelection);
-      if (!/^[0-9A-Za-z]{13,25}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
+      if (!/^[0-9A-Za-z]{13,27}$/.test(configuration)) return json({ error: "Die Konfiguration ist nicht gültig." }, 400, origin);
       await ensureProjectsTable(env);
       try {
         const result = await env.REPORTS.prepare("UPDATE projects SET configuration = ?, title = ?, detail = ?, poll_selection = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ?").bind(configuration, title, detail, pollSelection ? JSON.stringify(pollSelection) : null, decodeURIComponent(projectMatch[1]), reporter.id).run();
